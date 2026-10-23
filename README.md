@@ -47,6 +47,8 @@ Under **Indstillinger → Funktioner** vælger du blandt andet planlægning, ver
 
 *Funktionerne styrer, hvilke arbejdsgange og instruktioner Aura stiller til rådighed. De er ikke en sikkerheds- eller myndighedsgodkendelse.*
 
+Designfunktionen indeholder også [Aura-design til dine apps](docs/aura-design-skill.md): en genbrugelig metode til brandkilder, designretning, farver, temaer og appmønstre i dit projekt. Den følger det eksisterende designvalg og ændrer ikke Auras egen brugerflade eller godkendelser.
+
 ## Brug Aura i terminalen
 
 Aura CLI giver adgang til samme kodeagent, regler og modelforbindelser fra terminalen. Du kan planlægge, gennemgå filændringer, se preview i browseren og genoptage samtalen. Git-versioner, projektkommandoer og testudgivelser kræver din godkendelse.
@@ -57,7 +59,7 @@ CLI'en kræver Node 22.12 eller nyere, npm og Git. Hent pakken og vejledningen t
 
 ## Brug dit eget kodeværktøj
 
-Aura Harness kan også bruges uden desktopappen. Grundreglerne og de 12 skills er læsbare tekstfiler, som kodeagenten kan bruge til afgrænsning, arkitektur, design, kodning, afprøvning, data og drift.
+Aura Harness kan også bruges uden desktopappen. Grundreglerne og de 13 skills er læsbare tekstfiler, som kodeagenten kan bruge til afgrænsning, arkitektur, design, kodning, afprøvning, data og drift.
 
 Der er pakker til blandt andet Claude Code, Codex, OpenCode, Cursor, GitHub Copilot, Gemini CLI, Mistral Vibe og Zed. Lovable får en tekst til platformens egne felter. Se [kataloget og de enkelte skills](https://github.com/ai-alliancen-org/ai-harness/blob/main/profiles/SKILLS.md).
 

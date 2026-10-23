@@ -1,0 +1,233 @@
+{
+  "schemaVersion": 1,
+  "reviewedAt": "2026-10-23",
+  "target": {
+    "repository": "ai-alliancen-org/ai-harness",
+    "base": "dce68ea74a199ca214ab535a16ff22765d8ee8de",
+    "version": "0.6.0-beta.1"
+  },
+  "source": {
+    "repository": "Parthee-Vijaya/skills_claude",
+    "path": "aura-design",
+    "revision": "88ef16cf3f8916911f5f26cb5a334dbdf332d1f5",
+    "version": "1.1",
+    "originalFiles": 18
+  },
+  "runtime": {
+    "node": "22.23.3",
+    "opencode": "1.18.33",
+    "electron": "44.4.4",
+    "platform": "macOS Apple Silicon"
+  },
+  "status": "ready-for-review-with-existing-baseline-failures",
+  "tests": {
+    "focused": {
+      "tests": 38,
+      "pass": 38,
+      "fail": 0,
+      "skipped": 0
+    },
+    "desktop": {
+      "tests": 523,
+      "pass": 521,
+      "fail": 2,
+      "skipped": 0
+    },
+    "cli": {
+      "tests": 26,
+      "pass": 26,
+      "fail": 0,
+      "skipped": 0
+    },
+    "baselineApprovals": {
+      "tests": 5,
+      "pass": 3,
+      "fail": 2,
+      "skipped": 0
+    },
+    "existingFailures": [
+      {
+        "file": "desktop/tests/approvals.test.cjs",
+        "line": 47,
+        "error": "Godkendelsen findes ikke længere."
+      },
+      {
+        "file": "desktop/tests/approvals.test.cjs",
+        "line": 74,
+        "error": "Cannot read properties of undefined (reading 'properties')"
+      }
+    ],
+    "actualEngine": {
+      "status": "bestået",
+      "results": [
+        {
+          "git": true,
+          "mode": "free",
+          "skills": 5,
+          "checks": 12
+        },
+        {
+          "git": false,
+          "mode": "free",
+          "skills": 5,
+          "checks": 11
+        },
+        {
+          "git": true,
+          "mode": "plan",
+          "skills": 5,
+          "checks": 12
+        }
+      ],
+      "checks": [
+        "kun aktive skills vises for modellen",
+        "aktiv skill hentes",
+        "skillens reference læses uden spørgsmål",
+        "ikke valgt privat reference afvises",
+        "valgt reference læses",
+        "OpenCodes egen skill skjult",
+        "skill under slået fra funktion findes ikke i motoren",
+        ".env og .git afvist",
+        "valgt integration og dens reference hentes",
+        "Aura-design og dens annoncerede brandreference hentes",
+        "projektets AGENTS.md indlæses ikke",
+        "med og uden Git",
+        "også under planlægning"
+      ]
+    },
+    "workbenchLoading": {
+      "status": "bestået",
+      "scenarios": [
+        {
+          "surface": "desktop",
+          "mode": "chat",
+          "modelRequests": 8,
+          "paidRequests": 0,
+          "checks": [
+            "projektregler med kilde",
+            "ny gennemgang og modelsession ved ændring",
+            "kun valgte skills",
+            "skill og reference læst",
+            "fravalgt skill afvist"
+          ]
+        },
+        {
+          "surface": "desktop",
+          "mode": "plan",
+          "modelRequests": 8,
+          "paidRequests": 0,
+          "checks": [
+            "projektregler med kilde",
+            "ny gennemgang og modelsession ved ændring",
+            "kun valgte skills",
+            "skill og reference læst",
+            "fravalgt skill afvist"
+          ]
+        },
+        {
+          "surface": "cli",
+          "mode": "free",
+          "modelRequests": 8,
+          "paidRequests": 0,
+          "checks": [
+            "projektregler med kilde",
+            "ny gennemgang og modelsession ved ændring",
+            "kun valgte skills",
+            "skill og reference læst",
+            "fravalgt skill afvist"
+          ]
+        }
+      ]
+    },
+    "native": {
+      "before": {
+        "status": "passed",
+        "checks": [
+          "Design remains an existing feature in unchanged UI",
+          "Feature information lists existing accessibility skill",
+          "Original baseline does not list new app design skill",
+          "New app design skill absent in original instruction selector",
+          "No renderer errors",
+          "No renderer HTTP(S) requests to external origins; no model calls initiated",
+          "Project instructions were not rewritten"
+        ],
+        "rendererErrors": [],
+        "externalRendererOrigins": []
+      },
+      "after": {
+        "status": "passed",
+        "checks": [
+          "Design remains an existing feature in unchanged UI",
+          "Feature information lists existing accessibility skill",
+          "Feature information automatically includes new app design skill",
+          "New app design skill visible in existing instruction selector",
+          "Skill content readable through native instruction dialog",
+          "Brand and theme references visible in actual content",
+          "Project-only customization saved using existing controls",
+          "Project customization retained after a normal app restart",
+          "Existing reset restores exact shared skill",
+          "Project design exception disables new skill together with existing design feature",
+          "Re-enabling design re-enables skill through existing controls",
+          "No renderer errors",
+          "No renderer HTTP(S) requests to external origins; no model calls initiated",
+          "Project instructions were not rewritten"
+        ],
+        "rendererErrors": [],
+        "externalRendererOrigins": []
+      }
+    },
+    "exports": {
+      "archives": 23,
+      "ordinarySkills": 13,
+      "optInIntegrations": 4,
+      "filesMatchInstaller": true,
+      "reproducible": true,
+      "localLinksChecked": true
+    }
+  },
+  "invariants": {
+    "hostUiCodeChanged": false,
+    "productionCoreChanged": false,
+    "permissionCodeChanged": false,
+    "dependenciesChanged": false,
+    "newAutomaticExecution": false,
+    "newAutomaticNetwork": false
+  },
+  "skillFiles": {
+    "profiles/skills/harness-aura-design/SKILL.md": "f76ceb91a2eab413eeb16906d22e1a55e3e4d5cbf81f5c09ff354f06cee07444",
+    "profiles/skills/harness-aura-design/references/agent-workspaces.md": "fcf00d4735d8635e06091723da572c57119bd3c95af2f4e06d454c166ff6566d",
+    "profiles/skills/harness-aura-design/references/app-patterns.md": "16f52fb316c47ec1083696f4c55eb4bab1897fc1c200ab1566eaeaa35e1ef15a",
+    "profiles/skills/harness-aura-design/references/brand-discovery.md": "e9796d31f8d15233a5aa586c68fee9d75650dbe993e2047cb3944f1d4c30b820",
+    "profiles/skills/harness-aura-design/references/design-brief.md": "820f3643f1ff3d2784dc688b256d52a2fa0b1c33f3634100aacedf1f1533638e",
+    "profiles/skills/harness-aura-design/references/design-directions.md": "174faaacfa1aedee519a08b9022be1a03844c9f06031f0a6ca87dd3eb5f8fe21",
+    "profiles/skills/harness-aura-design/references/design-quality.md": "093a7cdcdaa7c47573a0f4f6b87f6c68a66837604368b75ba4d246a21f1d5920",
+    "profiles/skills/harness-aura-design/references/motion-and-presentation.md": "2972775a9a831c8f7d8ed754926696f7eddcb9776473e4f65bb20e07c78128e4",
+    "profiles/skills/harness-aura-design/references/pacifio-license.md": "6350bb9e4a787b5d359c573ec36db996aa7bccd036c6973b2b5d40467de408ef",
+    "profiles/skills/harness-aura-design/references/provenance.md": "df9e2ec5fbb639736217b1cf3bd09504cedd67615e3e4a976a076790979a1105",
+    "profiles/skills/harness-aura-design/references/public-sector-requirements.md": "b6f446531aadf1af7e9874f7f5a69766bff47cd8103694dcd53b188ad9d0d545",
+    "profiles/skills/harness-aura-design/references/starter-css.md": "da2a3a319f370ca4a64be42f2d07893173d0fccbeff3849b63f8c17df7a2f2fd",
+    "profiles/skills/harness-aura-design/references/starter-design-css.md": "653cb0d14ba5685d541bbde5a935e3bb3c8010ccb8816e5bda4209497944225a",
+    "profiles/skills/harness-aura-design/references/starter-html.md": "5dee24e95ee0e16adb497e0f2de2c9b55e677b3142e294a1c7a35860182cb668",
+    "profiles/skills/harness-aura-design/references/token-generator.md": "a106a61b24cf9e2263566a6fccd7831ce5459b07ab8f1c701919a0a6ed101311",
+    "profiles/skills/harness-aura-design/references/tokens-and-theming.md": "8acee2a664102efbdf937dc9da25ea87e138dc135a2d2f36604a65d3c090fd04"
+  },
+  "screenshots": {
+    "docs/images/aura-design/after-design-info.png": "a08071943ef8a5d0d0b0fcb1a826409c2d8a2ff2f90e257c26e910d6f46f07bc",
+    "docs/images/aura-design/after-instructions.png": "fc87473c6fb99b48e3cb5005c708d9cacd1f83705be97eba104d129902540459",
+    "docs/images/aura-design/before-design-info.png": "a740fa9f39abf5a5645c9eff75103ac8d9d27bf5aec0762f069872a2adcdc980"
+  },
+  "notVerified": [
+    "physical Windows or Intel Mac",
+    "paid external model or model design quality",
+    "complete WCAG conformance",
+    "new packaged app or DMG",
+    "hosted CI",
+    "Skill Creator generic PyYAML validator (optional dependency unavailable; original strict library validation passed)"
+  ],
+  "published": {
+    "branch": false,
+    "pullRequest": false,
+    "release": false,
+    "workflowsStarted": false
+  }
+}

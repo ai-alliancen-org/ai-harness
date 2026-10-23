@@ -37,7 +37,8 @@
         "harness-ide-og-afgraensning",
         "harness-eksisterende-projekt",
         "harness-arkitektur-og-teknologi",
-        "harness-design-og-tilgaengelighed"
+        "harness-design-og-tilgaengelighed",
+        "harness-aura-design"
       ]
     },
     {
@@ -105,7 +106,8 @@
       "title": "Design og tilgængelighed",
       "summary": "Designpakker, logo og en side, som alle kan bruge.",
       "skills": [
-        "harness-design-og-tilgaengelighed"
+        "harness-design-og-tilgaengelighed",
+        "harness-aura-design"
       ]
     },
     {
@@ -389,6 +391,23 @@
         {
           "title": "WCAG 2.2",
           "url": "https://www.w3.org/TR/WCAG22/"
+        }
+      ]
+    },
+    {
+      "name": "harness-aura-design",
+      "title": "Aura-design til dine apps",
+      "summary": "Omsætter godkendte brandreferencer til farver, typografi, komponenter og afprøvede brugerforløb i de apps, du bygger.",
+      "faq": {
+        "hvad": "Hjælper med at finde dokumenterede brandreferencer og omsætte dem til et sammenhængende appdesign med lyst og mørkt tema, begrundede designretninger, skabeloner, agentarbejdsrum og konkrete kvalitetskontroller. Metoden gælder det projekt, du bygger med Aura Harness.",
+        "hvornaar": "Når et nyt appdesign planlægges, eller når du udtrykkeligt beder om at ændre designet i dit projekt. Eksisterende godkendt UI bevares ellers.",
+        "resultat": "Et designgrundlag med kilder og godkendt retning, farve- og typografitokens, komponenter og en ærlig oversigt over faktisk afprøvning og resterende arbejde.",
+        "ikke": "Den ændrer ikke Auras egen brugerflade, giver ingen ekstra værktøjs- eller datatilladelser og erklærer ikke automatisk en app tilgængelig. Hjælpekode er læsbart referenceindhold og køres ikke ved indlæsning."
+      },
+      "sources": [
+        {
+          "title": "Aura Design — metode og referencer af Parthee Vijayamohan",
+          "url": "https://github.com/Parthee-Vijaya/skills_claude/tree/88ef16cf3f8916911f5f26cb5a334dbdf332d1f5/aura-design"
         }
       ]
     },

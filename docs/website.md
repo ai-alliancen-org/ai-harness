@@ -21,7 +21,7 @@ python3 -m http.server 4173 --bind 127.0.0.1 --directory site/dist
 ## Indhold og vedligeholdelse
 
 - `profiles/grundregler.md`: fælles danske grundregler med version og kontrolord.
-- `profiles/skills/<navn>/SKILL.md`: de 12 skills og integrationerne til agenten. Kun Markdown, ingen scripts, og kun felterne `name` og `description`. Integrationer hedder `harness-integration-<system>` og følger ikke med pakkerne; se [integrationsskills.md](integrationsskills.md).
+- `profiles/skills/<navn>/SKILL.md`: de 13 skills og integrationerne til agenten. Kun Markdown, ingen scripts, og kun felterne `name` og `description`. Integrationer hedder `harness-integration-<system>` og følger ikke med pakkerne; se [integrationsskills.md](integrationsskills.md).
 - `profiles/catalog.json`: skillsenes beskrivelser til mennesker, spørgsmål og svar, kilder, værktøjernes filplaceringer og appens funktioner, hvor hver skill hører til præcis én funktion.
 - `profiles/gitignore.txt`: afsnittet til projektets `.gitignore`.
 - `desktop/core/library.cjs`, `adapters.cjs` og `installer.cjs`: indlæsning og validering af biblioteket, filplacering pr. værktøj og sikker installation. Appen, `scripts/harness.cjs` og byggescriptet bruger de samme moduler.

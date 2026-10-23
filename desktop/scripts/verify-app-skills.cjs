@@ -28,9 +28,10 @@ async function scenario(root, { git, mode }) {
   const features = new Features(store, library), skills = new Skills(library, store, features);
   await features.save(null, { scope: 'alle', values: { versioner: false, planlaegning: false, design: true, sikkerhed: false, kvalitet: true, deling: false, 'integration-adresser': true } });
   const context = await skills.context(project);
-  assert.deepEqual(context.skills.map(skill => skill.name).sort(), ['harness-afproevning-og-fejlretning', 'harness-design-og-tilgaengelighed', 'harness-integration-adresser', 'harness-kodestil']);
+  assert.deepEqual(context.skills.map(skill => skill.name).sort(), ['harness-afproevning-og-fejlretning', 'harness-aura-design', 'harness-design-og-tilgaengelighed', 'harness-integration-adresser', 'harness-kodestil']);
   assert.deepEqual(context.integrations, ['Adresser']);
   const skillReference = path.join(directory, 'config/skills/harness-design-og-tilgaengelighed/references/tilgaengelighed.md');
+  const auraReference = path.join(directory, 'config/skills/harness-aura-design/references/brand-discovery.md');
   const steps = [
     ['skill', { name: 'harness-design-og-tilgaengelighed' }],
     ['read', { filePath: skillReference }],
@@ -42,7 +43,9 @@ async function scenario(root, { git, mode }) {
     ...(git ? [['read', { filePath: path.join(project, '.git/config') }]] : []),
     // En valgt integration hentes som andre skills, og dens reference kan læses.
     ['skill', { name: 'harness-integration-adresser' }],
-    ['read', { filePath: path.join(directory, 'config/skills/harness-integration-adresser/references/adressevaelger.md') }]
+    ['read', { filePath: path.join(directory, 'config/skills/harness-integration-adresser/references/adressevaelger.md') }],
+    ['skill', { name: 'harness-aura-design' }],
+    ['read', { filePath: auraReference }]
   ];
   const requests = [];
   const server = http.createServer(async (req, res) => {
@@ -58,6 +61,11 @@ async function scenario(root, { git, mode }) {
       assert.ok(content.includes('Referencefiler i denne kørsel'), 'skillen viser præcise referencestier');
       assert.ok(content.includes(skillReference), 'referencefilens sti kommer fra skill-værktøjet');
       step = ['read', { filePath: skillReference }];
+    }
+    if (main && done === steps.length - 1) {
+      const result = body.messages.filter(message => message.role === 'tool').at(-1);
+      const content = typeof result.content === 'string' ? result.content : JSON.stringify(result.content);
+      assert.ok(content.includes(auraReference), 'Aura-design viser den præcise sti til sin brandreference');
     }
     res.setHeader('content-type', 'text/event-stream');
     const send = delta => res.write(`data: ${JSON.stringify({ id: 'prøve', object: 'chat.completion.chunk', created: 1, model: 'model', choices: [{ index: 0, delta, finish_reason: null }] })}\n\n`);
@@ -75,16 +83,17 @@ async function scenario(root, { git, mode }) {
     if (event.type === 'permission.asked') { asked.push(`${event.properties.permission}: ${event.properties.patterns}`); engine.reply(event.properties.id, false).catch(() => {}); }
     if (['session.idle', 'session.error', 'engine.error'].includes(event.type)) idle(event.type);
   } });
+  let timeout;
   try {
     await engine.start();
     await engine.send('Hjælp med en tilgængelig forside.', 'APPENS-SYSTEMPROMPT');
-    const outcome = await Promise.race([finished, new Promise(resolve => setTimeout(() => resolve('timeout'), 120000))]);
+    const outcome = await Promise.race([finished, new Promise(resolve => { timeout = setTimeout(() => resolve('timeout'), 120000); })]);
     assert.equal(outcome, 'session.idle', `motoren sluttede med ${outcome}`);
     const main = requests.filter(body => (body.tools || []).some(tool => tool.function?.name === 'read'));
     const system = JSON.stringify(main[0].messages.filter(message => message.role === 'system'));
     const listed = [...system.matchAll(/<name>([a-z0-9-]+)<\/name>/g)].map(found => found[1]).sort();
     const results = main.at(-1).messages.filter(message => message.role === 'tool').map(message => typeof message.content === 'string' ? message.content : JSON.stringify(message.content));
-    const denied = text => /prevents you from using this specific tool call/.test(text);
+    const denied = text => /prevents you from using this specific tool call|Aura beskytter denne fil\./.test(text);
     assert.deepEqual(listed, context.skills.map(skill => skill.name).sort(), 'modellen ser præcis de aktive skills');
     assert.match(system, /APPENS-SYSTEMPROMPT/);
     assert.doesNotMatch(system, /PROJEKT-AGENTS-MARKOER/, 'projektets AGENTS.md indlæses ikke; appen sender selv grundreglerne');
@@ -100,9 +109,11 @@ async function scenario(root, { git, mode }) {
     const integration = git ? 8 : 7;
     assert.match(results[integration], /skill_content name="harness-integration-adresser"[\s\S]*adressevaelger\.dk/, 'en valgt integration kan hentes');
     assert.match(results[integration + 1], /EPSG:25832/, 'integrationens reference kan læses');
+    assert.match(results[integration + 2], /skill_content name="harness-aura-design"/, 'den nye designskill kan hentes gennem den oprindelige motor');
+    assert.match(results[integration + 3], /Brand Discovery|Brandmetode|brand/i, 'den nye brandreference kan faktisk læses');
     assert.deepEqual(asked, [], 'intet af det spørger brugeren');
     return { git, mode, skills: listed.length, checks: results.length };
-  } finally { await engine.close(); server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }
+  } finally { clearTimeout(timeout); await engine.close(); server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }
 }
 
 (async () => {
@@ -110,6 +121,6 @@ async function scenario(root, { git, mode }) {
   try {
     const results = [];
     for (const setup of [{ git: true, mode: 'free' }, { git: false, mode: 'free' }, { git: true, mode: 'plan' }]) results.push(await scenario(root, setup));
-    console.log(JSON.stringify({ status: 'bestået', results, checks: ['kun aktive skills vises for modellen', 'aktiv skill hentes', 'skillens reference læses uden spørgsmål', 'ikke valgt privat reference afvises', 'valgt reference læses', 'OpenCodes egen skill skjult', 'skill under slået fra funktion findes ikke i motoren', '.env og .git afvist', 'valgt integration og dens reference hentes', 'projektets AGENTS.md indlæses ikke', 'med og uden Git', 'også under planlægning'] }, null, 2));
+    console.log(JSON.stringify({ status: 'bestået', results, checks: ['kun aktive skills vises for modellen', 'aktiv skill hentes', 'skillens reference læses uden spørgsmål', 'ikke valgt privat reference afvises', 'valgt reference læses', 'OpenCodes egen skill skjult', 'skill under slået fra funktion findes ikke i motoren', '.env og .git afvist', 'valgt integration og dens reference hentes', 'Aura-design og dens annoncerede brandreference hentes', 'projektets AGENTS.md indlæses ikke', 'med og uden Git', 'også under planlægning'] }, null, 2));
   } finally { await fs.rm(root, { recursive: true, force: true }); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

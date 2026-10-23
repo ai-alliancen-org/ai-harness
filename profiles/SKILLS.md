@@ -2,7 +2,7 @@
 
 Genereret fra `profiles/catalog.json` af `scripts/build-packages.cjs`. Ret kataloget eller skillfilerne, ikke denne fil.
 
-Aura Harness indeholder fælles grundregler og 12 skills samt fire integrationer. Grundreglerne gælder altid. En skill er en kort vejledning til kodeagenten om én arbejdsopgave, som bruges, når opgaven passer. En integration er en skill om ét bestemt system, fx et offentligt register. Integrationerne følger ikke med pakkerne til kodeværktøjerne; de vælges til for de systemer, man bruger. I Aura-appen kan kategorier, enkelte skills og integrationer slås til og fra.
+Aura Harness indeholder fælles grundregler og 13 skills samt fire integrationer. Grundreglerne gælder altid. En skill er en kort vejledning til kodeagenten om én arbejdsopgave, som bruges, når opgaven passer. En integration er en skill om ét bestemt system, fx et offentligt register. Integrationerne følger ikke med pakkerne til kodeværktøjerne; de vælges til for de systemer, man bruger. I Aura-appen kan kategorier, enkelte skills og integrationer slås til og fra.
 
 ## Grundregler · altid med
 
@@ -63,6 +63,20 @@ Kilder: [React om at oprette en ny app](https://react.dev/learn/creating-a-react
 **Hvad gør den ikke?** Den erklærer ikke løsningen tilgængelig. Et automatisk værktøj kan ikke alene afgøre, om en side er tilgængelig.
 
 Kilder: [Lov om tilgængelighed af offentlige organers websteder og mobilapplikationer](https://www.retsinformation.dk/eli/lta/2018/692), [Digitaliseringsstyrelsen om tilgængelighedserklæringen](https://digst.dk/digital-inklusion/webtilgaengelighed/om-tilgaengelighedserklaeringen/), [W3C om evaluering af tilgængelighed](https://www.w3.org/WAI/test-evaluate/), [WCAG 2.2](https://www.w3.org/TR/WCAG22/)
+
+### Aura-design til dine apps
+
+`harness-aura-design` · [SKILL.md](skills/harness-aura-design/SKILL.md)
+
+**Hvad gør den?** Hjælper med at finde dokumenterede brandreferencer og omsætte dem til et sammenhængende appdesign med lyst og mørkt tema, begrundede designretninger, skabeloner, agentarbejdsrum og konkrete kvalitetskontroller. Metoden gælder det projekt, du bygger med Aura Harness.
+
+**Hvornår bruges den?** Når et nyt appdesign planlægges, eller når du udtrykkeligt beder om at ændre designet i dit projekt. Eksisterende godkendt UI bevares ellers.
+
+**Hvad får du?** Et designgrundlag med kilder og godkendt retning, farve- og typografitokens, komponenter og en ærlig oversigt over faktisk afprøvning og resterende arbejde.
+
+**Hvad gør den ikke?** Den ændrer ikke Auras egen brugerflade, giver ingen ekstra værktøjs- eller datatilladelser og erklærer ikke automatisk en app tilgængelig. Hjælpekode er læsbart referenceindhold og køres ikke ved indlæsning.
+
+Kilder: [Aura Design — metode og referencer af Parthee Vijayamohan](https://github.com/Parthee-Vijaya/skills_claude/tree/88ef16cf3f8916911f5f26cb5a334dbdf332d1f5/aura-design)
 
 ## Kode og kvalitet
 

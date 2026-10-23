@@ -28,7 +28,7 @@ async function fixture(t, change = {}) {
 
 test('det rigtige bibliotek er gyldigt, og hvert værktøj kan installeres og fjernes igen', async t => {
   const library = await loadLibrary(profiles);
-  assert.equal(library.skills.length, 16);
+  assert.equal(library.skills.length, 17);
   assert.ok(library.tools.length >= 20, `${library.tools.length} værktøjer`);
   assert.ok(library.rules.includes(library.controlWord));
   for (const item of library.tools.filter(entry => entry.rules)) {

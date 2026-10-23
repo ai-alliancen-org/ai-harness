@@ -56,7 +56,7 @@ async function scenario(surface, mode) {
     const system = JSON.stringify(main[0].messages.filter(message => message.role === 'system'));
     assert.match(system, new RegExp('PROJEKTREGEL-' + surface)); assert.match(system, /NY-REGEL/);
     assert.match(system, /Kilde: AGENTS.md/); assert.match(system, /Ved modstrid/); assert.match(system, /FÆLLES-GRUNDLAG-02/);
-    assert.deepEqual([...system.matchAll(/<name>(harness-[a-z0-9-]+)<\/name>/g)].map(match => match[1]), ['harness-design-og-tilgaengelighed']);
+    assert.deepEqual([...system.matchAll(/<name>(harness-[a-z0-9-]+)<\/name>/g)].map(match => match[1]).sort(), ['harness-aura-design', 'harness-design-og-tilgaengelighed']);
     const tools = main.at(-1).messages.filter(message => message.role === 'tool').map(message => JSON.stringify(message.content));
     assert.match(tools[0], /skill_content/); assert.ok(tools[0].includes(reference)); assert.match(tools[1], /WCAG/);
     assert.match(tools[2], /not found/);

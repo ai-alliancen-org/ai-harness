@@ -40,8 +40,8 @@ test('instruktioner kan tilpasses og gendannes pr. projekt uden at ændre biblio
  await bench.features.save('/a', { scope: 'projekt', values: { versioner: false } });
  const context = await bench.skills.context('/a');
  assert.ok(!context.skills.some(s => ['harness-git-og-samarbejde', 'harness-udgivelse-og-gendannelse'].includes(s.name)));
- assert.equal(context.skills.length, 9); assert.equal(context.features.deling, false);
- assert.equal((await bench.skills.context('/b')).skills.length, 10, 'deling er ikke med i den anbefalede pakke');
+ assert.equal(context.skills.length, 10); assert.equal(context.features.deling, false);
+ assert.equal((await bench.skills.context('/b')).skills.length, 11, 'deling er ikke med i den anbefalede pakke');
  assert.ok(context.skills.find(s => s.name === 'harness-design-og-tilgaengelighed').files.some(f => f.path === 'references/tilgaengelighed.md'), 'referencer følger med skillen');
 });
 test('gendannelsens markør fjerner gamle planer, også når historikskrivning fejler',async t=>{
