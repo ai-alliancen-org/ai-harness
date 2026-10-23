@@ -8,6 +8,34 @@ const { protectedPath, secretContent } = require('./git.cjs');
 const OMIT = new Set(['.git', '.next', 'dist', 'build', '.venv', '.secrets']);
 const digest = data => createHash('sha256').update(data).digest('hex');
 const validID = id => /^[a-f0-9-]{36}$/.test(id || '');
+// A leftover merged copy is removable only while its entire tree is unchanged.
+// Include generated/dependency files too: removing the directory removes those files.
+// This is a bounded metadata comparison, not an atomic filesystem lock.
+async function cleanupFingerprint(root) {
+  const hash = createHash('sha256'), deadline = Date.now() + 2000; let entries = 0;
+  const stamp = stat => [stat.mode, stat.dev, stat.ino, stat.size, stat.mtimeNs, stat.ctimeNs].map(String);
+  const check = () => { if (++entries > 100000 || Date.now() > deadline) throw new Error('Kopiens oprydningsgrundlag er uafklaret.'); };
+  async function visit(file, relative) {
+    check();
+    const before = await fs.lstat(file, { bigint: true }), version = stamp(before);
+    // Replacing our own copy.json changes only the outer directory's timestamps.
+    // Its other entries and every nested directory retain full version checks.
+    hash.update(JSON.stringify([relative, ...(relative ? version : version.slice(0, 3))]) + '\n');
+    if (before.isDirectory()) {
+      for (const name of (await fs.readdir(file)).sort()) {
+        if (!relative && name === 'copy.json') continue;
+        await visit(path.join(file, name), relative ? `${relative}/${name}` : name);
+      }
+    } else if (before.isSymbolicLink()) hash.update(JSON.stringify(await fs.readlink(file)) + '\n');
+    else if (!before.isFile()) throw new Error('Kopiens filtype kræver manuel gennemgang.');
+    if (JSON.stringify(stamp(await fs.lstat(file, { bigint: true }))) !== JSON.stringify(version)) throw new Error('Kopien ændrede sig under kontrollen.');
+  }
+  try {
+    if ((await fs.realpath(root)) !== root || !(await fs.lstat(root)).isDirectory()) return null;
+    await visit(root, ''); if (Date.now() > deadline) return null;
+    return { version: 1, digest: hash.digest('hex'), entries };
+  } catch { return null; } // A failed or incomplete comparison never authorizes deletion.
+}
 async function snapshot(root) {
   const files = new Map(), blocked = new Map(); let bytes = 0;
   async function visit(dir, depth = 0) {
@@ -85,6 +113,7 @@ class Copies {
   async write(data) {
     const folder = this.folder(data.id), temp = path.join(folder, `copy-${randomUUID()}.tmp`);
     const { root, ...saved } = data;
+    if (saved.merged === true) saved.cleanupProof = await cleanupFingerprint(folder);
     await fs.writeFile(temp, JSON.stringify(saved), { mode: 0o600 }); await fs.rename(temp, path.join(folder, 'copy.json'));
   }
   async diff(copy) {
@@ -99,14 +128,17 @@ class Copies {
     return { files, unsupported: unsupported.sort() };
   }
   async remove(copy) { await fs.rm(this.folder(copy.id), { recursive: true, force: true }); }
-  // Kun ufærdige oprettelser og allerede flettede kopier ryddes automatisk. Ukendt materiale bevares.
+  // Kun uændrede flettede kopier med et kendt grundlag ryddes automatisk. Ukendt materiale bevares.
   async cleanup() {
     await fs.mkdir(this.directory, { recursive: true, mode: 0o700 });
     for (const entry of await fs.readdir(this.directory, { withFileTypes: true })) {
       if (!entry.isDirectory() || !validID(entry.name)) continue;
       try {
         const data = JSON.parse(await fs.readFile(path.join(this.folder(entry.name), 'copy.json'), 'utf8'));
-        if (data.version === 1 && data.id === entry.name && data.merged === true) await fs.rm(this.folder(entry.name), { recursive: true, force: true });
+        if (data.version === 1 && data.id === entry.name && data.merged === true && data.cleanupProof?.version === 1 && /^[a-f0-9]{64}$/.test(data.cleanupProof.digest)) {
+          const current = await cleanupFingerprint(this.folder(entry.name));
+          if (current && current.entries === data.cleanupProof.entries && current.digest === data.cleanupProof.digest) await fs.rm(this.folder(entry.name), { recursive: true, force: true });
+        }
       } catch (error) {
         if (error.code !== 'ENOENT') continue;
         // Et manglende manifest er ikke i sig selv bevis for en afbrudt oprettelse. Bevar uflettet eller ukendt

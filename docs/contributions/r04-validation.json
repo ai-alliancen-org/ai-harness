@@ -1,0 +1,29 @@
+{
+  "base": "dce68ea74a199ca214ab535a16ff22765d8ee8de",
+  "proposal": "R04",
+  "tests": {
+    "desktop": {
+      "tests": 519,
+      "pass": 517,
+      "fail": 2,
+      "skipped": 0
+    },
+    "cli": {
+      "tests": 26,
+      "pass": 26,
+      "fail": 0,
+      "skipped": 0
+    }
+  },
+  "scope": [
+    "Fejlen reproduceret på uændret original: laterChangesPreserved=false; porteringen giver true. Hovedprojektet er uændret i begge tilfælde.",
+    "Tre nye regressionstests dækker bl.a. samme filstørrelse og gendannet mtime, nye/slettede filer, node_modules, filer ved siden af project, legacy-proof, erstattet kopirod, omdøbning, tom mappe, rettigheder og ødelagt proof.",
+    "Faktisk native opstart og mappeåbning består før/efter med 0 rendererfejl, 0 Git-skrivninger og ingen modelkonto.",
+    "Eksisterende kopiering, konfliktgennemgang, indfletning og fortrydelse er med i kildegaten."
+  ],
+  "limits": "Sammenligningen er konservativ og tids-/antalsafgrænset. Den er ikke en atomisk OS-fillås og kan ikke love beskyttelse mod en samtidig ekstern skrivning mellem sidste kontrol og sletning. Ukendt eller ændret grundlag bevares; ældre efterladte kopier kræver manuel gennemgang. Ingen nye afhængigheder eller rettigheder.",
+  "images": {
+    "before.png": "e45c416a7848893c9b5269f6ce3c66b9ded84b263223313c9b248871270e5748",
+    "after.png": "824501c7ee7d70fc56b00a7d936332f734c055f88c1fd7afa4b458ffeb8cc3b2"
+  }
+}

@@ -152,3 +152,53 @@ test('fejl i registrering og papirkurv mister ikke en samtales uflettede materia
   assert.equal(bench.chat, second); assert.equal((await bench.history.readChat(root, second.id)).copy.id, copy.id);
   assert.equal(await fs.readFile(path.join(copy.root, 'a.txt'), 'utf8'), 'uflettet'); first.running = false; bench.release(first);
 });
+
+test('oprydning bevarer senere ændringer og filer i en efterladt flettet kopi', async t => {
+  const { root, copies } = await fixture(t); await fs.writeFile(path.join(root, 'a.txt'), 'base');
+  const changed = await copies.create(root, 'changed'), added = await copies.create(root, 'added'), dependency = await copies.create(root, 'dependency'), removed = await copies.create(root, 'removed'), outer = await copies.create(root, 'outer');
+  await fs.mkdir(path.join(dependency.root, 'node_modules/pakke'), { recursive: true });
+  await fs.writeFile(path.join(dependency.root, 'node_modules/pakke/note.txt'), 'base');
+  for (const copy of [changed, added, dependency, removed, outer]) await copies.write({ ...copy, merged: true });
+  const old = await fs.stat(path.join(changed.root, 'a.txt'));
+  await fs.writeFile(path.join(changed.root, 'a.txt'), 'edit');
+  await fs.utimes(path.join(changed.root, 'a.txt'), old.atime, old.mtime);
+  await fs.writeFile(path.join(added.root, 'senere.txt'), 'brugerens nye fil');
+  await fs.writeFile(path.join(dependency.root, 'node_modules/pakke/note.txt'), 'edit');
+  await fs.unlink(path.join(removed.root, 'a.txt'));
+  await fs.writeFile(path.join(copies.folder(outer.id), 'bevar-mig.txt'), 'brugerens fil ved siden af project');
+  await new Copies(copies.store).cleanup();
+  for (const copy of [changed, added, dependency, removed, outer]) assert.ok(await copies.load(copy.id, root));
+  assert.equal(await fs.readFile(path.join(changed.root, 'a.txt'), 'utf8'), 'edit');
+  assert.equal(await fs.readFile(path.join(added.root, 'senere.txt'), 'utf8'), 'brugerens nye fil');
+  assert.equal(await fs.readFile(path.join(dependency.root, 'node_modules/pakke/note.txt'), 'utf8'), 'edit');
+  assert.equal(await fs.readFile(path.join(copies.folder(outer.id), 'bevar-mig.txt'), 'utf8'), 'brugerens fil ved siden af project');
+});
+test('oprydning kræver et aktuelt sammenligningsgrundlag og følger ikke en erstattet kopirod', async t => {
+  const { dir, root, copies } = await fixture(t); await fs.writeFile(path.join(root, 'a.txt'), 'bevar');
+  const legacy = await copies.create(root, 'legacy'), unknown = await copies.create(root, 'unknown');
+  const manifest = path.join(copies.folder(legacy.id), 'copy.json');
+  const data = JSON.parse(await fs.readFile(manifest, 'utf8')); data.merged = true;
+  await fs.writeFile(manifest, JSON.stringify(data)); // Older merged records have no cleanupProof.
+  await copies.write({ ...unknown, merged: true });
+  const elsewhere = path.join(dir, 'bevarede-filer'); await fs.rename(unknown.root, elsewhere); await fs.symlink(elsewhere, unknown.root);
+  await copies.cleanup();
+  assert.ok(await copies.load(legacy.id, root));
+  assert.equal(await fs.readFile(path.join(legacy.root, 'a.txt'), 'utf8'), 'bevar');
+  assert.equal((await fs.lstat(unknown.root)).isSymbolicLink(), true);
+  assert.equal(await fs.readFile(path.join(elsewhere, 'a.txt'), 'utf8'), 'bevar');
+});
+
+test('oprydning bevarer omdøbninger, tomme mapper, ændrede rettigheder og ødelagt proof', async t => {
+  const { root, copies } = await fixture(t); await fs.writeFile(path.join(root, 'a.txt'), 'base');
+  for (const change of ['rename','directory','mode','proof']) {
+    const copy = await copies.create(root, change); await copies.write({ ...copy, merged: true });
+    if (change === 'rename') await fs.rename(path.join(copy.root, 'a.txt'), path.join(copy.root, 'b.txt'));
+    if (change === 'directory') await fs.mkdir(path.join(copy.root, 'nye-noter'));
+    if (change === 'mode') await fs.chmod(path.join(copy.root, 'a.txt'), 0o755);
+    if (change === 'proof') {
+      const file = path.join(copies.folder(copy.id), 'copy.json'), data = JSON.parse(await fs.readFile(file));
+      data.cleanupProof.digest = '0'.repeat(64); await fs.writeFile(file, JSON.stringify(data));
+    }
+    await copies.cleanup(); assert.ok(await copies.load(copy.id, root), `${change} kræver bevarelse`);
+  }
+});
