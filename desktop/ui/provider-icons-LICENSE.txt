@@ -32,3 +32,9 @@ Udgivelsesudbydere (hentet 20. oktober 2026):
 - Cloudflare: CF-Logo 1.png fra det officielle logoarkiv på https://www.cloudflare.com/press/
 Logoerne bruges alene til at identificere de ligestillede udgivelsesmuligheder.
 Varemærker og ophavsret tilhører de respektive udbydere.
+
+Onboarding B · farvevarianter (23. oktober 2026):
+- onboarding-provider-claude.svg: uændret “Claude Spark - Clay.svg” fra Anthropics officielle pressekit, https://anthropic.com/press-kit (arkiv: https://www-cdn.anthropic.com/ae59ca4ca194dac9c9dc3bc78c5829468cb0e8af.zip). SHA-256: 6d53db4be375e899c937c26cf16684a80d6e869b1928d72b37748bef2560e219.
+- onboarding-provider-mistral.svg: uændret “Mistral-Icon-Gradient-RGB.svg” fra den officielle brandguide https://mistral.ai/brand/ og https://mistral.ai/cms-media/api/documents/file/Mistral_Logos_2026.zip. SHA-256: 5aa0534fb52009c3ef9321544cd14d4b84ba34d4ee041abb3bdde9c3f2e765ca.
+- onboarding-aura-mark.svg: lokalt dekorativt Aura-symbol til visualiseringen. Appens fælles originale aura-icon.png og installationsikon ændres ikke.
+Farvevarianterne bruges alene til at identificere den valgte udbyder. Logoerne og deres varemærker tilhører de respektive ejere; dette er ingen partneranbefaling. Den eksisterende MIT-attribution ovenfor gælder fortsat de oprindelige OpenCode-ikoner; de officielle nye pressekit-assets angives særskilt her. Linjer og ringe er Auras egen brugerflade, ikke del af udbyderlogoerne. OpenAI-logoet er fortsat monokromt.

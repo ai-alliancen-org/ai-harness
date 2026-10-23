@@ -14,16 +14,27 @@ Aura skal kunne bruges af en person uden teknisk baggrund, som klikker sig igenn
 - **Knappen siger, hvad der sker.** Skriv "Installer resten" frem for et afkrydsningsfelt og en generel knap.
 - **Én næste handling.** Når noget er færdigt, vises det vigtigste næste skridt; andre handlinger er sekundære.
 
-Eksempler i appen: AI-adgang har to store valg. Udbyderoversigten er en udtrykkeligt valgt undtagelse fra grænsen på fire valg: alle ni udbydere har lige store kort med et lille logo og forbindelsesstatus. Ingen udbyder eller model anbefales. Kun det valgte kort åbner en formular. Modellen er udbyderens eget udgangspunkt, valgt på forhånd; modelknappen viser det, to alternativer og "Alle modeller". En filgodkendelse viser Tillad én gang, Tillad altid i projektet og Afvis; tilladelse til resten af opgaven ligger under Flere valg. Funktioner ved første start har to kort, Hele pakken (anbefalet) og Vælg selv. Kodeværktøj har fire kort og "Et andet værktøj".
+Eksempler i appen: AI-adgang har to store valg. Udbyderoversigten er en udtrykkeligt valgt undtagelse fra grænsen på fire valg: alle ti udbydere har store kort med logo og forbindelsesstatus. Ingen udbyder eller model anbefales. Kun det valgte kort åbner en formular. Modellen er udbyderens eget udgangspunkt, valgt på forhånd; modelknappen viser det, to alternativer og "Alle modeller". En filgodkendelse viser Tillad én gang, Tillad altid i projektet og Afvis; tilladelse til resten af opgaven ligger under Flere valg. Funktioner ved første start har to kort, Hele pakken (anbefalet) og Vælg selv. Kodeværktøj har fire kort og "Et andet værktøj".
 
 Tæl de synlige valg, før en skærm kaldes færdig, og gennemfør forløbet i appen.
+
+### Visuel opsætning med onboarding B
+
+Udbyderoversigten, den eksisterende forbindelsesformular, projektets idéfelt og **Din AI** bruger store kort og en visualisering til højre. Visualiseringen følger mus og tastaturfokus uden at gemme et valg eller sende noget. Udbyderkortet åbner fortsat formularen med ét klik; modelvalg sker fortsat i projektet, ikke i et nyt trin før projektoprettelse.
+
+Brandfarver bruges i logo og visualisering, mens kortfladerne forbliver neutrale. Claude og Mistrals farvede logoer har særskilt kildeangivelse i `ui/provider-icons-LICENSE.txt`; de øvrige logoer bevares. Et transparent Aura-symbol bruges kun som dekoration i visualiseringen. Appens originale logo og installationsikon erstattes ikke.
+
+Gemte forbindelser, katalogkontrol og modelvalg er forskellige tilstande. Grøn markering kræver en faktisk kontrol af den samme forbindelse i den aktuelle session. Et katalogsvar er ikke bevis for modelkørsel eller kvote. Hover, fejl og afventende kontrol må aldrig vise en gammel kontrol som gældende. Det eksisterende modelsamtykke, planer og værktøjsgodkendelser er uændrede.
+
+Layoutet lægger visualiseringen under indholdet på smalle vinduer og gør dekorationen kompakt på korte adgangs- og funktionstrin. Ingen arbejdsområde-, plan- eller godkendelsesstilarter ændres af onboardingens CSS. Reduceret bevægelse og tastaturfokus skal fortsat fungere.
+
 
 Dialogens tilgængelige navn skal bruge den overskrift, der faktisk vises i det aktuelle trin. Kontakter har deres eget navn, også når rækken indeholder en ⓘ-knap. Ved lukning skal fokus lande på en synlig åbner; en skjult menuhandling er ikke et brugbart returpunkt. Første lag i Før du sender forklarer tidligere beskeder i den fortsatte AI-session. Et tilvalg af en ekstra historikkopi må ikke ligne en kontakt til at slå den eksisterende session fra. Uden gemt AI-forbindelse skal Vælg AI føre direkte til forbindelsesguiden.
 
 ## Det, man møder
 
 - Første skærm spørger, om man vil bygge i appen eller bruge Aura Harness i sit eget kodeværktøj.
-- Den guidede opstart viser ét spørgsmål ad gangen med stor overskrift og to eller tre store valg. Først vælger man adgangsnøgle eller AI på computeren; en gemt forbindelse bliver et tredje valg. Adgangsnøgle fører til fire udbyderkort, Claude, Mistral, Corti og Alexandra, og "Bruger du en anden udbyder? Vælg en anden". Nøglefeltet vises først, når en udbyder er valgt. "Har du ikke en nøgle? Sådan får du en" viser konto, betaling, månedlig grænse og nøgle som nummererede trin med en knap til hver side hos udbyderen. Sidepanelet er skjult under introduktionen.
+- Den guidede opstart viser ét spørgsmål ad gangen med stor overskrift og to eller tre store valg. Først vælger man adgangsnøgle eller AI på computeren; en gemt forbindelse bliver et tredje valg. Adgangsnøgle fører til ti udbyderkort på lige vilkår, inklusive Alexandra, Azure, Claude, Corti, Egen server, Mistral, Ollama, OpenAI, OpenCode Zen og OpenRouter. Nøglefeltet vises først, når en udbyder er valgt. "Har du ikke en nøgle? Sådan får du en" viser konto, betaling, månedlig grænse og nøgle som nummererede trin med en knap til hver side hos udbyderen. Sidepanelet er skjult under introduktionen.
 - Efter AI-trinnet spørger den guidede opstart én gang: "Hvad skal Aura hjælpe med?".
   - Der er to store valg. Hele pakken står først og er markeret Anbefalet; det andet er Vælg selv.
   - Vælg selv viser de seks funktioner som kontakter, der starter slået fra. Knappen siger, hvad der sker, fx "Fortsæt med 2 funktioner".
@@ -42,7 +53,7 @@ Dialogens tilgængelige navn skal bruge den overskrift, der faktisk vises i det 
 - Næste trin viser kun det valgte forløb. Nøglehjælp og tekniske oplysninger er foldet sammen. GitHub og lokale værktøjer ligger under Avanceret opsætning. Tilbage og Vælg senere er altid tilgængelige.
 - Sidepanelet indeholder projekter, Nyt projekt, Åbn projekt og Indstillinger. Indstillinger har AI-forbindelser, Funktioner, Opdateringer og Hjælp og feedback.
 - Opdateringer viser version og status med én næste handling: Søg, Hent eller Genstart og opdatér. Automatisk søgning kan slås fra under Indstillinger i dialogen. En ny version vises med en diskret linje over arbejdsområdet. En kritisk rettelse giver en vedvarende advarsel, men blokerer ikke arbejdet. Genstart venter på igangværende opgaver og gemmer kladden først.
-- AI-forbindelser er en liste med Rediger på hver forbindelse. Tilføj forbindelse går gennem den guidede opsætning med de tre udbyderkort. Rediger viser formularen med Test forbindelse og Fjern forbindelse.
+- AI-forbindelser er en liste med Rediger på hver forbindelse. Tilføj forbindelse går gennem den guidede opsætning med de ti udbyderkort. Rediger viser formularen med Test forbindelse og Fjern forbindelse.
 - Arbejdsområdet består af samtalen og en arbejdsflade med en flytbar skillelinje. Arbejdsfladen har fem faner: Forhåndsvisning, Plan, Ændringer, Kode og Aktivitet. Forhåndsvisning er udgangspunktet.
   - Kun brugeren skifter fane. AI'ens hændelser giver Ændringer et tal og Aktivitet en prik, men flytter ikke brugeren. Nyt indhold i en åben fane vises først, når brugeren vælger det, fx med Vis dem.
   - Faneskift bevarer previewets formularer og rulning, filvalget, rulningen i de andre faner og beskedkladden.

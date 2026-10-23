@@ -1,0 +1,618 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-10-23",
+  "baseCommit": "dce68ea74a199ca214ab535a16ff22765d8ee8de",
+  "featureCommit": "6fbead9558e099a24c88ed0bc78d8c75721b9c78",
+  "scope": "F20 visual presentation only, ported onto current original Aura. Original product name and controller-owned behavior preserved.",
+  "environment": {
+    "platform": "macOS arm64",
+    "node": "22.23.3",
+    "electron": "44.4.4",
+    "opencode": "1.18.33"
+  },
+  "freshQualification": {
+    "desktopSource": {
+      "total": 523,
+      "passed": 521,
+      "failed": 2,
+      "note": "The two failures are reproduced on the unchanged original baseline. This is not an all-green suite."
+    },
+    "focusedSource": {
+      "total": 36,
+      "passed": 36,
+      "scope": "Onboarding B, plan, approval policy and model consent; overlaps full suite."
+    },
+    "cliSource": {
+      "total": 26,
+      "passed": 26
+    },
+    "originalApprovalsBaseline": {
+      "total": 5,
+      "passed": 3,
+      "failed": 2
+    },
+    "nativeF20": {
+      "status": "bestået",
+      "checks": [
+        "Ti oprindelige udbydere og brandfarver ved hover/fokus uden netværkskald",
+        "Oprindelig udbyderformular og endpoint bevares; Tilbage rydder kun den ikke-gemte nøgle",
+        "Responsivt layout ved 1440/980, zoom 150 %, smalle CSS-stressprøver og reduceret bevægelse",
+        "Vælg senere og gentagen opsætning bevarer idékladden",
+        "Gem og katalogkontrol gennem brugerfladen; afventende og fejlet kontrol giver aldrig falsk grøn",
+        "Faktisk modelvalg i den eksisterende Din AI-dialog uden inferens eller projektændringer",
+        "Genstart bevarer forbindelsen men genbruger ikke en gammel grøn katalogkontrol"
+      ],
+      "screenshots": 21,
+      "rendererErrors": [],
+      "catalogRequests": 4,
+      "inference": false,
+      "measurements": [
+        {
+          "requestedWidth": 1440,
+          "requestedHeight": 940,
+          "zoom": 1,
+          "stressOnly": false,
+          "width": 1440,
+          "height": 908,
+          "scroll": 1209,
+          "client": 1209,
+          "body": 1425,
+          "visual": 320
+        },
+        {
+          "requestedWidth": 980,
+          "requestedHeight": 720,
+          "zoom": 1,
+          "stressOnly": false,
+          "width": 980,
+          "height": 688,
+          "scroll": 781,
+          "client": 781,
+          "body": 965,
+          "visual": 270
+        },
+        {
+          "requestedWidth": 980,
+          "requestedHeight": 720,
+          "zoom": 1.5,
+          "stressOnly": false,
+          "width": 653,
+          "height": 458,
+          "scroll": 583,
+          "client": 583,
+          "body": 643,
+          "visual": 531.0729370117188
+        },
+        {
+          "requestedWidth": 750,
+          "requestedHeight": 850,
+          "zoom": 1,
+          "stressOnly": true,
+          "width": 750,
+          "height": 818,
+          "scroll": 675,
+          "client": 675,
+          "body": 735,
+          "visual": 615
+        },
+        {
+          "requestedWidth": 390,
+          "requestedHeight": 844,
+          "zoom": 1,
+          "stressOnly": true,
+          "width": 390,
+          "height": 812,
+          "scroll": 315,
+          "client": 315,
+          "body": 375,
+          "visual": 279
+        }
+      ]
+    },
+    "independentReview": "No blocking findings; boundaries and original controller ownership verified.",
+    "originalDesktopBaseline": {
+      "total": 516,
+      "passed": 514,
+      "failed": 2,
+      "baselineCommit": "dce68ea74a199ca214ab535a16ff22765d8ee8de",
+      "note": "Full unchanged baseline suite rerun with identical two approvals failures; the F20 branch adds seven passing tests."
+    }
+  },
+  "knownBaselineFailures": [
+    {
+      "test": "desktop/tests/approvals.test.cjs:47",
+      "message": "Godkendelsen findes ikke længere."
+    },
+    {
+      "test": "desktop/tests/approvals.test.cjs:74",
+      "message": "Cannot read properties of undefined (reading 'properties')"
+    }
+  ],
+  "earlierSameSourceEvidence": {
+    "date": "2026-10-23",
+    "baseCommit": "dce68ea74a199ca214ab535a16ff22765d8ee8de",
+    "featureCommit": "6fbead9558e099a24c88ed0bc78d8c75721b9c78",
+    "originalNativeDriversPassed": [
+      "introduction",
+      "setup",
+      "connections",
+      "preferences",
+      "layout"
+    ],
+    "screenMeasurement": {
+      "screensBefore": 41,
+      "screensAfter": 41,
+      "rendererErrors": 0,
+      "unnamedControls": 0,
+      "duplicateIDs": 0,
+      "horizontalOverflows": 0,
+      "sameChoicesAndFields": true,
+      "clicks": {
+        "connection": 5,
+        "ideaToDraft": 6,
+        "edit": 4,
+        "undo": 3
+      },
+      "gitWriting": false,
+      "excludedVersionScreens": 3,
+      "syntheticModelServer": true
+    },
+    "limitation": "Unchanged original planning/approval drivers have baseline state/text/button mismatches; they are not reported as passing. The measured native flow is separate positive continuity evidence."
+  },
+  "preservation": {
+    "unchangedFiles": 77,
+    "files": [
+      {
+        "path": "desktop/core/activity.cjs",
+        "unchanged": true,
+        "sha256": "7311993f5d9120694f6b01b1f008109e1ee8f714175a9c6db0226fb751a908f6"
+      },
+      {
+        "path": "desktop/core/adapters.cjs",
+        "unchanged": true,
+        "sha256": "56aee0756a624ab50e5309cdebe6438792fc6313f14bee6c1aeccfa12860c3e4"
+      },
+      {
+        "path": "desktop/core/app-identity.cjs",
+        "unchanged": true,
+        "sha256": "b60355da60d74c12b5af8639b61986efd04b053765946b023e4c42827786e9d2"
+      },
+      {
+        "path": "desktop/core/approvals-policy.cjs",
+        "unchanged": true,
+        "sha256": "bf0b8d597b4a4ab1fb5958d2cb0089f179ba314d54652c204212c7555e90a2bf"
+      },
+      {
+        "path": "desktop/core/azure-setup.cjs",
+        "unchanged": true,
+        "sha256": "3057efd104659b978a05829638f6c05af2e1d9bc51dbb4f881871cbb0bb1aa9d"
+      },
+      {
+        "path": "desktop/core/brief.cjs",
+        "unchanged": true,
+        "sha256": "49a24fabbdf999c059062120dd38ba31e9a7955948d21eed902fc4c4720b96d7"
+      },
+      {
+        "path": "desktop/core/change-review.cjs",
+        "unchanged": true,
+        "sha256": "5a43cf01ec7c74207ba5cb555d10f1b3d201001f5f6e91411bb5dacb34a81e77"
+      },
+      {
+        "path": "desktop/core/changes.cjs",
+        "unchanged": true,
+        "sha256": "a1f051ac2d5a49f65848407ca1c748a126f7b61e3c5f0237fa0bb3a29183db3e"
+      },
+      {
+        "path": "desktop/core/chat-session.cjs",
+        "unchanged": true,
+        "sha256": "cb41ab925ea66e415f1e0355183edb293c6c634c2199325ae2c6cfef0d4b8802"
+      },
+      {
+        "path": "desktop/core/checkpoints.cjs",
+        "unchanged": true,
+        "sha256": "ffa581e13e6b2f317cd7fdf1d879cee44eec2439e7c3bd9c54f0cf118d56a22f"
+      },
+      {
+        "path": "desktop/core/command-sandbox-runner.mjs",
+        "unchanged": true,
+        "sha256": "6be10372dfaf6907d2ae7b8ffb92cc9519e23150e5f74587eee2cba841af48c8"
+      },
+      {
+        "path": "desktop/core/command-sandbox.cjs",
+        "unchanged": true,
+        "sha256": "f74f43d68ae29563cb7377b34c5f67b955c234cc3b683f11e50d08b0ee74f498"
+      },
+      {
+        "path": "desktop/core/connections.cjs",
+        "unchanged": true,
+        "sha256": "63dc8fd641784e99bd4de9cfda0c8a368e804377acf78679663e56c1cff4c1f0"
+      },
+      {
+        "path": "desktop/core/copies.cjs",
+        "unchanged": true,
+        "sha256": "f97fdbdefc1584c922bd461942f239e8e3f6355ac9ab4d51bb065fd428d23633"
+      },
+      {
+        "path": "desktop/core/deployment-artifact.cjs",
+        "unchanged": true,
+        "sha256": "b9f17ad9e2835ba52b385361945d9db10a360f1790fbcb469aef5040ce62a77a"
+      },
+      {
+        "path": "desktop/core/deployment-configuration.cjs",
+        "unchanged": true,
+        "sha256": "b450dd466f3a768c61b6576befe6aebfc19b990fc582548c1e723c3501336473"
+      },
+      {
+        "path": "desktop/core/deployment-providers.cjs",
+        "unchanged": true,
+        "sha256": "9bafcda31f894dc6dd44d88cb3d6d1acf42925f8986d7ad9ebc71a21663e2725"
+      },
+      {
+        "path": "desktop/core/deployment-setup.cjs",
+        "unchanged": true,
+        "sha256": "d516492aa41a3443bc50ffe4e3a9d2c3aa6694f489ec6a37e19f9bad32f30290"
+      },
+      {
+        "path": "desktop/core/deployments.cjs",
+        "unchanged": true,
+        "sha256": "2e19182e897aa7911eed58e44e94f1c1359a9f1e2221bf2ea92c8bf5ee38df30"
+      },
+      {
+        "path": "desktop/core/designs.cjs",
+        "unchanged": true,
+        "sha256": "5c35c98a41addbef64002cb9feb82fe69a844e8b8641a124503f3925f273586d"
+      },
+      {
+        "path": "desktop/core/dev-server-runner.cjs",
+        "unchanged": true,
+        "sha256": "6b73cc241e69b0ef91ca5a8fa5e173ff76747c28571c4bcc2900865c6d66b47a"
+      },
+      {
+        "path": "desktop/core/dev-server.cjs",
+        "unchanged": true,
+        "sha256": "6b1a5c0f9dc127e10fcedcd1cf49718b7bbec9fd0bb63b60c49c30e520e6fa9c"
+      },
+      {
+        "path": "desktop/core/diagnostics.cjs",
+        "unchanged": true,
+        "sha256": "a3fd1d672d1455e5c4a46390198e43fbb4fcae674690612485562492581b38e4"
+      },
+      {
+        "path": "desktop/core/diff.cjs",
+        "unchanged": true,
+        "sha256": "5c570663ee1d1cf71bcceb46a1454087bb517d5c8b525cf0e1b3a3f00507cf9d"
+      },
+      {
+        "path": "desktop/core/engine.cjs",
+        "unchanged": true,
+        "sha256": "bd37cd236a3c07a2f2bf6f12678d66dda8ab03e74834bf89cb700a8e3cc131d3"
+      },
+      {
+        "path": "desktop/core/features.cjs",
+        "unchanged": true,
+        "sha256": "823043873a20dc453975da89f16b38cb7100cb5202bbe3adc790836ded7a88d3"
+      },
+      {
+        "path": "desktop/core/feedback.cjs",
+        "unchanged": true,
+        "sha256": "e40c23c1083ce130c37163920bc864bc6836a7c1b020b5f01c7d73c45cba7a9c"
+      },
+      {
+        "path": "desktop/core/gateway.cjs",
+        "unchanged": true,
+        "sha256": "cc1f21ba1533fc495b922b9b957fa9d28f5ef6504e2ed457370e58d0df3cf8d0"
+      },
+      {
+        "path": "desktop/core/git.cjs",
+        "unchanged": true,
+        "sha256": "ce309c4a33ebc26ea330e284c96a86e2b7b28a623092e786875338f0208a17cf"
+      },
+      {
+        "path": "desktop/core/github.cjs",
+        "unchanged": true,
+        "sha256": "9e183aa96e2f84a46ac0c1c5a8ab550866d5763fee8f2b07b6d135b017c82f41"
+      },
+      {
+        "path": "desktop/core/history.cjs",
+        "unchanged": true,
+        "sha256": "35eac8811f61c18d20bcc79024189eed369e935980fbb174e25f3cbd4c924e52"
+      },
+      {
+        "path": "desktop/core/hosting-guidance.cjs",
+        "unchanged": true,
+        "sha256": "69d5ba029a2f444c94892ce930c4349457c770f5c1e69f5f121bc9306b7e9149"
+      },
+      {
+        "path": "desktop/core/installer.cjs",
+        "unchanged": true,
+        "sha256": "7592e5fadf364208344bf8c4bfe728f58a852d19fe2c0fb6eeec965b77c22b97"
+      },
+      {
+        "path": "desktop/core/komplai-build.cjs",
+        "unchanged": true,
+        "sha256": "26554e36334f9ebd4f86ca29308fba4f54e2b48192a2747b0612c9d006c7e047"
+      },
+      {
+        "path": "desktop/core/komplai-preview.cjs",
+        "unchanged": true,
+        "sha256": "b7759d4d4058cd2be3ab194f6922fab97795ba9816894ac460788a72f450ce14"
+      },
+      {
+        "path": "desktop/core/komplai-publish.cjs",
+        "unchanged": true,
+        "sha256": "98a4aafd884dfec65bb8f80c3a28dbcd0a260c9e1333fd01a614816704624cc6"
+      },
+      {
+        "path": "desktop/core/komplai.cjs",
+        "unchanged": true,
+        "sha256": "c3f5b110431fb5d9dfe139bc72121e17b0b2bb8d28bbcee1f0da34fed651a19c"
+      },
+      {
+        "path": "desktop/core/library.cjs",
+        "unchanged": true,
+        "sha256": "5343a5b7b378460db50a6b56aa5439ee87f7c02c527738c46dc7282457bb1bac"
+      },
+      {
+        "path": "desktop/core/local-discovery.cjs",
+        "unchanged": true,
+        "sha256": "85daa7d26f95bc7df42a6f0b2b8642876a96c9bc281ba842aecd52c5beee3658"
+      },
+      {
+        "path": "desktop/core/merge.cjs",
+        "unchanged": true,
+        "sha256": "341d80fead6aebbffe61e2730d9f662fdbceb809a2fea3f71208a82c423a84de"
+      },
+      {
+        "path": "desktop/core/model-consent.cjs",
+        "unchanged": true,
+        "sha256": "e4692f1afb48c29ac758affdf3eff0eea83066c182e34379509ac5e23d9b33bc"
+      },
+      {
+        "path": "desktop/core/npm-policy.cjs",
+        "unchanged": true,
+        "sha256": "9213b36c836f9cc11cfecc910db9163c9b5c553a352e4d6197746177a2d6bf4e"
+      },
+      {
+        "path": "desktop/core/own-tools.cjs",
+        "unchanged": true,
+        "sha256": "473a891bb948b4365fba3138f9d119cdb5c1fed970c55f5dc42433c835f84159"
+      },
+      {
+        "path": "desktop/core/pages-publishing.cjs",
+        "unchanged": true,
+        "sha256": "3a36d2820f7b884f9b08c95cdf92aa2bf8534d601d264028562f23db8f0905ad"
+      },
+      {
+        "path": "desktop/core/preferences.cjs",
+        "unchanged": true,
+        "sha256": "598f81ebaca41ccae17da5cba43a998f9f568e6b579b0d70e64b2995d939df86"
+      },
+      {
+        "path": "desktop/core/preview-edit.cjs",
+        "unchanged": true,
+        "sha256": "9f3a590ad4f3cc1536b666664072b73627650ef55af9d1e700ed925def9dfb2a"
+      },
+      {
+        "path": "desktop/core/preview-policy.cjs",
+        "unchanged": true,
+        "sha256": "e1ff81a0c489122ba99a865da0f85b71c84e95309e2adc894f4936f4d454fa21"
+      },
+      {
+        "path": "desktop/core/preview-session.cjs",
+        "unchanged": true,
+        "sha256": "94f6f084c6c3d43fcc83596c03e072a01ddba7c0d2fdf23b6b79d903859daf42"
+      },
+      {
+        "path": "desktop/core/preview.cjs",
+        "unchanged": true,
+        "sha256": "c12756d63f82189c62428dc23970a4de02d523446f0dc867f119bb27c3e7160a"
+      },
+      {
+        "path": "desktop/core/project-files.cjs",
+        "unchanged": true,
+        "sha256": "4aa69fd4e7c760b9597004a9759c0a7bb1eaf3181f241bea62c12ee2af375ec0"
+      },
+      {
+        "path": "desktop/core/project-guidance.cjs",
+        "unchanged": true,
+        "sha256": "79fad76f5e71844d30190ece3ff789f9904891c09d01cde80bc5a89f98ee48f5"
+      },
+      {
+        "path": "desktop/core/project-instructions.cjs",
+        "unchanged": true,
+        "sha256": "936825f4a4e669f2f70ac0bb4bdfda6ee3e48b1f4a8db173bd9413eb81878f43"
+      },
+      {
+        "path": "desktop/core/project-runtime.cjs",
+        "unchanged": true,
+        "sha256": "90557d639dfd8e5b5f058ae0cdabe0a8e821e69eb6f699e70fe6842c765f8a89"
+      },
+      {
+        "path": "desktop/core/projects.cjs",
+        "unchanged": true,
+        "sha256": "ed82a1dbd54b7acd4dbca0e397ce1f88e4428be2f36f8ffd83e2ed1927384a7e"
+      },
+      {
+        "path": "desktop/core/promte-preview.cjs",
+        "unchanged": true,
+        "sha256": "a784efc48ca2efefaa6c5771d3d7351c68433e624a6b1fa56d4f5f148db0917f"
+      },
+      {
+        "path": "desktop/core/provider-promte.cjs",
+        "unchanged": true,
+        "sha256": "66c9812c2a3131f58088ba862d50a2898c8cad3f771fc1846692a0a19e21083e"
+      },
+      {
+        "path": "desktop/core/publishing.cjs",
+        "unchanged": true,
+        "sha256": "c54cea65ffbfbb969c9a242da89510bfce3196093cd2259576695d4a1cce3052"
+      },
+      {
+        "path": "desktop/core/restoration.cjs",
+        "unchanged": true,
+        "sha256": "11fa528239418217310bd57d255be9f1b2cfcf89523f52c480362f683a933aff"
+      },
+      {
+        "path": "desktop/core/runtime.cjs",
+        "unchanged": true,
+        "sha256": "7382556695536ea32ade448d1b9986d43df240d0320f4637f1136683ebfbe45a"
+      },
+      {
+        "path": "desktop/core/skills.cjs",
+        "unchanged": true,
+        "sha256": "3f9a55b5d455b3e1b85c0b9aef04e2eedb819cddff981ecae5841daf4e6f0d35"
+      },
+      {
+        "path": "desktop/core/store.cjs",
+        "unchanged": true,
+        "sha256": "71073c04648278b220399d01b163312a71fd5a154f4cba716d023f70548380bd"
+      },
+      {
+        "path": "desktop/core/stream-progress.cjs",
+        "unchanged": true,
+        "sha256": "3a38197423a2b0eae493db474c07b28bdf2133856911558d2f2944bff30b3caa"
+      },
+      {
+        "path": "desktop/core/updates.cjs",
+        "unchanged": true,
+        "sha256": "6d46821ed1c59245fc40749761ab08ec254849aa229dd4c06135000bf6d96ed5"
+      },
+      {
+        "path": "desktop/core/vercel-setup.cjs",
+        "unchanged": true,
+        "sha256": "b3430da167d0692443de2338ce2c8bbe890d032b8721f1dd00441fc6b594d8bb"
+      },
+      {
+        "path": "desktop/core/workbench.cjs",
+        "unchanged": true,
+        "sha256": "62ca92c35d10564bd32f7fd413583c41713daf465fc999e6c0fd7d209cfa7470"
+      },
+      {
+        "path": "desktop/core/workspace-history.cjs",
+        "unchanged": true,
+        "sha256": "6d5a9e0fa6ab9e49899e8fbe12a92fa06336724be8e29fff0fab496d9ca464d5"
+      },
+      {
+        "path": "desktop/core/workspaces.cjs",
+        "unchanged": true,
+        "sha256": "ddd92bb92e980957637aea8ca74dc721c04e2e87bc6d76db0a3fac94ed9dd65e"
+      },
+      {
+        "path": "desktop/preload.cjs",
+        "unchanged": true,
+        "sha256": "05d3375b79069ca9764626f79bf1f6035f6f81c5ece5fa4c64d3cf60051c22f4"
+      },
+      {
+        "path": "desktop/ui/planning.js",
+        "unchanged": true,
+        "sha256": "bc151626d5156539816d802cb0383508354b87082d413bf0fef563e596170f5e"
+      },
+      {
+        "path": "desktop/ui/plan-view.js",
+        "unchanged": true,
+        "sha256": "815ce40c71855d55aea62568eb4e7353bc7bbaa52688be3a5ab67354f2059101"
+      },
+      {
+        "path": "desktop/ui/approvals.js",
+        "unchanged": true,
+        "sha256": "2ea7457a12323838da9baffec7598808e4198f3b374bd6d27e7df82370fbfe60"
+      },
+      {
+        "path": "desktop/ui/approval-view.js",
+        "unchanged": true,
+        "sha256": "270416b98e6ab39360cc2bad0c24c16189f34761b0fefb80774cda111aa04615"
+      },
+      {
+        "path": "desktop/ui/styles.css",
+        "unchanged": true,
+        "sha256": "1f541e1fa09b37831a33be31c23c8928a2f4b96b7f267201ce421961b5f82ac8"
+      },
+      {
+        "path": "desktop/ui/workspace.js",
+        "unchanged": true,
+        "sha256": "c1ac3ea1f8da973d1b89eab321c2819252dbb1b230773be7eea32ad554c352e5"
+      },
+      {
+        "path": "desktop/runtime-lock.json",
+        "unchanged": true,
+        "sha256": "dab606832d5f67952cd29bd144acfd9de203eb4d343c80bb65a58bbb6d1da33d"
+      },
+      {
+        "path": "desktop/package.json",
+        "unchanged": true,
+        "sha256": "762b48059f0213a9adb4dd276cc4dc43ae87ea0f5db1a8b3bf9471fd3f8b6329"
+      },
+      {
+        "path": "desktop/package-lock.json",
+        "unchanged": true,
+        "sha256": "7606c32231c54e9a161952682fbff8ba59dc80041a15cdbad331e4310b5c0aa9"
+      }
+    ],
+    "newDependencies": false,
+    "newIPC": false,
+    "newModelCalls": false,
+    "newDataPermissions": false,
+    "workspaceRedesign": false
+  },
+  "featureFiles": [
+    {
+      "path": "desktop/DESIGN.md",
+      "sha256": "117f47b6d3104404e34752102838d4bedeef0f795b6573ba7d4cdd7f80c9c477"
+    },
+    {
+      "path": "desktop/README.md",
+      "sha256": "0c7e556ad9d2c7131fa021bbfcb01ceecdc4d98fc31dc5b293b4449b0557ce50"
+    },
+    {
+      "path": "desktop/main.cjs",
+      "sha256": "b274a140c18499d6ab2498a3f08d3940c38d6c58e1c89e9b7d0a670c5bc4464d"
+    },
+    {
+      "path": "desktop/scripts/verify-onboarding-b.cjs",
+      "sha256": "c167514518eb44c9b99f0fac2c71e893a2e75561fe9c058be75ed52fee91c29a"
+    },
+    {
+      "path": "desktop/tests/onboarding-b.test.cjs",
+      "sha256": "c32d8895b3d141663c2b987a994830c0fd86f3c21ee87e2c9e599b0c9a103173"
+    },
+    {
+      "path": "desktop/ui/app.js",
+      "sha256": "e053081480b0a007181a59d4000860a9039f3ec5d5b62c22396cc63ea0aa3c7b"
+    },
+    {
+      "path": "desktop/ui/index.html",
+      "sha256": "20103821c0dede7fd3a80a07677aaf46d6a820d8f315196a7a764d45f254cae9"
+    },
+    {
+      "path": "desktop/ui/onboarding-aura-mark.svg",
+      "sha256": "be3d0b3648845a635484ea975176e4bf47a5953780b5bdfa8f4502dc58c00c01"
+    },
+    {
+      "path": "desktop/ui/onboarding-b.css",
+      "sha256": "4881919de4cb39105395e13a8d53dcfbbd4d9dddf0ad8cce50ac2120c771c764"
+    },
+    {
+      "path": "desktop/ui/onboarding-b.js",
+      "sha256": "f869b0f5efd21aaf8f76abab106ead435c51ba04ff13c282dcd2be6e402ef9bc"
+    },
+    {
+      "path": "desktop/ui/onboarding-provider-claude.svg",
+      "sha256": "6d53db4be375e899c937c26cf16684a80d6e869b1928d72b37748bef2560e219"
+    },
+    {
+      "path": "desktop/ui/onboarding-provider-mistral.svg",
+      "sha256": "5aa0534fb52009c3ef9321544cd14d4b84ba34d4ee041abb3bdde9c3f2e765ca"
+    },
+    {
+      "path": "desktop/ui/provider-icons-LICENSE.txt",
+      "sha256": "35879b76d80085f8d9519665e1a8104e5bba1c05f8bf1c2b132bb1399b0c3c91"
+    }
+  ],
+  "limits": [
+    "Native catalog is a controlled loopback fixture, no inference or real provider account.",
+    "The 41-screen measured flow uses the real original OpenCode engine against a controlled local model server, not a production cloud account.",
+    "Windows, external-model quality, user study, installer, signing and hosted CI not qualified by this PR.",
+    "No workflows or releases were started."
+  ],
+  "screenshots": "images/onboarding-b/provenance.json"
+}

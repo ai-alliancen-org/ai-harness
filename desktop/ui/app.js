@@ -10,7 +10,7 @@ function message(text, error = false) {
   // Beskeden tager sin egen plads, så den aldrig dækker skrivefeltet eller en knap.
   const surface = current && !$('#workspace').hidden ? $('#workspace') : !$('#setup').hidden ? $('#setup') : $('#onboarding');
   const anchor = surface.id === 'workspace' ? surface.querySelector('.work-grid') : surface.id === 'onboarding' ? $('#create-form') : surface.querySelector('section');
-  surface.insertBefore($('#message'), anchor);
+  (anchor?.parentElement || surface).insertBefore($('#message'), anchor);
   $('#message').textContent = text; $('#message').classList.toggle('error', error); $('#message').hidden = false;
 }
 async function call(method, value, owner) { const result = await window.harness[method](value, owner); if (!result.ok) throw new Error(result.error); return result.value; }
@@ -153,6 +153,34 @@ new MutationObserver(() => { if (view.followChat) chatContent.scrollTop = chatCo
 $('#chat-latest').onclick = () => { view.followChat = true; chatContent.scrollTop = chatContent.scrollHeight; updateChatScroll(); };
 let guidedSetup = false, setupStep = 'choice';
 let setupActive = false, setupGeneration = 0, verifiedConnection = '', recovery = '';
+// F20 changes presentation only; connection checks and all actions remain owned by the existing controllers.
+let onboardingPreviewKind = '';
+function syncOnboardingVisuals() {
+  if (!window.OnboardingB) return;
+  const selected = state?.connections?.find(c => c.id === $('#setup-connection').value);
+  const details = setupStep === 'provider' && $('#setup-provider').dataset.view === 'details';
+  const setupConnection = details ? state?.connections?.find(c => c.id === $('#connection-id').value) : setupStep === 'saved' || setupStep?.startsWith('features') ? selected : null;
+  const setupCheck = setupConnection && connectionChecks.get(setupConnection.id);
+  const kind = details ? $('#provider-kind').value : setupStep === 'local' ? 'ollama' : setupConnection?.kind || onboardingPreviewKind || '';
+  const phase = setupStep === 'saved' || setupStep === 'local' || details ? 'connection' : setupStep?.startsWith('features') ? 'features' : setupStep === 'provider' ? 'provider' : 'choice';
+  const checked = Boolean(setupConnection && setupConnection.kind === kind && verifiedConnection === setupConnection.id && setupCheck?.status === 'ok' && setupCheck.count);
+  window.OnboardingB.render($('#setup-visual'), { kind, phase, preview: setupStep === 'provider' && !details, connectionName: setupConnection?.name || '', saved: Boolean(setupConnection), checked, error: setupCheck?.status === 'error', pending: setupCheck?.status === 'checking' });
+  for (const step of document.querySelectorAll('#setup .onboarding-b-progress li')) {
+    const complete = step.dataset.phase === 'provider' && Boolean(details || setupConnection) || step.dataset.phase === 'connection' && checked;
+    step.dataset.complete = String(complete);
+    step.querySelector('span').textContent = complete ? '✓' : String(['provider', 'connection', 'features', 'idea'].indexOf(step.dataset.phase) + 1);
+    const active = step.dataset.phase === (phase === 'choice' ? 'provider' : phase);
+    if (active) step.setAttribute('aria-current', 'step'); else step.removeAttribute('aria-current');
+  }
+  const connection = state?.connections?.find(c => c.id === $('#connection-select').value);
+  const check = connection && connectionChecks.get(connection.id);
+  const model = $('#model-select');
+  window.OnboardingB.render($('#model-visual'), { kind: connection?.kind || '', phase: 'model', connectionName: connection?.name || '', modelName: model.value ? model.selectedOptions[0]?.textContent || model.value : '', saved: Boolean(connection), checked: Boolean(check?.status === 'ok' && check.count), error: check?.status === 'error', pending: check?.status === 'checking', modelChosen: Boolean(model.value) });
+  const startup = state?.connections?.find(c => c.id === $('#startup-connection').value);
+  const startupCheck = startup && connectionChecks.get(startup.id);
+  window.OnboardingB.render($('#idea-visual'), { kind: startup?.kind || '', phase: 'idea', connectionName: startup?.name || '', saved: Boolean(startup), checked: Boolean(startupCheck?.status === 'ok' && startupCheck.count), error: startupCheck?.status === 'error' });
+}
+
 let preferredConnection = '', autoConnect = false;
 try { preferredConnection = localStorage.getItem('harness.preferredConnection') || ''; } catch {}
 function setupControls() {
@@ -167,6 +195,7 @@ function setupControls() {
   $('#setup-continue').hidden = verifiedConnection !== id || !id;
   $('#setup-test').hidden = Boolean(id && verifiedConnection === id);
   $('#setup-add-another').hidden = !id || verifiedConnection !== id;
+  syncOnboardingVisuals();
 }
 function moveConnectionForm(guided) {
   const parent = guided ? $('#setup-provider-body') : $('#connection-form-home');
@@ -202,17 +231,21 @@ const providerCards = [
   { kind: 'openrouter', name: 'OpenRouter', text: 'OpenRouter API.' }
 ];
 function providerPicker() {
+  onboardingPreviewKind = '';
   $('#api-key').value = '';
   $('#setup-provider').dataset.view = 'choose'; $('#setup-provider-body').hidden = true; $('#provider-cards').hidden = false;
   $('#setup-title').textContent = 'Hvem vil du forbinde?'; $('#setup-subtitle').textContent = 'Vælg den udbyder eller server, du har adgang til.'; $('#setup-title').focus();
+  syncOnboardingVisuals();
 }
 function chooseProvider(kind) {
+  onboardingPreviewKind = kind;
   $('#provider-kind').value = kind; updateProvider();
   $('#setup-provider').dataset.view = 'details'; $('#provider-cards').hidden = true;
   $('#setup-title').textContent = `Forbind ${providerCards.find(item => item.kind === kind)?.name || kind}`;
   $('#setup-subtitle').textContent = ['ollama', 'compatible'].includes(kind) ? 'Indtast adressen på din modelserver.' : 'Brug din adgangsnøgle fra udbyderen.';
   $('#connection-advanced').hidden = false;
   $('#setup-provider-body').hidden = false; $('#setup-title').focus();
+  syncOnboardingVisuals();
 }
 function renderProviderCards() {
   $('#provider-cards').replaceChildren(...providerCards.map(item => {
@@ -220,6 +253,9 @@ function renderProviderCards() {
     const logo = node('img'); logo.src = `provider-${item.kind}.svg`; logo.alt = ''; logo.width = 28; logo.height = 28;
     const status = node('small'); status.dataset.providerStatus = item.kind;
     card.append(logo, node('strong', item.name), node('span', item.text), status);
+    window.OnboardingB?.decorateProviderCard(card, item.kind);
+    card.addEventListener('focus', () => { onboardingPreviewKind = item.kind; syncOnboardingVisuals(); });
+    card.addEventListener('pointerenter', () => { onboardingPreviewKind = item.kind; syncOnboardingVisuals(); });
     card.onclick = () => chooseProvider(item.kind); return card;
   }));
   updateProviderStatuses();
@@ -469,6 +505,7 @@ function updateConnectionChecks() {
     el.title = check?.detail || 'Forbindelsen er gemt, men endnu ikke kontrolleret efter appstart.';
   }
   updateProviderStatuses();
+  syncOnboardingVisuals();
 }
 function updateProviderStatuses() {
   for (const el of document.querySelectorAll('[data-provider-status]')) {
@@ -1027,6 +1064,7 @@ function updateModelSummary() {
   $('#model-chip').textContent = view.running && view.activeModelSummary ? view.activeModelSummary : label;
   $('#model-chip').title = chosen ? `Du har valgt ${chosen} indsats i denne samtale. Klik for at skifte model eller indsats.` : effort ? `${effort[0].toUpperCase()}${effort.slice(1)} indsats er udbyderens standard for modellen. Klik for at skifte model.` : connection?.kind === 'mistral' ? 'Aura sender ikke et valg af indsats. Mistrals standard gælder; niveauet er ikke verificeret. Klik for at skifte model eller forbindelse.' : 'Klik for at skifte model eller forbindelse.';
   $('#connection-status').textContent = model.value ? (state?.connections.find(c => c.id === $('#connection-select').value)?.name || 'Valgt forbindelse') + ' · ' + model.value : 'Ingen model valgt';
+  syncOnboardingVisuals();
 }
 // Forbruget i samtalen: tokens ind og ud og en anslået pris ud fra udbyderens prisliste. Det faktiske forbrug står hos udbyderen.
 const tokenCount = value => Math.round(value).toLocaleString('da-DK');
@@ -1202,6 +1240,7 @@ function updateStartupSummary() {
   const values = startupValues(), design = featureOn('design'), sharing = featureOn('deling');
   const chosen = [state?.connections.find(c => c.id === values.connectionID)?.name, sharing && values.hosting && hostingLabel(values.hosting), design && values.designID && $('#design-select').selectedOptions[0]?.textContent.split(' · ')[0], values.tests !== 'senere' && testLabel(values.tests)].filter(Boolean);
   $('#project-options-summary').textContent = chosen.length ? `Flere valg · ${chosen.join(' · ')}` : 'Flere valg · valgfrit';
+  syncOnboardingVisuals();
 }
 async function clearStartupDesign() {
   showAssets(await call('clearAssets')); $('#design-select').value = ''; setProjectColor(null); $('#links').value = ''; updateStartupSummary();
@@ -1590,6 +1629,7 @@ function renderShortlist() {
   for (const { model, text } of picks) {
     const button = node('button', undefined, 'model-choice'); button.type = 'button'; button.dataset.model = model.id;
     button.append(node('strong', model.name), node('span', text));
+    window.OnboardingB?.decorateProviderCard(button, kind);
     // Et klik vælger modellen og lukker dialogen. Kun OpenRouter kræver bagefter et valg af udbyder.
     button.onclick = () => action(async () => {
       if ($('#model-select').value !== model.id) view.effort = null;

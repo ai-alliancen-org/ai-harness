@@ -1,0 +1,335 @@
+/* Approved onboarding B. All rules are confined to onboarding and its existing
+   model dialog; the workspace, plan view and approval surfaces are untouched. */
+:is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) {
+  --ob-line: var(--line, #e2e3e9);
+  --ob-surface: var(--surface, #fff);
+  --ob-soft: var(--soft, #f6f6f8);
+  --ob-ink: var(--ink, #25262b);
+  --ob-muted: var(--muted, #777a87);
+  --ob-success: #16784f;
+  color: var(--ob-ink);
+}
+:is(#setup.onboarding-b, #onboarding.onboarding-b) {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 1580px;
+  margin: 0 auto;
+  padding: 34px clamp(24px, 4vw, 66px) 40px;
+}
+#task-dialog.onboarding-b { width: min(1130px, calc(100vw - 40px)); max-width: 1130px; }
+:is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  align-items: start;
+  gap: 34px;
+}
+:is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-content { min-width: 0; }
+#setup.onboarding-b :is(#setup-provider, #setup-saved, #setup-local-step, #setup-tools, #setup-features, #setup-features-pick) { max-width: none; }
+#setup.onboarding-b .setup-topbar { margin-bottom: 26px; }
+#setup.onboarding-b .setup-heading { max-width: 100%; margin-bottom: 32px; }
+:is(#setup.onboarding-b, #onboarding.onboarding-b) :is(.setup-heading h1, .intro h1) {
+  font-size: clamp(31px, 3.1vw, 48px);
+  line-height: 1.12;
+  font-weight: 650;
+  letter-spacing: -1.65px;
+  margin-bottom: 15px;
+  overflow-wrap: anywhere;
+}
+:is(#setup.onboarding-b, #onboarding.onboarding-b) :is(.setup-heading h1, .intro h1) em {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-weight: 500;
+  letter-spacing: -1.1px;
+}
+:is(#setup.onboarding-b, #onboarding.onboarding-b) :is(.setup-heading > p:not(.eyebrow), .intro > p) { color: var(--ob-muted); font-size: 14px; line-height: 1.8; }
+#setup.onboarding-b .eyebrow { font-size: 10px; letter-spacing: 2px; font-weight: 650; }
+:is(#setup.onboarding-b, #onboarding.onboarding-b) .onboarding-b-progress {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 15px 24px;
+  margin: 0 0 34px;
+  padding: 0 0 24px;
+  border-bottom: 1px solid var(--ob-line);
+}
+:is(#setup.onboarding-b, #onboarding.onboarding-b) .onboarding-b-progress > * {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  color: var(--ob-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+:is(#setup.onboarding-b, #onboarding.onboarding-b) .onboarding-b-progress :is([aria-current=step], [data-current=true]) { color: var(--ob-ink); font-weight: 600; }
+:is(#setup.onboarding-b, #onboarding.onboarding-b) .onboarding-b-progress :is(.onboarding-b-step-number, .onboarding-b-step-circle) {
+  display: inline-grid;
+  place-items: center;
+  width: 25px;
+  height: 25px;
+  flex: none;
+  border: 1px solid var(--ob-line);
+  border-radius: 50%;
+  color: var(--ob-muted);
+  background: var(--ob-surface);
+  font-size: 11px;
+}
+:is(#setup.onboarding-b, #onboarding.onboarding-b) .onboarding-b-progress [data-done=true] :is(.onboarding-b-step-number, .onboarding-b-step-circle) { color: #fff; background: var(--ob-success); border-color: var(--ob-success); }
+#setup.onboarding-b .provider-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 0; }
+#setup.onboarding-b .provider-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 0;
+  min-width: 0;
+  min-height: 158px;
+  padding: 22px 19px 18px;
+  border: 1px solid var(--ob-line);
+  border-radius: 16px;
+  text-align: left;
+  color: var(--ob-ink);
+  background: var(--ob-surface);
+  box-shadow: none;
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+#setup.onboarding-b .provider-card:hover:not(:disabled) { background: var(--ob-surface); border-color: var(--ob-ink); box-shadow: 0 3px 14px #191a2106; }
+#setup.onboarding-b .provider-card[aria-pressed=true] { border-color: var(--ob-ink); box-shadow: 0 0 0 1px var(--ob-ink); background: var(--ob-surface); }
+#setup.onboarding-b .provider-card img {
+  width: 38px;
+  height: 35px;
+  object-fit: contain;
+  margin: 0 0 15px;
+  padding: 0;
+  background: transparent;
+  filter: grayscale(1);
+  opacity: .55;
+  flex: none;
+}
+#setup.onboarding-b .provider-card:is([aria-pressed=true], :hover, :focus-visible) img { filter: none; opacity: 1; }
+#setup.onboarding-b .provider-card strong { margin: 0 22px 0 0; font-size: 15px; font-weight: 600; line-height: 1.4; letter-spacing: -.2px; }
+#setup.onboarding-b .provider-card > span:not(.onboarding-b-choice-mark) { margin-top: 5px; font-size: 11px; color: var(--ob-muted); line-height: 1.6; }
+#setup.onboarding-b .provider-card > small { margin-top: 7px; font-size: 10px; line-height: 1.5; color: var(--ob-muted); }
+#setup.onboarding-b .provider-card > small[data-state=connected] { color: var(--ob-success); }
+#setup.onboarding-b .provider-card > small[data-state=error] { color: var(--danger, #b83f3a); }
+#setup.onboarding-b .provider-card > small:empty { display: none; }
+#setup.onboarding-b .provider-card[data-kind=openrouter] { grid-column: span 2; }
+#setup.onboarding-b .onboarding-b-choice-mark {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  right: 17px;
+  top: 20px;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--ob-line);
+  border-radius: 50%;
+  color: transparent;
+  background: var(--ob-surface);
+}
+#setup.onboarding-b .onboarding-b-choice-mark svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+#setup.onboarding-b .provider-card[aria-pressed=true] .onboarding-b-choice-mark { background: var(--ob-ink); border-color: var(--ob-ink); color: var(--ob-surface); }
+#setup.onboarding-b #setup-provider-body { border: 1px solid var(--ob-line); border-radius: 16px; background: var(--ob-surface); padding: 25px; }
+#setup.onboarding-b #setup-provider-body :is(input, select) { max-width: 100%; box-sizing: border-box; }
+#setup.onboarding-b #setup-saved { border: 1px solid var(--ob-line); border-radius: 16px; background: var(--ob-surface); padding: 26px; }
+#setup.onboarding-b #setup-saved label { margin-top: 0; }
+#setup.onboarding-b #setup-saved .setup-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+#setup.onboarding-b :is(#setup-ai, #local-discovery-status) { font-size: 13px; line-height: 1.8; overflow-wrap: anywhere; }
+#setup.onboarding-b .setup-footer { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 15px; margin-top: 28px; }
+#onboarding.onboarding-b .panel { border-radius: 16px; }
+#onboarding.onboarding-b #purpose { font-size: 14px; line-height: 1.8; min-height: 140px; }
+#onboarding.onboarding-b .create-footer { gap: 20px; align-items: flex-end; flex-wrap: wrap; }
+#task-dialog.onboarding-b #model-shortlist { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 18px 0; }
+#task-dialog.onboarding-b #model-shortlist .model-choice {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  min-height: 145px;
+  margin: 0;
+  padding: 23px 19px;
+  border: 1px solid var(--ob-line);
+  border-radius: 15px;
+  text-align: left;
+  color: var(--ob-ink);
+  background: var(--ob-surface);
+  box-shadow: none;
+}
+#task-dialog.onboarding-b #model-shortlist .model-choice strong { font-size: 15px; line-height: 1.4; overflow-wrap: anywhere; }
+#task-dialog.onboarding-b #model-shortlist .model-choice span { font-size: 11px; line-height: 1.7; color: var(--ob-muted); overflow-wrap: anywhere; }
+#task-dialog.onboarding-b #model-shortlist .model-choice:is([aria-pressed=true], :hover) { border-color: var(--ob-ink); background: var(--ob-surface); }
+#task-dialog.onboarding-b #model-shortlist .model-choice[aria-pressed=true] { box-shadow: 0 0 0 1px var(--ob-ink); }
+#task-dialog.onboarding-b #model-shortlist > .hint { grid-column: 1 / -1; }
+#task-dialog.onboarding-b #model-catalog { margin-top: 22px; }
+:is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-visual {
+  --ob-brand: #898c98;
+  position: sticky;
+  top: 24px;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--ob-line);
+  border-radius: 22px;
+  background: var(--ob-soft);
+}
+:is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-visual[data-kind=anthropic] { --ob-brand: #d97757; }
+:is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-visual[data-kind=mistral] { --ob-brand: #fa500f; }
+:is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-visual[data-kind=azure] { --ob-brand: #0078d4; }
+:is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-visual[data-kind=alexandra] { --ob-brand: #001b4f; }
+:is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-visual[data-kind=openrouter] { --ob-brand: #6467b9; }
+:is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-visual-top { display: flex; align-items: center; justify-content: space-between; gap: 9px; padding: 26px 24px 0; color: var(--ob-muted); }
+:is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-visual-top > span:first-child { font-size: 10px; letter-spacing: 1.8px; font-weight: 650; text-transform: uppercase; }
+:is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-live-tag { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--ob-line); border-radius: 999px; padding: 4px 7px; white-space: nowrap; text-transform: uppercase; font-size: 8px; font-weight: 600; letter-spacing: .8px; }
+:is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-live-tag::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: var(--ob-brand); }
+:is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-art { position: relative; display: grid; place-items: center; height: 240px; margin: 12px 10px 0; }
+:is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-art-ring { position: relative; display: grid; place-items: center; width: 208px; height: 208px; border: 1px solid var(--ob-brand); border-radius: 50%; }
+:is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-art-ring::before,
+:is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-art-ring::after { content: ''; position: absolute; border: 1px solid var(--ob-brand); border-radius: 50%; opacity: .3; pointer-events: none; }
+:is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-art-ring::before { inset: 25px; }
+:is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-art-ring::after { inset: 48px; opacity: .16; }
+:is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-hero { position: relative; z-index: 1; display: grid; place-items: center; height: 94px; width: 94px; border: 1px solid #e1e2e8; border-radius: 25px; background: #fff; box-shadow: 0 11px 25px #15161c08; }
+:is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-hero img { width: 60px; height: 60px; object-fit: contain; }
+:is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-visual[data-kind=''] .onboarding-b-hero { background: transparent; border: none; box-shadow: none; }
+:is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-visual[data-kind=''] .onboarding-b-hero img { width: 85px; height: 85px; }
+:is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-orbit { position: absolute; z-index: 2; display: grid; place-items: center; height: 37px; width: 37px; border: 1px solid #e1e2e8; border-radius: 11px; background: #fff; color: #747783; box-shadow: 0 2px 5px #00000003; }
+:is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-orbit img { height: 24px; width: 24px; object-fit: contain; }
+:is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-orbit svg { height: 19px; width: 19px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+:is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-orbit-0 { left: 0; top: 10px; }
+:is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-orbit-1 { right: -8px; bottom: 28px; }
+:is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-orbit-2 { right: 2px; top: 12px; }
+:is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-orbit-3 { left: -3px; bottom: 18px; }
+:is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-art-pill { position: absolute; z-index: 3; bottom: 17px; max-width: calc(100% - 12px); box-sizing: border-box; border: 1px solid var(--ob-line); border-radius: 999px; background: var(--ob-surface); color: var(--ob-muted); padding: 6px 10px; font-size: 9px; line-height: 1.4; text-align: center; }
+:is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-visual-copy { padding: 0 27px; text-align: center; }
+:is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-visual-heading { margin: 8px 0 13px; font-size: 25px; line-height: 1.25; letter-spacing: -.8px; overflow-wrap: anywhere; }
+:is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-visual-heading > span,
+:is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-visual-heading > em { display: block; }
+:is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-visual-heading em { margin-top: 2px; font-family: Georgia, 'Times New Roman', serif; font-weight: 500; font-size: 29px; }
+:is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-visual-description { color: var(--ob-muted); font-size: 11px; line-height: 1.8; margin: 0; overflow-wrap: anywhere; }
+:is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-connection-name { color: var(--ob-muted); font-size: 10px; line-height: 1.6; margin: 11px 0 0; overflow-wrap: anywhere; }
+:is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-data-path { display: grid; grid-template-columns: minmax(0, 1fr) 24px minmax(0, 1fr) 24px minmax(0, 1fr); gap: 3px; align-items: start; margin: 27px 18px 28px; }
+:is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-route-node { display: flex; flex-direction: column; align-items: center; gap: 7px; min-width: 0; text-align: center; }
+:is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-route-tile { display: grid; place-items: center; height: 37px; width: 37px; flex: none; border: 1px solid var(--ob-line); border-radius: 10px; background: var(--ob-surface); color: var(--ob-muted); }
+:is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-route-tile img { width: 24px; height: 24px; object-fit: contain; }
+:is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-route-tile svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+:is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-route-node strong { color: var(--ob-ink); font-size: 10px; line-height: 1.4; font-weight: 600; overflow-wrap: anywhere; }
+:is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-route-node small { color: var(--ob-muted); font-size: 9px; line-height: 1.45; overflow-wrap: anywhere; }
+:is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-route-arrow { display: grid; place-items: center; padding-top: 8px; color: var(--ob-line); }
+:is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-route-arrow[data-active=true] { color: var(--ob-brand); }
+:is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-route-arrow svg { width: 24px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+:is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-visual-note { display: flex; gap: 9px; align-items: flex-start; margin: auto 0 0; padding: 17px 22px; border-top: 1px solid var(--ob-line); background: var(--ob-surface); color: var(--ob-muted); font-size: 10px; line-height: 1.8; }
+:is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-visual-note svg { height: 17px; width: 17px; flex: none; margin-top: 1px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+:is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-visual-note[data-verified=true] svg { background: var(--ob-success); color: #fff; border-radius: 50%; padding: 2px; box-sizing: border-box; }
+:is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-visual-note[data-state=error] { color: var(--danger, #b83f3a); }
+:is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) :is(button, input, select, textarea, summary):focus-visible { outline: 2px solid var(--ob-ink); outline-offset: 3px; }
+@media (max-width: 1150px) {
+  :is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-layout { grid-template-columns: minmax(0, 1fr) 270px; gap: 24px; }
+  #setup.onboarding-b .provider-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  :is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-visual-top { padding: 21px 17px 0; flex-wrap: wrap; }
+  :is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-art { height: 215px; }
+  :is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-art-ring { width: 180px; height: 180px; }
+  :is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-visual-copy { padding: 0 20px; }
+  :is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-visual-heading { font-size: 23px; }
+  :is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-visual-heading em { font-size: 27px; }
+  :is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-data-path { margin-left: 11px; margin-right: 11px; }
+}
+@media (max-width: 899px) {
+  :is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-layout { grid-template-columns: minmax(0, 1fr); gap: 28px; }
+  :is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-visual { position: static; display: grid; grid-template-columns: 190px minmax(0, 1fr); align-items: center; }
+  :is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-visual-top { grid-column: 1 / -1; padding: 20px 23px 0; }
+  :is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-art { grid-column: 1; grid-row: 2 / 4; height: 208px; margin: 6px 10px 15px; }
+  :is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-art-ring { height: 145px; width: 145px; }
+  :is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-art-ring::before { inset: 17px; }
+  :is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-art-ring::after { inset: 32px; }
+  :is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-hero { height: 69px; width: 69px; border-radius: 19px; }
+  :is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-hero img { height: 44px; width: 44px; }
+  :is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-visual-copy { padding: 18px 22px 0 0; text-align: left; }
+  :is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-visual-heading { font-size: 22px; margin-top: 0; }
+  :is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-visual-heading em { font-size: 24px; }
+  :is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-data-path { grid-column: 2; margin: 18px 20px 23px 0; }
+  :is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-visual-note { grid-column: 1 / -1; padding: 15px 23px; }
+  #task-dialog.onboarding-b { width: calc(100vw - 32px); padding: 22px; }
+}
+@media (max-width: 540px) {
+  :is(#setup.onboarding-b, #onboarding.onboarding-b) { padding: 24px 18px 32px; }
+  :is(#setup.onboarding-b, #onboarding.onboarding-b) .onboarding-b-progress { gap: 12px 16px; margin-bottom: 25px; }
+  :is(#setup.onboarding-b, #onboarding.onboarding-b) .onboarding-b-progress > * { font-size: 10px; gap: 6px; }
+  :is(#setup.onboarding-b, #onboarding.onboarding-b) :is(.setup-heading h1, .intro h1) { font-size: 31px; letter-spacing: -1px; }
+  #setup.onboarding-b .provider-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  #setup.onboarding-b .provider-card { min-height: 145px; padding: 18px 13px 15px; }
+  #setup.onboarding-b .provider-card strong { font-size: 13px; }
+  #setup.onboarding-b .provider-card > span:not(.onboarding-b-choice-mark) { font-size: 10px; }
+  #setup.onboarding-b .provider-card img { width: 32px; height: 30px; }
+  #setup.onboarding-b .onboarding-b-choice-mark { width: 16px; height: 16px; right: 12px; top: 17px; }
+  #setup.onboarding-b :is(#setup-provider-body, #setup-saved) { padding: 20px 17px; }
+  :is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-visual { grid-template-columns: 135px minmax(0, 1fr); }
+  :is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-art { height: 175px; margin-left: 6px; margin-right: 4px; }
+  :is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-art-ring { width: 110px; height: 110px; }
+  :is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-art-ring::before { inset: 13px; }
+  :is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-art-ring::after { inset: 24px; }
+  :is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-hero { width: 55px; height: 55px; border-radius: 15px; }
+  :is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-hero img { width: 35px; height: 35px; }
+  :is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-orbit { width: 28px; height: 28px; border-radius: 8px; }
+  :is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-orbit img { width: 19px; height: 19px; }
+  :is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-art-pill { font-size: 8px; bottom: 13px; border-radius: 9px; padding: 5px 6px; }
+  :is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-visual-copy { padding: 16px 15px 0 8px; }
+  :is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-visual-heading { font-size: 18px; letter-spacing: -.5px; }
+  :is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-visual-heading em { font-size: 21px; }
+  :is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-visual-description { font-size: 10px; line-height: 1.7; }
+  :is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-data-path { margin: 15px 12px 20px 8px; grid-template-columns: minmax(0, 1fr) 14px minmax(0, 1fr) 14px minmax(0, 1fr); gap: 2px; }
+  :is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-route-tile { width: 29px; height: 29px; border-radius: 8px; }
+  :is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-route-tile img { width: 20px; height: 20px; }
+  :is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-route-node strong { font-size: 8px; }
+  :is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-route-node small { font-size: 8px; }
+  :is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-route-arrow svg { width: 14px; }
+  #task-dialog.onboarding-b #model-shortlist { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 360px) {
+  #setup.onboarding-b .provider-cards { grid-template-columns: minmax(0, 1fr); }
+  #setup.onboarding-b .provider-card[data-kind=openrouter] { grid-column: auto; }
+  :is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-visual { display: flex; }
+  :is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-art { width: calc(100% - 20px); height: 170px; }
+  :is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-visual-copy { padding: 0 20px; text-align: center; }
+  :is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-data-path { margin: 22px 20px; }
+}
+/* Keep the original short setup choices and their footer visible on laptop windows. */
+@media (min-width: 900px) and (max-height: 800px) {
+  #setup.onboarding-b:is([data-step=choice], [data-step=features]) { padding-top: 24px; padding-bottom: 24px; }
+  #setup.onboarding-b:is([data-step=choice], [data-step=features]) .setup-topbar { margin-bottom: 12px; }
+  #setup.onboarding-b:is([data-step=choice], [data-step=features]) .setup-heading { margin: 12px 0 20px; }
+  #setup.onboarding-b:is([data-step=choice], [data-step=features]) .onboarding-b-progress { margin-bottom: 20px; padding-bottom: 16px; }
+  #setup.onboarding-b:is([data-step=choice], [data-step=features]) :is(#setup-choice, #setup-feature-choice) { margin: 0; }
+  #setup.onboarding-b:is([data-step=choice], [data-step=features]) :is(.onboarding-b-art, .onboarding-b-data-path) { display: none; }
+  #setup.onboarding-b:is([data-step=choice], [data-step=features]) .onboarding-b-visual-copy { padding: 20px 22px; }
+  #setup.onboarding-b:is([data-step=choice], [data-step=features]) .onboarding-b-visual-heading { font-size: 22px; }
+  #setup.onboarding-b:is([data-step=choice], [data-step=features]) .onboarding-b-visual-heading em { font-size: 24px; }
+  #setup.onboarding-b:is([data-step=choice], [data-step=features]) .setup-footer { margin-top: 20px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  :is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) * { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}
+@media (forced-colors: active) {
+  #setup.onboarding-b .provider-card[aria-pressed=true], #task-dialog.onboarding-b #model-shortlist .model-choice[aria-pressed=true] { border: 2px solid Highlight; }
+  :is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-art-ring { border-color: CanvasText; }
+  :is(#setup.onboarding-b, #onboarding.onboarding-b) .onboarding-b-progress [data-done=true] :is(.onboarding-b-step-number, .onboarding-b-step-circle),
+  :is(#setup.onboarding-b, #onboarding.onboarding-b, #task-dialog.onboarding-b) .onboarding-b-visual-note[data-verified=true] svg { background: Highlight; color: HighlightText; border-color: Highlight; }
+}
+/* Controller-owned progress uses completion only for actual passed stages. */
+:is(#setup.onboarding-b, #onboarding.onboarding-b) .onboarding-b-progress [data-complete=true] :is(.onboarding-b-step-number, .onboarding-b-step-circle) { color: #fff; background: var(--ob-success); border-color: var(--ob-success); }
+#task-dialog.onboarding-b #model-shortlist .model-choice > img { width: 34px; height: 34px; object-fit: contain; margin-bottom: 4px; opacity: .6; filter: grayscale(1); }
+#task-dialog.onboarding-b #model-shortlist .model-choice:is([aria-pressed=true], :hover, :focus-visible) > img { opacity: 1; filter: none; }
+#task-dialog.onboarding-b #model-shortlist .onboarding-b-choice-mark { position: absolute; right: 17px; top: 22px; display: grid; place-items: center; width: 18px; height: 18px; border: 1px solid var(--ob-line); border-radius: 50%; color: transparent; background: var(--ob-surface); padding: 0; margin: 0; }
+#task-dialog.onboarding-b #model-shortlist .onboarding-b-choice-mark svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+#task-dialog.onboarding-b #model-shortlist .model-choice .onboarding-b-choice-mark { color: transparent; }
+#task-dialog.onboarding-b #model-shortlist .model-choice:not([aria-pressed=true]) .onboarding-b-choice-mark svg { visibility: hidden; }
+#task-dialog.onboarding-b #model-shortlist .model-choice[aria-pressed=true] .onboarding-b-choice-mark { color: var(--ob-surface); background: var(--ob-ink); border-color: var(--ob-ink); }
+:is(#setup.onboarding-b, #onboarding.onboarding-b) .onboarding-b-progress { list-style: none; padding-left: 0; }
+:is(#setup.onboarding-b, #onboarding.onboarding-b) .onboarding-b-progress li > span { display: inline-grid; place-items: center; width: 25px; height: 25px; flex: none; border: 1px solid var(--ob-line); border-radius: 50%; color: var(--ob-muted); background: var(--ob-surface); font-size: 11px; }
+:is(#setup.onboarding-b, #onboarding.onboarding-b) .onboarding-b-progress li[aria-current=step] > span { color: var(--ob-ink); border-color: var(--ob-ink); }
+:is(#setup.onboarding-b, #onboarding.onboarding-b) .onboarding-b-progress li[data-complete=true] > span { color: #fff; background: var(--ob-success); border-color: var(--ob-success); }
+@media (forced-colors: active) {
+  :is(#setup.onboarding-b, #onboarding.onboarding-b) .onboarding-b-progress li[data-complete=true] > span { color: HighlightText; background: Highlight; border-color: Highlight; }
+}

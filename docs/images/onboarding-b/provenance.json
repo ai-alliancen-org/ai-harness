@@ -1,0 +1,86 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-10-23",
+  "baseCommit": "dce68ea74a199ca214ab535a16ff22765d8ee8de",
+  "featureCommit": "6fbead9558e099a24c88ed0bc78d8c75721b9c78",
+  "source": "Actual Electron captures from the unchanged original and the F20 branch on macOS; synthetic projects, no production accounts or private user data.",
+  "edits": "None. Original PNG bytes copied unchanged.",
+  "limitations": [
+    "Catalog/test responses are controlled fixtures, not live vendor-account verification.",
+    "Provider overview captures have different dimensions and scroll positions. Connection/model/idea pairs share the same capture dimensions."
+  ],
+  "images": [
+    {
+      "path": "providers-before.png",
+      "label": "Udbyderoversigt før F20",
+      "variant": "baseline",
+      "width": 2850,
+      "height": 1996,
+      "bytes": 273061,
+      "sha256": "3a0fdf02c62cf52b248c6bd0e353e4e4b53faf549f48f2bc8e7854a71df4daa9"
+    },
+    {
+      "path": "providers-after.png",
+      "label": "Udbyderoversigt efter F20 med Mistral i forhåndsvisningen",
+      "variant": "feature",
+      "width": 2880,
+      "height": 1816,
+      "bytes": 350691,
+      "sha256": "a009a2fe891e42047bedde4105b4b54404591ca0e5eb5b5b4b37b3c5844b3118"
+    },
+    {
+      "path": "connection-before.png",
+      "label": "AI-forbindelse før F20",
+      "variant": "baseline",
+      "width": 2880,
+      "height": 1816,
+      "bytes": 98845,
+      "sha256": "a1390c4d4ec74b5d6d265a1b2cb6fd08c59177806aae3d6bc8e6c062ed66aeab"
+    },
+    {
+      "path": "connection-after.png",
+      "label": "AI-forbindelse efter F20",
+      "variant": "feature",
+      "width": 2880,
+      "height": 1816,
+      "bytes": 200486,
+      "sha256": "ddae644280fd2c971e7c1a4a2ec90fef3be2eb34b0d405a88643819939289f1f"
+    },
+    {
+      "path": "model-before.png",
+      "label": "Din AI og modelvalg før F20",
+      "variant": "baseline",
+      "width": 2880,
+      "height": 1816,
+      "bytes": 420360,
+      "sha256": "0ba92d44923554971ed700727851342f20733eaee99bb11f6f27b47c441cb655"
+    },
+    {
+      "path": "model-after.png",
+      "label": "Din AI og modelvalg efter F20",
+      "variant": "feature",
+      "width": 2880,
+      "height": 1816,
+      "bytes": 396380,
+      "sha256": "2f43323c1660c25e45530a996bf81204588d70f5bf80ee30e52255f390409280"
+    },
+    {
+      "path": "idea-before.png",
+      "label": "Projektidé før F20",
+      "variant": "baseline",
+      "width": 2880,
+      "height": 1816,
+      "bytes": 224379,
+      "sha256": "01e6d395f9001df44e2054049cae3df6dbaa30bf85f8e9abf59c6e0f455e4275"
+    },
+    {
+      "path": "idea-after.png",
+      "label": "Projektidé efter F20",
+      "variant": "feature",
+      "width": 2880,
+      "height": 1816,
+      "bytes": 332276,
+      "sha256": "16bcf430c20f44bd15b03ae3f46dc88d386d53503d5bbf44739725353a44ea30"
+    }
+  ]
+}
