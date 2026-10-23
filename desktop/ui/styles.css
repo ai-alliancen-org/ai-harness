@@ -140,6 +140,31 @@ html:has(#workspace:not([hidden])), body:has(#workspace:not([hidden])) { height:
 .composer textarea { border: 0; border-radius: 6px; background: transparent; resize: none; min-height: 68px; font-size: 13px; padding: 7px; }
 .composer textarea:focus-visible { outline: none; }
 .composer:has(textarea:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* F28: dekorativ arbejdskant. Tilstanden kommer fra den aktive samtale, aldrig en timer. */
+@property --aura-metal-angle { syntax: '<angle>'; initial-value: 0deg; inherits: false; }
+#chat-form { position: relative; isolation: isolate; }
+#chat-form::before, #chat-form::after {
+  content: ''; position: absolute; inset: -3px; padding: 3px; border-radius: 16px;
+  pointer-events: none; z-index: 2; opacity: 0; animation: none;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0); mask-composite: exclude;
+  background: conic-gradient(from var(--aura-metal-angle), #8b8c9e 0deg, #e7e8f3 32deg, #8583ab 65deg, #c6dbe2 110deg, #7d82a1 155deg, #f5effa 194deg, #a6c6c2 237deg, #8f8ba9 278deg, #e9ecf3 322deg, #8b8c9e 360deg);
+}
+#chat-form::after { inset: -5px; padding: 4px; filter: blur(6px); z-index: 1; }
+#chat-form[data-metal-state="working"]::before { opacity: 1; animation: aura-metal-flow 5s linear infinite; }
+#chat-form[data-metal-state="working"]::after { opacity: .3; animation: aura-metal-flow 5s linear infinite; }
+#chat-form[data-metal-state="waiting"]::before { inset: -2px; padding: 2px; background: #b87916; opacity: .7; }
+@keyframes aura-metal-flow { to { --aura-metal-angle: 360deg; } }
+@media (prefers-reduced-motion: reduce) {
+  #chat-form::before, #chat-form::after { animation: none !important; }
+  #chat-form::after { display: none; }
+}
+@media (forced-colors: active) {
+  #chat-form::before, #chat-form::after { display: none; }
+  /* Borderfarven giver status uden at erstatte tekstfeltets eksisterende fokusoutline. */
+  #chat-form[data-metal-state="working"], #chat-form[data-metal-state="waiting"] { border-color: Highlight; }
+}
+
 .composer-toolbar { display: flex; align-items: center; gap: 6px; }
 #send, #stop { flex-shrink: 0; white-space: nowrap; }
 /* Model, udbyder og indsats skal altid kunne læses helt; teksten må bryde over to linjer i et smalt panel. */

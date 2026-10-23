@@ -1,0 +1,223 @@
+{
+  "feature": "F28 / UP19: tilstandsbestemt arbejdskant ved skrivefeltet",
+  "checkedAt": "2026-10-23T20:19:05.756042+00:00",
+  "baseline": {
+    "repository": "ai-alliancen-org/ai-harness",
+    "commit": "dce68ea74a199ca214ab535a16ff22765d8ee8de",
+    "release": "v0.6.0-beta.1",
+    "desktop": {
+      "tests": 516,
+      "pass": 514,
+      "fail": 2
+    }
+  },
+  "runtime": {
+    "node": "22.23.3",
+    "electron": "44.4.4",
+    "platform": "macOS Apple Silicon",
+    "nativeKind": "Electron-renderer med kontrollerede IPC-hændelser; ingen rigtig AI-motor eller modelkontakt"
+  },
+  "unit": {
+    "composer": {
+      "tests": 7,
+      "pass": 7,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "desktop": {
+      "tests": 523,
+      "pass": 521,
+      "fail": 2,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "cli": {
+      "tests": 26,
+      "pass": 26,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    }
+  },
+  "baselineFailures": [
+    {
+      "file": "desktop/tests/approvals.test.cjs",
+      "line": 47,
+      "error": "Godkendelsen findes ikke længere."
+    },
+    {
+      "file": "desktop/tests/approvals.test.cjs",
+      "line": 74,
+      "error": "Cannot read properties of undefined (reading 'properties')"
+    }
+  ],
+  "newFailures": [],
+  "native": {
+    "checksPassed": 14,
+    "checks": [
+      "Inaktiv samtale har ingen synlig eller animeret arbejdskant.",
+      "Starting og working bruger den aktive samtales kant; 5-sekunders animationen bevæger sig uden layoutændring.",
+      "Begge dekorationslag er klikgennemtrængelige; skrivning, AI-knap og tastaturnavigation virker.",
+      "En reel godkendelsesvisning fra IPC skifter til en statisk ventekant med den eksisterende statustekst.",
+      "Kun et eksplicit klik godkender handlingen; korrekt samtale og id bevares, hvorefter arbejdskanten fortsætter.",
+      "Arbejde i baggrundssamtale A tænder ikke kanten i den ledige, aktive samtale B.",
+      "Rigtige samtaleskift A/B genskaber kant og kladde for den valgte samtale.",
+      "Reduceret bevægelse fjerner rotation og slør; den statiske arbejdskant og eksisterende status bevares.",
+      "Tvungne systemfarver skjuler dekorationen, bruger systemets Highlight og bevarer tastaturfokus.",
+      "Ved 720 px forbliver skrivefelt og knapper synlige uden vandret sidescroll.",
+      "Stop-knappen bruger eksisterende IPC med aktiv ejer og slukker kanten ved stopped-hændelsen.",
+      "Fejlens afsluttende status slukker kanten; en fejltekst alene foregiver ingen afsluttet kørsel.",
+      "Normal afslutning slukker animation og aria-busy uden en efterfølgende timer.",
+      "Ingen rendererfejl eller Git-skrivninger under forløbet."
+    ],
+    "rendererErrors": [],
+    "mediaPreferences": "Chromium media emulation",
+    "modelRequests": 0,
+    "sourceSha256": {
+      "desktop/ui/app.js": "8a27a217ea63fce7044d6f513f84b108b325a216477fe9fa714810767210193e",
+      "desktop/ui/styles.css": "48a79ee1a9ca73daceed8767f9ca6f2cd5198e314050511c41db089c36572635",
+      "desktop/scripts/verify-composer-glow.cjs": "2b688ba5e9fab71c7f0627827ed69e27b7e308831d2952f705957b41326f5733"
+    }
+  },
+  "unchangedAgainstBaseline": [
+    {
+      "path": "desktop/core",
+      "files": 67,
+      "byteIdenticalToBaseline": true
+    },
+    {
+      "path": "desktop/preload.cjs",
+      "files": 1,
+      "byteIdenticalToBaseline": true
+    },
+    {
+      "path": "desktop/main.cjs",
+      "files": 1,
+      "byteIdenticalToBaseline": true
+    },
+    {
+      "path": "desktop/runtime-lock.json",
+      "files": 1,
+      "byteIdenticalToBaseline": true
+    },
+    {
+      "path": "desktop/package.json",
+      "files": 1,
+      "byteIdenticalToBaseline": true
+    },
+    {
+      "path": "desktop/package-lock.json",
+      "files": 1,
+      "byteIdenticalToBaseline": true
+    },
+    {
+      "path": "desktop/ui/index.html",
+      "files": 1,
+      "byteIdenticalToBaseline": true
+    },
+    {
+      "path": "desktop/ui/approvals.js",
+      "files": 1,
+      "byteIdenticalToBaseline": true
+    },
+    {
+      "path": "desktop/ui/planning.js",
+      "files": 1,
+      "byteIdenticalToBaseline": true
+    },
+    {
+      "path": "profiles",
+      "files": 34,
+      "byteIdenticalToBaseline": true
+    },
+    {
+      "path": "cli",
+      "files": 16,
+      "byteIdenticalToBaseline": true
+    },
+    {
+      "path": ".github/workflows",
+      "files": 4,
+      "byteIdenticalToBaseline": true
+    }
+  ],
+  "screenshots": [
+    {
+      "file": "docs/images/composer-glow/idle.png",
+      "widthPixels": 840,
+      "heightPixels": 1686,
+      "viewportCropCssPixels": {
+        "width": 420,
+        "height": 843
+      },
+      "bytes": 71228,
+      "sha256": "5bc1f22a4b217bf927eb67fe9695c69bfd80936989d0dbe543b80c0e872ed919"
+    },
+    {
+      "file": "docs/images/composer-glow/working.png",
+      "widthPixels": 840,
+      "heightPixels": 1686,
+      "viewportCropCssPixels": {
+        "width": 420,
+        "height": 843
+      },
+      "bytes": 104182,
+      "sha256": "4fc1e15d2e49f500ee911eee50f9fb82874d72ce8bd14d6d2f1f606a45048792"
+    },
+    {
+      "file": "docs/images/composer-glow/waiting-approval.png",
+      "widthPixels": 840,
+      "heightPixels": 1686,
+      "viewportCropCssPixels": {
+        "width": 420,
+        "height": 843
+      },
+      "bytes": 136360,
+      "sha256": "f66da2eb66ffade983a7a54eddc99c0e7f3ac28e5664207fa45592f05a066747"
+    },
+    {
+      "file": "docs/images/composer-glow/reduced-motion.png",
+      "widthPixels": 840,
+      "heightPixels": 1686,
+      "viewportCropCssPixels": {
+        "width": 420,
+        "height": 843
+      },
+      "bytes": 109779,
+      "sha256": "74d0212fc4fc8b007d0e7ee8b0de5fd7d3b79efb5ae05d2788b4a74170de8a22"
+    },
+    {
+      "file": "docs/images/composer-glow/forced-colors.png",
+      "widthPixels": 840,
+      "heightPixels": 1686,
+      "viewportCropCssPixels": {
+        "width": 420,
+        "height": 843
+      },
+      "bytes": 91630,
+      "sha256": "3d47b30928966dc79df3ba1ed4d3079d4b6d3833050cfe4e87cc29a2d4b11831"
+    },
+    {
+      "file": "docs/images/composer-glow/narrow-720.png",
+      "widthPixels": 706,
+      "heightPixels": 1488,
+      "viewportCropCssPixels": {
+        "width": 353,
+        "height": 744
+      },
+      "bytes": 112518,
+      "sha256": "b61cf697e521762cf5865cf63c404b693a0bd1c6b5e9398f4d03c6618c2226d8"
+    }
+  ],
+  "limitations": [
+    "Kontrollerede IPC-hændelser; ingen rigtig AI-inferens eller udbyderlogin.",
+    "Ingen Windows-, Linux- eller VoiceOver-prøve.",
+    "Nativeprøven dokumenterer eksisterende godkendelsesbetjening, ikke den komplette motor- eller sikkerhedskæde.",
+    "Ingen distributionspakke bygget; ingen GitHub Actions startet.",
+    "Samlet desktoptest er ikke grøn: to fejl findes også på den uændrede original."
+  ]
+}

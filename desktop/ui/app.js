@@ -744,6 +744,8 @@ function waitFor(id, title, element, v = view) { v.waitingFor = [...v.waitingFor
 function doneWaiting(id, v = view) { v.waitingFor = v.waitingFor.filter(item => item.id !== id); if (v === view) renderStatus(); window.chats?.render(); }
 function renderStatus() {
   const v = view, waiting = v.running && v.waitingFor.length > 0;
+  // Lyskanten følger kun den aktive samtale; ventende valg står stille.
+  $('#chat-form').dataset.metalState = v.running ? (waiting ? 'waiting' : 'working') : 'idle';
   $('#agent-activity').hidden = !v.running; $('#agent-activity').classList.toggle('is-waiting', waiting);
   $('#agent-activity-text').textContent = waiting ? `Venter på dig: ${v.waitingFor[0].title}${v.waitingFor.length > 1 ? ` Og ${v.waitingFor.length - 1} mere.` : ''}` : window.ChatDisplay.phase(v) || v.statusDetail;
   $('#agent-activity-jump').hidden = !waiting; $('#agent-follow').hidden = waiting;
