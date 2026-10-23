@@ -724,6 +724,7 @@ function showData(data, canSend) {
 async function sendNow(data, text) {
   const v = view, owner = selectedOwner(); v.activityGroup = null; v.planCard = false; v.runConnection = $('#connection-select').value;
   v.activeModelSummary = $('#model-chip').textContent;
+  v.activeModelBrand = { kind: state?.connections.find(c => c.id === v.runConnection)?.kind, modelID: $('#model-select').value };
   $('#model-options').open = false; $('#task-dialog').close(); $('#connection-warning').hidden = true; $('#data-dialog').close(); setRunning(true, 'Starter agent …');
   if ($('#work-mode').value === 'free') { activePlan = null; $('#plan-card').hidden = true; }
   $('#run-review').hidden = true; if ($('#work-mode').value === 'build') $('#plan-card').hidden = true; if ($('#work-mode').value === 'plan') { activePlan = null; $('#plan-card').hidden = true; }
@@ -1024,7 +1025,8 @@ function updateModelSummary() {
   $('#model-effort').hidden = !chosen; $('#model-effort-text').textContent = chosen ? `Du har valgt ${chosen} indsats i denne samtale.` : '';
   const label = model.value ? [model.selectedOptions[0].textContent, provider, effortLabel].filter(Boolean).join(' · ') : 'Vælg AI';
   $('#model-summary').textContent = model.value ? model.selectedOptions[0].textContent : 'Vælg din AI';
-  $('#model-chip').textContent = view.running && view.activeModelSummary ? view.activeModelSummary : label;
+  const brand = view.running && view.activeModelSummary ? view.activeModelBrand : { kind: connection?.kind, modelID: model.value };
+  window.ProviderBrand.decorate($('#model-chip'), { ...brand, label: view.running && view.activeModelSummary ? view.activeModelSummary : label });
   $('#model-chip').title = chosen ? `Du har valgt ${chosen} indsats i denne samtale. Klik for at skifte model eller indsats.` : effort ? `${effort[0].toUpperCase()}${effort.slice(1)} indsats er udbyderens standard for modellen. Klik for at skifte model.` : connection?.kind === 'mistral' ? 'Aura sender ikke et valg af indsats. Mistrals standard gælder; niveauet er ikke verificeret. Klik for at skifte model eller forbindelse.' : 'Klik for at skifte model eller forbindelse.';
   $('#connection-status').textContent = model.value ? (state?.connections.find(c => c.id === $('#connection-select').value)?.name || 'Valgt forbindelse') + ' · ' + model.value : 'Ingen model valgt';
 }
@@ -1589,7 +1591,11 @@ function renderShortlist() {
   $('#model-shortlist').replaceChildren();
   for (const { model, text } of picks) {
     const button = node('button', undefined, 'model-choice'); button.type = 'button'; button.dataset.model = model.id;
-    button.append(node('strong', model.name), node('span', text));
+    const heading = node('strong', undefined, 'provider-brand-heading');
+    const logo = window.ProviderBrand.icon(kind, model.id, document);
+    if (logo) heading.append(logo);
+    heading.append(node('span', model.name));
+    button.append(heading, node('span', text));
     // Et klik vælger modellen og lukker dialogen. Kun OpenRouter kræver bagefter et valg af udbyder.
     button.onclick = () => action(async () => {
       if ($('#model-select').value !== model.id) view.effort = null;

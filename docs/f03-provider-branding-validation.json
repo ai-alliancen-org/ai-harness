@@ -1,0 +1,337 @@
+{
+  "kind": "Electron med kontrolleret modelkatalog; ingen rigtig AI eller konto",
+  "platform": "darwin",
+  "originalSource": {
+    "commit": "dce68ea74a199ca214ab535a16ff22765d8ee8de",
+    "hashes": {
+      "main.cjs": "19c1be630241844c1dc3d979500c2f3aaa9942f94286c9dc05bf52d4022cdf34",
+      "ui/app.js": "2aec4d88cf3067b3079d4658be5284aceb973c84fa1185721e9ea145eb8f74c8",
+      "ui/index.html": "06246e60d5cc4379c13bb3023908bc569c489879e71de44cf8861466a118d7db",
+      "ui/styles.css": "1f541e1fa09b37831a33be31c23c8928a2f4b96b7f267201ce421961b5f82ac8"
+    }
+  },
+  "beforeResult": {
+    "electron": "44.4.4",
+    "errors": [],
+    "networkRequests": 0
+  },
+  "afterResult": {
+    "electron": "44.4.4",
+    "errors": [],
+    "networkRequests": 0
+  },
+  "checks": [
+    "before: tastatur åbner samme modeldialog, og almindeligt modelklik vælger Large og returnerer til skrivefeltet.",
+    "before: OpenRouter beholder forbindelsen, den konkrete rute og model-id; Escape lukker den oprindelige dialog.",
+    "before: ukendt udbyder beholder en læsbar tekst uden gættet logo eller ekstern billedadresse.",
+    "before: 720 px og reduceret bevægelse bevarer synligt skrivefelt og modelnavn uden vandret sidescroll.",
+    "before: ingen rendererfejl, eksterne netværksforsøg eller Git-skrivninger under prøven.",
+    "after: tastatur åbner samme modeldialog, og almindeligt modelklik vælger Large og returnerer til skrivefeltet.",
+    "after: OpenRouter beholder forbindelsen, den konkrete rute og model-id; Escape lukker den oprindelige dialog.",
+    "after: ukendt udbyder beholder en læsbar tekst uden gættet logo eller ekstern billedadresse.",
+    "after: igangværende models navn og mærke beholdes ved et valg til næste opgave.",
+    "after: et katalog med HTML-lignende modelnavn forbliver tekst, uden ekstra DOM eller eksternt billede.",
+    "after: 720 px og reduceret bevægelse bevarer synligt skrivefelt og modelnavn uden vandret sidescroll.",
+    "after: systemets kontrastfarver bevarer tekst og synligt tastaturfokus; logo er fortsat kun dekoration.",
+    "after: ingen rendererfejl, eksterne netværksforsøg eller Git-skrivninger under prøven."
+  ],
+  "images": [
+    {
+      "file": "before-composer-mistral.png",
+      "version": "before",
+      "scenario": "composer-mistral",
+      "width": 776,
+      "height": 360,
+      "cssWidth": 388,
+      "cssHeight": 180,
+      "clip": {
+        "x": 232,
+        "y": 691,
+        "width": 388,
+        "height": 180
+      },
+      "bytes": 29676,
+      "sha256": "b44c28afd1431a29983cfc6e230c2b579a207b0c738347fcb2b47613c0528b60",
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "source": "Faktisk Electron-renderer med syntetisk modelkatalog; ingen AI-kørsel."
+    },
+    {
+      "file": "before-model-dialog.png",
+      "version": "before",
+      "scenario": "model-dialog",
+      "width": 1200,
+      "height": 1560,
+      "cssWidth": 600,
+      "cssHeight": 780,
+      "clip": {
+        "x": 340,
+        "y": 60,
+        "width": 600,
+        "height": 780
+      },
+      "bytes": 167540,
+      "sha256": "09b268d5aa322259c3b02b8632d7055ff8f624bbd87e2359829f077f5a2cbaa4",
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "source": "Faktisk Electron-renderer med syntetisk modelkatalog; ingen AI-kørsel."
+    },
+    {
+      "file": "before-composer-openrouter.png",
+      "version": "before",
+      "scenario": "composer-openrouter",
+      "width": 776,
+      "height": 360,
+      "cssWidth": 388,
+      "cssHeight": 180,
+      "clip": {
+        "x": 232,
+        "y": 691,
+        "width": 388,
+        "height": 180
+      },
+      "bytes": 29124,
+      "sha256": "5786f6e5ff9f2d22ec4be3c230df1c1fca8b21c7ba7dfe514764a7b4198390a7",
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "source": "Faktisk Electron-renderer med syntetisk modelkatalog; ingen AI-kørsel."
+    },
+    {
+      "file": "before-openrouter-dialog.png",
+      "version": "before",
+      "scenario": "openrouter-dialog",
+      "width": 1200,
+      "height": 1560,
+      "cssWidth": 600,
+      "cssHeight": 780,
+      "clip": {
+        "x": 340,
+        "y": 60,
+        "width": 600,
+        "height": 780
+      },
+      "bytes": 155326,
+      "sha256": "cfc307bd05cefb19423b032d436b698c2bc5c2a93e7ad6f2e5229c5af36fb747",
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "source": "Faktisk Electron-renderer med syntetisk modelkatalog; ingen AI-kørsel."
+    },
+    {
+      "file": "before-narrow-720.png",
+      "version": "before",
+      "scenario": "narrow-720",
+      "width": 642,
+      "height": 360,
+      "cssWidth": 321,
+      "cssHeight": 180,
+      "clip": {
+        "x": 76,
+        "y": 591,
+        "width": 321,
+        "height": 180
+      },
+      "bytes": 30665,
+      "sha256": "ff15b2453788c6b5c607a51d4a38f2715be399e2ec5e7ffbd3975db32406844a",
+      "viewport": {
+        "width": 720,
+        "height": 800
+      },
+      "source": "Faktisk Electron-renderer med syntetisk modelkatalog; ingen AI-kørsel."
+    },
+    {
+      "file": "after-composer-mistral.png",
+      "version": "after",
+      "scenario": "composer-mistral",
+      "width": 776,
+      "height": 360,
+      "cssWidth": 388,
+      "cssHeight": 180,
+      "clip": {
+        "x": 232,
+        "y": 691,
+        "width": 388,
+        "height": 180
+      },
+      "bytes": 29716,
+      "sha256": "6a0259ea41f8f08b7ac39cf0eb20684f28da3c10626530c05cb18becbe97e922",
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "source": "Faktisk Electron-renderer med syntetisk modelkatalog; ingen AI-kørsel."
+    },
+    {
+      "file": "after-model-dialog.png",
+      "version": "after",
+      "scenario": "model-dialog",
+      "width": 1200,
+      "height": 1560,
+      "cssWidth": 600,
+      "cssHeight": 780,
+      "clip": {
+        "x": 340,
+        "y": 60,
+        "width": 600,
+        "height": 780
+      },
+      "bytes": 168730,
+      "sha256": "9772a58a9d8ab58fc505e168893212dfe53bb0a9df11871524fe3efef23dcd16",
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "source": "Faktisk Electron-renderer med syntetisk modelkatalog; ingen AI-kørsel."
+    },
+    {
+      "file": "after-composer-openrouter.png",
+      "version": "after",
+      "scenario": "composer-openrouter",
+      "width": 776,
+      "height": 360,
+      "cssWidth": 388,
+      "cssHeight": 180,
+      "clip": {
+        "x": 232,
+        "y": 691,
+        "width": 388,
+        "height": 180
+      },
+      "bytes": 29142,
+      "sha256": "9f3c27bda71b9c2868080216293bfde047176cb75fe4ab3f60d8b4f45df77e6a",
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "source": "Faktisk Electron-renderer med syntetisk modelkatalog; ingen AI-kørsel."
+    },
+    {
+      "file": "after-openrouter-dialog.png",
+      "version": "after",
+      "scenario": "openrouter-dialog",
+      "width": 1200,
+      "height": 1560,
+      "cssWidth": 600,
+      "cssHeight": 780,
+      "clip": {
+        "x": 340,
+        "y": 60,
+        "width": 600,
+        "height": 780
+      },
+      "bytes": 155145,
+      "sha256": "ed032371bfa726337216620cb7eb433878a8f4983b03da692e9e8c25545729f5",
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "source": "Faktisk Electron-renderer med syntetisk modelkatalog; ingen AI-kørsel."
+    },
+    {
+      "file": "after-narrow-720.png",
+      "version": "after",
+      "scenario": "narrow-720",
+      "width": 642,
+      "height": 360,
+      "cssWidth": 321,
+      "cssHeight": 180,
+      "clip": {
+        "x": 76,
+        "y": 591,
+        "width": 321,
+        "height": 180
+      },
+      "bytes": 31845,
+      "sha256": "843a4a1b368a7d81022a55040c0776dfcebf6a5bc9efed6367169aed346bd45c",
+      "viewport": {
+        "width": 720,
+        "height": 800
+      },
+      "source": "Faktisk Electron-renderer med syntetisk modelkatalog; ingen AI-kørsel."
+    }
+  ],
+  "sourceHashes": {
+    "main.cjs": "90dbaaedd9c9e387411e0dff9fe8d7bea1154147000326f3b7f0aded2b7555f6",
+    "ui/app.js": "0a4ebf06db19c2252356e4ed0542b9b66ddf3c28b5a99315f731df908d4cc983",
+    "ui/index.html": "280ccf2c0cefdd9c77b436617199b507b97d47a8139960f730025c8069c63ca0",
+    "ui/styles.css": "000588db5263876560b4d075cab88148b10adbcae213866bcad5370c7643686d",
+    "ui/provider-brand.js": "4e9d09d043a991205a292ea282a6d57c506ff74935b323ad452799f1ff2b462b"
+  },
+  "limits": [
+    "Windows er ikke afprøvet.",
+    "Ingen rigtig modelsession, kontoadgang eller datamodtagelse er afprøvet.",
+    "Skærmlæser er ikke afprøvet; dekorative alt/aria-egenskaber og tastatur er kontrolleret."
+  ],
+  "date": "2026-10-23",
+  "tests": {
+    "featureUnit": {
+      "passed": 9,
+      "total": 9
+    },
+    "desktop": {
+      "passed": 523,
+      "total": 525,
+      "failed": 2,
+      "baselineFailures": [
+        {
+          "file": "desktop/tests/approvals.test.cjs",
+          "line": 47,
+          "message": "Godkendelsen findes ikke længere."
+        },
+        {
+          "file": "desktop/tests/approvals.test.cjs",
+          "line": 74,
+          "message": "Cannot read properties of undefined (reading 'properties')"
+        }
+      ]
+    },
+    "cli": {
+      "passed": 26,
+      "total": 26
+    },
+    "native": {
+      "passed": 13,
+      "total": 13
+    }
+  },
+  "provenance": "Billeder taget direkte fra to særskilte Electron-appforløb. Før-kilden er en separat, urørt original-checkout; efter-kilden er denne branches produktkode. Samme syntetiske katalog, viewport, reduceret bevægelse og faste beskæringer pr. par. Ingen billedredigering.",
+  "driverSHA256": "0c18edfb4256573ecbbf90291946347a302996141fc2f5e0045d445a5440b82b",
+  "baselineTests": {
+    "date": "2026-10-23",
+    "commit": "dce68ea74a199ca214ab535a16ff22765d8ee8de",
+    "trackedDiff": "",
+    "desktop": {
+      "tests": 516,
+      "pass": 514,
+      "fail": 2,
+      "skipped": 0
+    },
+    "cli": {
+      "tests": 26,
+      "pass": 26,
+      "fail": 0,
+      "skipped": 0
+    },
+    "knownFailures": [
+      {
+        "file": "desktop/tests/approvals.test.cjs",
+        "line": 47,
+        "message": "Godkendelsen findes ikke længere."
+      },
+      {
+        "file": "desktop/tests/approvals.test.cjs",
+        "line": 74,
+        "message": "Cannot read properties of undefined (reading 'properties')"
+      }
+    ],
+    "runtime": "Node 22.23.3",
+    "qualification": "Frisk kørsel på urørt original. De eneste ikke-trackede indgange er lokal .runtime og node_modules; ingen tracked kildeændringer. Ingen GitHub workflow eller modelkontakt er startet."
+  }
+}

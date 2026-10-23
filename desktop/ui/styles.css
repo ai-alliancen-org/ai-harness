@@ -144,6 +144,11 @@ html:has(#workspace:not([hidden])), body:has(#workspace:not([hidden])) { height:
 #send, #stop { flex-shrink: 0; white-space: nowrap; }
 /* Model, udbyder og indsats skal altid kunne læses helt; teksten må bryde over to linjer i et smalt panel. */
 #model-chip { margin-right: auto; flex: 1 1 auto; min-width: 0; text-align: left; white-space: normal; line-height: 1.4; font-weight: 450; font-size: 11px; color: var(--muted); }
+/* F03: lokale, dekorative udbydermærker; modelnavn og modtagertekst bevares. */
+#model-chip, .model-choice .provider-brand-heading { display: flex; align-items: center; gap: 7px; }
+.provider-brand-icon { flex: 0 0 18px; width: 18px; height: 18px; object-fit: contain; }
+.provider-brand-label, .provider-brand-heading > span { min-width: 0; overflow-wrap: anywhere; }
+.model-choice .provider-brand-heading > span { margin-top: 0; font-size: inherit; color: inherit; }
 #composer-mode { font-size: 10px; margin: 0; }
 .composer button { padding: 6px 13px; font-size: 12px; }
 #draft-status { font-size: 10px; margin: 0 20px 8px; color: var(--muted); min-height: 15px; }
