@@ -1133,3 +1133,13 @@ kbd { font: 600 11px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif
 @media (prefers-reduced-motion: reduce) { .operation-spinner { animation: none; } }
 
 .composer-shortcut { margin: 0 14px 4px; color: var(--muted); font-size: 11px; line-height: 1.4; }
+
+/* Local conversation search follows the app's existing dialog and button style. */
+.history-search-dialog { width: min(760px, calc(100vw - 32px)); }
+.history-search-form { display: grid; grid-template-columns: 1fr auto; gap: 8px 12px; }
+.history-search-form label, .history-search-form input { grid-column: 1 / -1; }
+.history-search-results { list-style: none; padding: 0; display: grid; gap: 8px; }
+.history-search-result { display: grid; gap: 5px; width: 100%; text-align: left; white-space: normal; overflow-wrap: anywhere; }
+.history-search-result small { color: var(--muted); }
+.search-message-hit { outline: 2px solid var(--accent, #0055ce); outline-offset: 4px; }
+@media (max-width: 600px) { .history-search-form { grid-template-columns: minmax(0, 1fr); } }

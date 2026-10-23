@@ -400,7 +400,7 @@ async function displayProject(project, { firstTask = false } = {}) {
 // beskederne skal vises fra den gemte samtale; ellers står de allerede i samtalens visning.
 function fillChat(next, fresh) {
   const history = next.workspace, v = view;
-  if (fresh) for (const item of history?.messages || []) appendMessage(item.text, item.role);
+  if (fresh) for (const item of history?.messages || []) { const element = appendMessage(item.text, item.role); if (typeof item.id === 'string') element.dataset.messageId = item.id; }
   const empty = !v.log.children.length;
   $('#project-intro').hidden = !empty; $('#start-idea').hidden = !empty;
   $('#resume-notice').hidden = !history?.messages?.length && !next.historyWarning; $('#resume-notice').open = false;
@@ -444,6 +444,30 @@ async function showChat(next) {
   window.chats?.render();
   if (view.followChat) $('#chat-content').scrollTop = $('#chat-content').scrollHeight;
 }
+// A local search hit selects a stored message for display, never as model context.
+window.openStoredMessage = async result => {
+  if (!result || !/^[a-f0-9]{64}$/.test(result.project || '') || !/^[a-f0-9-]{36}$/.test(result.chat || '') || typeof result.message !== 'string' || result.message.length > 200) throw new Error('Vælg et aktuelt lokalt søgeresultat.');
+  const project = window.chats.projects().find(item => item.id === result.project);
+  if (!project) throw new Error('Projektet findes ikke længere. Søg igen.');
+  if (project.root !== current?.root && anyRunning()) throw new Error('Vent på de aktive opgaver, før du åbner et andet projekt.');
+  await saveChatDraft(true);
+  await window.chats.openChat(project, result.chat);
+  if (current?.root !== project.root || view.id !== result.chat) throw new Error('Samtalen er skiftet. Vælg søgeresultatet igen.');
+  const owner = view, find = () => [...owner.log.children].find(element => element.dataset?.messageId === result.message);
+  if (!find()) {
+    if (owner.running) throw new Error('Samtalen arbejder stadig. Åbn træffet igen, når opgaven er færdig.');
+    const next = await call('chatOpen', result.chat);
+    if (view !== owner) throw new Error('Samtalen er skiftet. Vælg søgeresultatet igen.');
+    // Reload only the transcript. A same-chat search must not reset an unsaved
+    // brief/plan editor, model selection, draft or approval controls.
+    owner.log.replaceChildren(); owner.parts.clear(); owner.assistantText.clear(); owner.pendingMarkdown.clear();
+    for (const item of next.workspace?.messages || []) { const element = appendMessage(item.text, item.role, owner); if (typeof item.id === 'string') element.dataset.messageId = item.id; }
+  }
+  const target = find(); if (!target) throw new Error('Beskeden findes ikke længere i den gemte samtale. Søg igen.');
+  for (const element of owner.log.querySelectorAll('.search-message-hit')) element.classList.remove('search-message-hit');
+  owner.followChat = false; target.classList.add('search-message-hit'); target.tabIndex = -1;
+  target.scrollIntoView({ block: 'center', behavior: 'auto' }); target.focus({ preventScroll: true }); return target;
+};
 // Forbindelser bliver gemt hver for sig. Kontrolstatus gælder kun katalogkald i denne appsession.
 let editingConnection = '', connectionPage = 0, checkingConnections = false, repeatSetup = null;
 const connectionChecks = ConnectionOverview.tracker();

@@ -1,0 +1,33 @@
+{
+  "base": "dce68ea74a199ca214ab535a16ff22765d8ee8de",
+  "proposal": "F11",
+  "tests": {
+    "desktop": {
+      "tests": 523,
+      "pass": 521,
+      "fail": 2,
+      "skipped": 0
+    },
+    "cli": {
+      "tests": 26,
+      "pass": 26,
+      "fail": 0,
+      "skipped": 0
+    }
+  },
+  "scope": [
+    "Automatiske testcases: søgning i beskedtekst uden skrivning, projekts-/samtalefiltre, pagination, ukendte IDer, korrupte og store records, symlinkede filer/mapper og legacy-historik uden migration.",
+    "Seks korrupte 8 MiB-filer afprøves med måling af faktisk læste bytes; samlet læsning holder sig under 32 MiB-budgettet.",
+    "Den faktiske navigationsfunktion afprøves med en nyligt gemt besked uden DOM-ID. Genindlæsningen må ikke kalde fillChat eller nulstille plan-/briefredigering; en arbejdende samtale genopbygges ikke.",
+    "Native prøve: 20 og derefter 25 lokale træf, præcis besked m0, gemt og gendannet ufærdig kladde, bevaret usendt briefredigering i samme samtale, nul træf, Escape og smalt vindue uden vandret side-overflow.",
+    "Nul modelkald, nul rendererfejl og nul Git-skrivninger i den native prøve. Resultatet blev ikke valgt som ekstra historik til AI.",
+    "Gentag prøverne med `node --test --test-concurrency=1 desktop/tests/*.test.cjs` og `node --test --test-concurrency=1 cli/tests/*.test.cjs`."
+  ],
+  "limits": "Der søges kun i den historik, Aura faktisk har bevaret; allerede frasorterede gamle beskeder kan ikke genfindes. Faste grænser er 100 projekter, 500 samtaler, 512 KiB pr. indeks, 8 MiB pr. samtalefil og 32 MiB samlet faktisk læsning. Et gammelt format skal først åbnes og migreres gennem den eksisterende projektfunktion. Begrænset eller utilgængelig historik oplyses i søgestatus. Store biblioteker kan derfor kræve en snævrere søgning. Ingen ny historikindeksering eller baggrundstjeneste indføres. Der søges højst i de første 30.000 tegn af hver gemt besked.",
+  "images": {
+    "before.png": "0de049b215ef4182ae1f1691c9d4e662fe76c3849341dd2d43c4a4ff44930b33",
+    "after.png": "0de5f500960b03d1f5414db2da554598e697567eebaf49f38992adf0f8ecb3ae",
+    "exact-message.png": "8185106ad497ae7f7a10229645395bae689adf9d1420e1537cf72cb6f1805a7c",
+    "after-narrow.png": "68c79b012fbdf5b1fe13b91e20d3999076a638ab382964dadb988d7665cd71c9"
+  }
+}
