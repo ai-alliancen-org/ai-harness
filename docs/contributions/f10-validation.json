@@ -1,0 +1,31 @@
+{
+  "base": "dce68ea74a199ca214ab535a16ff22765d8ee8de",
+  "proposal": "F10",
+  "tests": {
+    "desktop": {
+      "tests": 520,
+      "pass": 518,
+      "fail": 2,
+      "skipped": 0
+    },
+    "cli": {
+      "tests": 26,
+      "pass": 26,
+      "fail": 0,
+      "skipped": 0
+    }
+  },
+  "scope": [
+    "Nye testcases dækker inert HTML, tabeller, escaped/code pipes, opdateret streaming, eksisterende lister/overskrifter, eksplicitte klik, eksakt tekstkopiering samt blokering af usikre links i både renderer og hovedproces.",
+    "Kodekopiering bevarer tomme linjer og bruger den oprindelige tekst, selv når visningen efterfølgende dekoreres med projektlinks/farveprøver.",
+    "Native Workbench → OpenCode → lokal SSE-server: korrekt svarvisning, eksakt kopi af svar og kode samt ét korrekt link gennem rigtig IPC og URL-validering. En ekstra prøve i Chromiums faktiske DOM holder HTML i tabelceller inert.",
+    "OS-udklipsholder og browseråbning blev erstattet med kontrollerede testmodtagere under prøven; brugerens udklipsholder og browser blev ikke ændret. Nul rendererfejl og nul Git-skrivninger.",
+    "Gentag de automatiske prøver med `node --test --test-concurrency=1 desktop/tests/*.test.cjs` og `node --test --test-concurrency=1 cli/tests/*.test.cjs`."
+  ],
+  "limits": "Dette er en bevidst lille Markdown-visning, ikke en fuld CommonMark/GFM-parser; komplekse indlejrede tabeller og alle Markdown-linkvarianter er ikke understøttet. Et tilladt http(s)-link er ikke en garanti for destinationssidens troværdighed. De faktiske systemhandlinger til udklipsholder og standardbrowser er afgrænset ved testmodtagere; native prøve verificerer brugerhandling, indhold og IPC/validering, ikke OS-programstart.",
+  "images": {
+    "before.png": "63eb87216b73325fbbf4879994a7b669f78112e40958733de10efab15dcdd28f",
+    "after.png": "4a2f6bd68682f3dbfa1b1e323ded2f441ee1fb9ad145093e75d30a1353026be7",
+    "after-narrow.png": "3298e8c011e92a9371ec1e14442bade69a51854f0789730e4b9c6a21e1d8a7d6"
+  }
+}

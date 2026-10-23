@@ -91,46 +91,14 @@ async function saveChatDraft(required = false) {
   catch { if (current?.root === root && view.id === chat) $('#draft-status').textContent = 'Kladden kunne ikke gemmes. Kopiér teksten, før du lukker.'; if (required === true) throw new Error('Kladden kunne ikke gemmes. Kopiér teksten, før du opdaterer.'); }
 }
 function option(value, label) { const el = node('option', label); el.value = value; return el; }
-// AI'ens svar er markdown. Vi viser overskrifter, fed og kursiv tekst, kode, lister og skillelinjer, men bygger kun
-// elementer med textContent, så modellens tekst aldrig bliver til HTML. Links vises som tekst og kan ikke klikkes.
-function inlineMarkdown(target, text) {
-  const pattern = /(\*\*([^*]+)\*\*|`([^`]+)`|\*([^*\s][^*]*)\*|\[([^\]]+)\]\(([^)\s]+)\))/g;
-  let last = 0, match;
-  while ((match = pattern.exec(text))) {
-    if (match.index > last) target.append(text.slice(last, match.index));
-    if (match[2] !== undefined) target.append(node('strong', match[2]));
-    else if (match[3] !== undefined) target.append(node('code', match[3]));
-    else if (match[4] !== undefined) target.append(node('em', match[4]));
-    else target.append(`${match[5]} (${match[6]})`);
-    last = pattern.lastIndex;
-  }
-  if (last < text.length) target.append(text.slice(last));
-}
+// Keep model text inert; external links cross the validated main-process boundary.
 function markdownInto(element, text) {
-  const blocks = [], lines = window.ConversationMode.visible(text).replace(/\r\n/g, '\n').split('\n');
-  let paragraph = null, list = null, code = null;
-  const close = () => { paragraph = null; list = null; };
-  for (const line of lines) {
-    if (code) { if (/^\s*```/.test(line)) code = null; else code.textContent += (code.textContent ? '\n' : '') + line; continue; }
-    if (/^\s*```/.test(line)) { close(); const pre = node('pre'); code = node('code'); pre.append(code); blocks.push(pre); continue; }
-    if (!line.trim()) { close(); continue; }
-    const heading = /^\s{0,3}#{1,6}\s+(.*)$/.exec(line);
-    if (heading) { close(); const h = node('h4'); inlineMarkdown(h, heading[1].replace(/\s+#+\s*$/, '')); blocks.push(h); continue; }
-    if (/^\s{0,3}([-*_])(\s*\1){2,}\s*$/.test(line)) { close(); blocks.push(node('hr')); continue; }
-    const item = /^\s*(?:[-*+]|(\d+)[.)])\s+(.*)$/.exec(line);
-    if (item) {
-      const tag = item[1] ? 'ol' : 'ul';
-      if (!list || list.tagName.toLowerCase() !== tag) { paragraph = null; list = node(tag); blocks.push(list); }
-      const li = node('li'); inlineMarkdown(li, item[2]); list.append(li); continue;
-    }
-    list = null;
-    if (!paragraph) { paragraph = node('p'); blocks.push(paragraph); } else paragraph.append(node('br'));
-    inlineMarkdown(paragraph, line);
-  }
-  element.classList.add('markdown'); element.replaceChildren(...blocks);
-  // Stier til filer i projektet bliver til links, der åbner filen under Kode.
-  window.ChatDisplay.swatches(element);
-  window.workspace?.linkify(element);
+  window.MarkdownView.render(element, text, {
+    visible: value => window.ConversationMode.visible(value),
+    copy: element.classList.contains('assistant') ? value => navigator.clipboard.writeText(value) : undefined,
+    openLink: async url => { const result = await window.harness.openExternalLink({ url }); if (!result.ok) throw new Error(result.error); },
+    decorate: target => { window.ChatDisplay.swatches(target); window.workspace?.linkify(target); }
+  });
 }
 // Under streaming gemmes den rå tekst, og visningen opdateres højst én gang pr. skærmopdatering.
 function showAssistant(id, text, v = view) {

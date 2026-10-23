@@ -1133,3 +1133,12 @@ kbd { font: 600 11px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif
 @media (prefers-reduced-motion: reduce) { .operation-spinner { animation: none; } }
 
 .composer-shortcut { margin: 0 14px 4px; color: var(--muted); font-size: 11px; line-height: 1.4; }
+
+/* Answer tools use the existing app controls; wide tables scroll inside the answer. */
+.markdown-table { max-width: 100%; overflow: auto; margin: 0 0 10px; }
+.markdown-table table { width: 100%; border-collapse: collapse; font-size: inherit; }
+.markdown-table th, .markdown-table td { border: 1px solid var(--line); padding: 6px 9px; text-align: left; min-width: 7ch; }
+.markdown-table th { font-weight: 650; }
+.markdown-link { border: 0; background: none; padding: 0; color: var(--accent, #0055ce); font: inherit; text-decoration: underline; cursor: pointer; }
+.markdown-code { margin-bottom: 10px; }
+.markdown-copy-code, .markdown-copy-answer { font-size: 11px; }
