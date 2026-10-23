@@ -424,6 +424,7 @@ function fillChat(next, fresh) {
   try { const key = `harness.chatDraft.${current.root}`, legacy = localStorage.getItem(key); if (legacy !== null) { if (localStorage.getItem(`${key}.${v.id}`) === null) localStorage.setItem(`${key}.${v.id}`, legacy); localStorage.removeItem(key); } } catch {}
   try { const draft = JSON.parse(localStorage.getItem(`harness.chatDraft.${current.root}.${v.id}`)); if (draft && typeof draft.text === 'string' && (draft.text || !['working','interrupted'].includes(history?.status))) { $('#prompt').value = draft.text; if (['chat','plan','free'].includes(draft.mode)) { $('#work-mode').value = draft.mode; v.modeChosen = true; } } } catch {}
   if (v.draft) { $('#prompt').value = v.draft.text; if (['chat','plan','free','build'].includes(v.draft.mode)) $('#work-mode').value = v.draft.mode; }
+  v.contextUsage = next.contextUsage || null;
   renderUsage(v.usage || next.usage);
   updateWorkMode(); $('#draft-status').textContent = history?.draft ? 'Kladde hentet fra denne computer' : '';
   updateStartIdea(); applyRunning();
@@ -684,6 +685,7 @@ async function loadRoutes(saved = '') {
   $('#route-select').replaceChildren(option('', 'Vælg udbyder – ingen automatisk routing'));
   for (const route of routes) $('#route-select').append(option(route.id, route.name));
   if (routes.some(route => route.id === saved)) $('#route-select').value = saved;
+  renderContextUsage();
 }
 function selection() { return { effort: view?.effort || null, includeHistory: $('#include-history').checked, mode: $('#work-mode').value, planID: activePlan?.id, connectionID: $('#connection-select').value, modelID: $('#model-select').value, routeID: $('#route-select').value, references: [...document.querySelectorAll('#reference-choices input:checked')].map(el => el.value), fileRefs: window.workspace?.references() || [], previewTarget: window.workspace?.target()?.id || null, view: window.previewViewSize?.() || null, chat: view.id }; }
 const detailLabels = { projectInstructions: 'Projektets egne regler, der sendes', workspace: 'Arbejdsmappe', mode: 'Arbejdsmåde', brief: 'Projektbrief, der sendes', previewReferenceText: 'Valgt element, der sendes', conversation: 'Tidligere samtale, der sendes', projectGuidance: 'Appens vejledning om projektvalg og design', planContext: 'Plan og afklaring, der sendes', projectChoices: 'Projektets opstartsvalg', projectDesign: 'Projektets designvalg', fileReferences: 'Filhenvisninger i beskeden', connection: 'Forbindelse', model: 'Model', endpoint: 'Serveradresse', recipients: 'Modtagere', region: 'Behandlingssted', retention: 'Opbevaring', training: 'Brug til træning', price: 'Pris og gratisbegrænsninger', capabilities: 'Modelmuligheder', material: 'Hvad sendes?', references: 'Udvalgte private referencer', skills: 'Skills, AI’en kan hente', localStorage: 'Lokal historik og yderligere netværk', security: 'Forbindelsens sikkerhed', source: 'Kilde', checkedAt: 'Dokumentation kontrolleret', evidence: 'Grundlag' };
@@ -723,6 +725,7 @@ function showData(data, canSend) {
 }
 async function sendNow(data, text) {
   const v = view, owner = selectedOwner(); v.activityGroup = null; v.planCard = false; v.runConnection = $('#connection-select').value;
+  v.runContextSelection = { connectionID: $('#connection-select').value, modelID: $('#model-select').value, routeID: $('#route-row').hidden ? '' : $('#route-select').value };
   v.activeModelSummary = $('#model-chip').textContent;
   $('#model-options').open = false; $('#task-dialog').close(); $('#connection-warning').hidden = true; $('#data-dialog').close(); setRunning(true, 'Starter agent …');
   if ($('#work-mode').value === 'free') { activePlan = null; $('#plan-card').hidden = true; }
@@ -829,14 +832,14 @@ window.harness.onEvent(event => {
   if (event.type === 'files.written') { if (v.modelProgress) v.modelProgress.draft = null; if (active) renderStatus(); }
   if (event.type === 'model.progress') { if (v.running) { v.modelProgress = event.progress; v.lastSignalAt = event.progress.lastContentAt; if (active) renderStatus(); } return; }
   if (event.type === 'message.part.delta' && typeof p.delta === 'string' && v.partTypes.get(p.partID) === 'text') { v.receivedChars += p.delta.length; if (active) renderStatus(); }
-  if (event.type === 'usage') { v.usage = event.usage; if (active) renderUsage(event.usage); return; }
+  if (event.type === 'usage') { v.usage = event.usage; v.contextUsage = event.contextUsage || null; if (active) renderUsage(event.usage); return; }
   if (event.type === 'plan.offer') { v.planOffer = event.offered; updatePlanOffer(v); }
   if (event.type === 'plan.retired') { v.plan = null; v.planCard = false; if (active) { activePlan = null; $('#plan-card').hidden = true; } }
   if (event.type === 'plan.ready') { v.plan = event.plan; v.planCard = true; if (v.buildOffer) { v.buildOffer = false; v.review.hidden = true; } updatePlanOffer(v); if (active) { activePlan = event.plan; window.planning?.onPlan(event.plan); $('#plan-card').hidden = false; if (v.followChat) requestAnimationFrame(() => $('#plan-card').scrollIntoView({ block: 'nearest' })); } }
   if (event.type === 'run.review') { renderRunReview(event, v); if (!active) { v.unread = true; window.chats?.render(); } }
   // Versionen efter opgaven vises på resultatkortet. Kun en oversprunget version nævnes i samtalen.
   if (event.type === 'git.checkpoint') { v.lastCheckpoint = event; if (event.status === 'skipped') appendMessage(event.message, 'system', v); return; }
-  if (event.type === 'session.new') { v.roles.clear(); v.parts.clear(); v.partTypes.clear(); }
+  if (event.type === 'session.new') { v.contextUsage = null; if (active) renderContextUsage(); v.roles.clear(); v.parts.clear(); v.partTypes.clear(); }
   if (event.type === 'run.status') {
     const working = ['starting', 'working'].includes(event.status);
     const statuses = { starting: 'Starter agent …', working: 'Arbejder …', idle: 'Klar', error: 'Fejl', stopped: 'Stoppet' };
@@ -1026,11 +1029,13 @@ function updateModelSummary() {
   $('#model-summary').textContent = model.value ? model.selectedOptions[0].textContent : 'Vælg din AI';
   $('#model-chip').textContent = view.running && view.activeModelSummary ? view.activeModelSummary : label;
   $('#model-chip').title = chosen ? `Du har valgt ${chosen} indsats i denne samtale. Klik for at skifte model eller indsats.` : effort ? `${effort[0].toUpperCase()}${effort.slice(1)} indsats er udbyderens standard for modellen. Klik for at skifte model.` : connection?.kind === 'mistral' ? 'Aura sender ikke et valg af indsats. Mistrals standard gælder; niveauet er ikke verificeret. Klik for at skifte model eller forbindelse.' : 'Klik for at skifte model eller forbindelse.';
+  renderContextUsage();
   $('#connection-status').textContent = model.value ? (state?.connections.find(c => c.id === $('#connection-select').value)?.name || 'Valgt forbindelse') + ' · ' + model.value : 'Ingen model valgt';
 }
 // Forbruget i samtalen: tokens ind og ud og en anslået pris ud fra udbyderens prisliste. Det faktiske forbrug står hos udbyderen.
 const tokenCount = value => Math.round(value).toLocaleString('da-DK');
 function renderUsage(usage) {
+  renderContextUsage();
   const target = $('#usage-status');
   if (!usage || !usage.calls) { target.textContent = 'Intet forbrug i denne samtale endnu'; target.title = ''; return; }
   const input = usage.input + usage.cacheRead + usage.cacheWrite;
@@ -1042,6 +1047,19 @@ function renderUsage(usage) {
   target.textContent = `Denne samtale: ${tokenCount(input)} tokens ind · ${tokenCount(usage.output + usage.reasoning)} ud · ${price}`;
   target.title = `${usage.calls} modelkald. Ind: ${tokenCount(usage.input)} nye, ${tokenCount(usage.cacheRead)} fra cache og ${tokenCount(usage.cacheWrite)} skrevet til cache. Ud: ${tokenCount(usage.output)} svar og ${tokenCount(usage.reasoning)} ræsonnement. Prisen er et overslag ud fra udbyderens listepris og kan afvige fra din faktura; se det faktiske forbrug hos udbyderen.`;
 }
+// Viser kun den åbne samtales seneste måling for den valgte AI. Ingen deling eller estimeret historik.
+function renderContextUsage() {
+  const selected = view.running && view.runContextSelection ? view.runContextSelection : { connectionID: $('#connection-select').value, modelID: $('#model-select').value, routeID: $('#route-row').hidden ? '' : $('#route-select').value };
+  const model = modelCatalog?.find(item => item.id === selected.modelID);
+  const value = window.ContextDisplay.project(selected, view.contextUsage, model, $('#connection-select').value);
+  const text = window.ContextDisplay.format(value), target = $('#context-status'), meter = $('#context-meter');
+  target.hidden = !current || !view.id || !selected.modelID;
+  $('#context-label').textContent = text.label; target.title = text.description;
+  meter.hidden = value.percentage === null;
+  if (value.percentage !== null) { meter.value = Math.min(value.percentage, 100); meter.setAttribute('aria-label', text.description); meter.setAttribute('aria-valuetext', text.label); }
+  else { meter.removeAttribute('value'); meter.removeAttribute('aria-label'); meter.removeAttribute('aria-valuetext'); }
+}
+$('#route-select').addEventListener('change', renderContextUsage);
 function showConnectionWarning(reason) {
   $('#connection-warning-text').textContent = reason;
   $('#connection-warning').hidden = false;

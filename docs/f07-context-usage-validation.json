@@ -1,0 +1,250 @@
+{
+  "feature": "F07",
+  "checkedAt": "2026-10-23T20:57:10.793721+00:00",
+  "baseRepository": "https://github.com/ai-alliancen-org/ai-harness",
+  "baseCommit": "dce68ea74a199ca214ab535a16ff22765d8ee8de",
+  "runtime": {
+    "node": "22.23.3",
+    "electron": "44.4.4",
+    "platform": "macOS arm64"
+  },
+  "unitResults": {
+    "focused": {
+      "exitCode": 0,
+      "tests": 9,
+      "pass": 9,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "failures": []
+    },
+    "desktop": {
+      "exitCode": 1,
+      "tests": 525,
+      "pass": 523,
+      "fail": 2,
+      "cancelled": 0,
+      "skipped": 0,
+      "failures": [
+        "not ok 25 - afvisning med en besked sendes til motoren og stopper ikke; Stop giver et resultatkort med det, AI’en nåede",
+        "not ok 26 - godkendelsen får værktøjets egne oplysninger med, og en fejl fra OpenCode får en type"
+      ]
+    },
+    "cli": {
+      "exitCode": 0,
+      "tests": 26,
+      "pass": 26,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "failures": []
+    }
+  },
+  "baseline": {
+    "desktop": {
+      "total": 516,
+      "pass": 514,
+      "fail": 2
+    },
+    "cli": {
+      "total": 26,
+      "pass": 26
+    },
+    "freshlyRechecked": true
+  },
+  "knownBaselineFailures": [
+    {
+      "file": "desktop/tests/approvals.test.cjs",
+      "line": 47,
+      "error": "Godkendelsen findes ikke længere."
+    },
+    {
+      "file": "desktop/tests/approvals.test.cjs",
+      "line": 74,
+      "error": "Cannot read properties of undefined (reading 'properties')"
+    }
+  ],
+  "native": {
+    "proofKind": "Faktisk Electron-renderer og betjening med kontrollerede IPC-hændelser og syntetisk katalog; ingen AI-inferens.",
+    "checksPassed": 14,
+    "checks": [
+      "before: samme samlede forbrug; kun efter viser sidste målte kontekst separat.",
+      "before: manglende cachetal giver ingen opdigtet procent eller nulmåling.",
+      "before: valg af anden rute eller model genbruger ikke kontekstmålingen.",
+      "before: næste modelvalg overtager ikke målingen for den igangværende opgave.",
+      "before: baggrundssamtalens hændelser ændrer ikke det åbne skrivefelts forbrug eller kontekst.",
+      "before: 720 px uden vandret sidescroll eller afskåret kontekstlinje.",
+      "before: ingen rendererfejl, HTTP/S-forsøg eller Git-skrivninger.",
+      "after: samme samlede forbrug; kun efter viser sidste målte kontekst separat.",
+      "after: manglende cachetal giver ingen opdigtet procent eller nulmåling.",
+      "after: valg af anden rute eller model genbruger ikke kontekstmålingen.",
+      "after: næste modelvalg overtager ikke målingen for den igangværende opgave.",
+      "after: baggrundssamtalens hændelser ændrer ikke det åbne skrivefelts forbrug eller kontekst.",
+      "after: 720 px uden vandret sidescroll eller afskåret kontekstlinje.",
+      "after: ingen rendererfejl, HTTP/S-forsøg eller Git-skrivninger."
+    ],
+    "originalSource": {
+      "commit": "dce68ea74a199ca214ab535a16ff22765d8ee8de",
+      "sha256": {
+        "main.cjs": "19c1be630241844c1dc3d979500c2f3aaa9942f94286c9dc05bf52d4022cdf34",
+        "core/chat-session.cjs": "cb41ab925ea66e415f1e0355183edb293c6c634c2199325ae2c6cfef0d4b8802",
+        "ui/app.js": "2aec4d88cf3067b3079d4658be5284aceb973c84fa1185721e9ea145eb8f74c8",
+        "ui/index.html": "06246e60d5cc4379c13bb3023908bc569c489879e71de44cf8861466a118d7db",
+        "ui/styles.css": "1f541e1fa09b37831a33be31c23c8928a2f4b96b7f267201ce421961b5f82ac8"
+      }
+    },
+    "afterSource": {
+      "commit": "dce68ea74a199ca214ab535a16ff22765d8ee8de",
+      "sha256": {
+        "main.cjs": "33618d60ef817cf93002c97ae230ed71cd2676f08320f78d8c3f620a68f3dd1c",
+        "core/chat-session.cjs": "272f7ab800b40a7bb31de9b7cbfe75751b35e6ef80bbc5d708c1463414ceb2b3",
+        "ui/app.js": "8f9067d7004147e64641ebe000f05b181fee32311312d963deba0b53910a5b3c",
+        "ui/index.html": "d588b3a7bc51744b1cb045476201f078dbf8436e59a890219fab8d2d186758d2",
+        "ui/styles.css": "2243111381ccbe481c79b7e6c9a2256b4e07eb2d0b6f70f39e2a638ff40cdad5"
+      }
+    },
+    "rendererErrors": [],
+    "networkAttempts": 0,
+    "originalUnmodified": true,
+    "images": [
+      {
+        "file": "docs/images/f07-context-usage/before-measured.png",
+        "scenario": "measured",
+        "version": "before",
+        "clip": {
+          "x": 216,
+          "y": 600,
+          "width": 420,
+          "height": 300
+        },
+        "bytes": 40526,
+        "sha256": "30f8c114487aaa6b1eb1b764e8b146825c73364fea748ccc3959bc33e6cdb315",
+        "viewport": {
+          "width": 1280,
+          "height": 900
+        },
+        "widthPixels": 840,
+        "heightPixels": 600
+      },
+      {
+        "file": "docs/images/f07-context-usage/before-unknown-input.png",
+        "scenario": "unknown-input",
+        "version": "before",
+        "clip": {
+          "x": 216,
+          "y": 600,
+          "width": 420,
+          "height": 300
+        },
+        "bytes": 40526,
+        "sha256": "30f8c114487aaa6b1eb1b764e8b146825c73364fea748ccc3959bc33e6cdb315",
+        "viewport": {
+          "width": 1280,
+          "height": 900
+        },
+        "widthPixels": 840,
+        "heightPixels": 600
+      },
+      {
+        "file": "docs/images/f07-context-usage/before-narrow-720.png",
+        "scenario": "narrow-720",
+        "version": "before",
+        "clip": {
+          "x": 60,
+          "y": 500,
+          "width": 353,
+          "height": 300
+        },
+        "bytes": 41129,
+        "sha256": "19fcd2227221b260d5e0473c845ba19dc7e23e16cbd2da601f1620c5d0854d53",
+        "viewport": {
+          "width": 720,
+          "height": 800
+        },
+        "widthPixels": 706,
+        "heightPixels": 600
+      },
+      {
+        "file": "docs/images/f07-context-usage/after-measured.png",
+        "scenario": "measured",
+        "version": "after",
+        "clip": {
+          "x": 216,
+          "y": 600,
+          "width": 420,
+          "height": 300
+        },
+        "bytes": 46434,
+        "sha256": "f1ca1a3011d3d332d0edb430c7b9e2e66e4b1e275174fa29e10498f0cdb25799",
+        "viewport": {
+          "width": 1280,
+          "height": 900
+        },
+        "widthPixels": 840,
+        "heightPixels": 600
+      },
+      {
+        "file": "docs/images/f07-context-usage/after-unknown-input.png",
+        "scenario": "unknown-input",
+        "version": "after",
+        "clip": {
+          "x": 216,
+          "y": 600,
+          "width": 420,
+          "height": 300
+        },
+        "bytes": 45957,
+        "sha256": "7761f296b3041ceb9b083433d0d72a6b9341ca03592a5a39a3417bfe07ee47e9",
+        "viewport": {
+          "width": 1280,
+          "height": 900
+        },
+        "widthPixels": 840,
+        "heightPixels": 600
+      },
+      {
+        "file": "docs/images/f07-context-usage/after-narrow-720.png",
+        "scenario": "narrow-720",
+        "version": "after",
+        "clip": {
+          "x": 60,
+          "y": 500,
+          "width": 353,
+          "height": 300
+        },
+        "bytes": 46967,
+        "sha256": "d725a12adcd5fa5db60f94f9bcbe73a515f6d36d1ec662d808ab65808b3e263e",
+        "viewport": {
+          "width": 720,
+          "height": 800
+        },
+        "widthPixels": 706,
+        "heightPixels": 600
+      }
+    ]
+  },
+  "sourceSha256": {
+    "desktop/main.cjs": "33618d60ef817cf93002c97ae230ed71cd2676f08320f78d8c3f620a68f3dd1c",
+    "desktop/core/chat-session.cjs": "272f7ab800b40a7bb31de9b7cbfe75751b35e6ef80bbc5d708c1463414ceb2b3",
+    "desktop/core/context-usage.cjs": "e6507657a98d5b88d59cc3a46957f282fc6dc6df517df1321b37f8cf3d60eaf9",
+    "desktop/ui/app.js": "8f9067d7004147e64641ebe000f05b181fee32311312d963deba0b53910a5b3c",
+    "desktop/ui/index.html": "d588b3a7bc51744b1cb045476201f078dbf8436e59a890219fab8d2d186758d2",
+    "desktop/ui/styles.css": "2243111381ccbe481c79b7e6c9a2256b4e07eb2d0b6f70f39e2a638ff40cdad5",
+    "desktop/ui/context-display.js": "9e2322d51b494e0f25665f24786a7da75db95d9b6897d1c1b7e50373209909aa",
+    "desktop/tests/context-usage.test.cjs": "d52fc829c90b4eeec07170a1a6ccadba475f952a2ae2ab9dbb9bcff772124689",
+    "desktop/tests/context-display.test.cjs": "6cf8c5df56b3c58c0b812c17505c5e45a2c35bfd764f51619bbae15dddc8a0e8",
+    "desktop/scripts/verify-context-usage.cjs": "6ac3fbc7e6980d3fc619bc9c261f7540129cc86eb2f2af049341d37c56b1ee03"
+  },
+  "preserved": [
+    "Existing token/cost totals",
+    "Existing model routing and send parameters",
+    "Recipient review, plans and tool approvals",
+    "Onboarding and remaining UI"
+  ],
+  "limits": [
+    "Last completed observed request only, not a guarantee about the next request or total memory.",
+    "Missing token fields or unknown context window never become a guessed percentage.",
+    "Data path uses actual ChatSession methods in Node; Electron uses controlled IPC and a synthetic catalog.",
+    "No production account or real AI inference, Windows/Linux/VoiceOver qualification, hosted CI or release."
+  ]
+}
