@@ -61,7 +61,7 @@ class ChatSession {
     this.running = false; this.starting = false; this.finishing = null; this.generation = 0; this.task = null; this.prepared = null;
     this.engine = null; this.gateway = null; this.engineIdentity = null; this.allowProjectEdits = false; this.historyWarning = '';
     this.taskRules = new Set(); this.approvals = new Map();
-    this.runUser = null; this.runText = new Map(); this.runRoles = new Map(); this.runSteps = new Map(); this.runPrice = null; this.questions = new Map();
+    this.runUser = null; this.runText = new Map(); this.runRoles = new Map(); this.runSteps = new Map(); this.runPrice = null; this.questions = new Map(); this.closedQuestions = new Set();
     // Ændringer og Aktivitet for denne samtale, så længe appen er åben: udgangspunkt, afsluttede opgaver og loggen.
     // De ligger hos arbejdsbænken, så de bevares, når projektet genåbnes, fx efter en gendannelse.
     this.changes = bench.changesFor(this.id, root);
@@ -257,7 +257,7 @@ class ChatSession {
     if (typeof input.text !== 'string' || !input.text.trim() || input.text.length > 30000) throw new Error('Skriv en besked på højst 30.000 tegn.');
     if (prepared.mode === 'build' && prepared.disclosure.planID !== this.plan?.id) throw new Error('Planen har ændret sig. Gennemgå den igen.');
     if (Object.hasOwn(prepared.context, 'projectInstructions') && JSON.stringify(await projectInstructions(this.root)) !== JSON.stringify(prepared.context.projectInstructions)) throw new Error('Projektets AGENTS.md har ændret sig. Gennemgå oplysningerne igen før afsendelse.');
-    const generation = ++this.generation; this.runStopped = false;
+    const generation = ++this.generation; this.runStopped = false; this.questions.clear(); this.closedQuestions.clear();
     const checkStopped = () => { if (generation !== this.generation) throw new Error('Opgaven blev stoppet før afsendelse.'); };
     // Kun én samtale ad gangen kan arbejde i den samme mappe.
     // Et efterbillede fra forrige opgave skal være taget, før en ny opgave kan ændre filerne.
@@ -571,9 +571,18 @@ class ChatSession {
     }
     if (event.type === 'permission.asked') return this.permissionAsked(event).catch(() => this.emit({ type: 'engine.error', message: 'Godkendelsen kunne ikke vises. Stop opgaven, og prøv igen.' }));
     if (event.type === 'permission.replied') { this.approvals.delete(p.requestID); this.waiting = this.approvals.size > 0; bench.chatsChanged(); const entry = this.changes.activity.get(`approval-${p.requestID}`); if (entry?.status === 'waiting') this.log({ id: entry.id, status: p.reply === 'reject' ? 'rejected' : 'answered', ended: Date.now() }); }
-    if (event.type === 'question.asked' && Array.isArray(p.questions)) this.questions?.set(p.id, p.questions);
+    if (event.type === 'question.asked') {
+      if (!this.engine || !this.running || this.runStopped || this.finishing || typeof p.id !== 'string' || !Array.isArray(p.questions) || (p.sessionID && p.sessionID !== this.engine.session?.id)) return;
+      if (this.questions.has(p.id) || this.closedQuestions.has(p.id)) return;
+      this.questions.set(p.id, { questions: p.questions, engine: this.engine, generation: this.generation, sessionID: this.engine.session?.id, submitting: false });
+    }
     if (event.type === 'question.asked') { this.waiting = true; bench.chatsChanged(); this.log({ id: `question-${p.id}`, kind: 'question', title: 'Spørgsmål til dig', target: (p.questions || []).map(q => q.question).join('\n').slice(0, 2000), status: 'waiting', started: Date.now(), task: this.task?.id }); }
-    if (['question.replied', 'question.rejected'].includes(event.type)) { this.waiting = false; bench.chatsChanged(); const entry = this.changes.activity.get(`question-${p.requestID || p.id}`); if (entry?.status === 'waiting') this.log({ id: entry.id, status: event.type === 'question.rejected' ? 'rejected' : 'answered', ended: Date.now() }); }
+    if (['question.replied', 'question.rejected'].includes(event.type)) {
+      const id = p.requestID || p.id, record = this.questions.get(id);
+      if (record) { record.rejected = event.type === 'question.rejected'; this.closedQuestions.add(id); }
+      this.questions.delete(id); this.waiting = this.approvals.size > 0 || this.questions.size > 0; bench.chatsChanged();
+      const entry = this.changes.activity.get(`question-${id}`); if (entry?.status === 'waiting') this.log({ id: entry.id, status: event.type === 'question.rejected' ? 'rejected' : 'answered', ended: Date.now() });
+    }
     if (['session.error', 'engine.error'].includes(event.type) && this.running && !this.runFailure) this.runFailure = { kind: event.failure?.kind || sessionFailure(p.error), status: event.failure?.status || p.error?.data?.statusCode || null, message: String(event.message || p.error?.data?.message || p.error?.message || '').slice(0, 800) };
     if (['session.error', 'engine.error'].includes(event.type) && this.running) this.log({ kind: 'error', title: 'Fejl under opgaven', detail: String(event.message || p.error?.data?.message || p.error?.message || 'Modelkaldet mislykkedes.').slice(0, 800), status: 'error', task: this.task?.id });
     if (event.type === 'message.part.updated' && p.part?.type === 'step-finish' && this.runSteps && !this.runSteps.has(p.part.id)) {
@@ -592,6 +601,7 @@ class ChatSession {
     // Abort kan selv sende idle/error. Stop ejer allerede afslutningen og skal vente på versionsgemningen;
     // hændelsen må ikke starte en anden afslutning og frigive mappen, mens den første stadig skriver.
     if (['session.idle', 'session.error', 'engine.error'].includes(event.type) && this.running && !this.finishing && !this.runStopped) {
+      this.questions.clear();
       const status = event.type === 'session.idle' ? 'idle' : 'error';
       this.finishing = (owner ? this.checkpoints.finish() : Promise.resolve()).then(async () => {
         if (this.runStopped) return;
@@ -633,7 +643,7 @@ class ChatSession {
   async stop() {
     if (this.finishing) throw new Error('Afslutningen er i gang. Vent på resultatet.');
     const bench = this.bench, owner = (this.copy || bench.checkpointOwner === this);
-    this.runStopped = true; this.allowProjectEdits = false; this.taskRules.clear(); this.approvals.clear(); this.retirePlan('stoppet'); if (owner) this.checkpoints.cancel(); ++this.generation; this.engineIdentity = null;
+    this.runStopped = true; this.questions.clear(); this.allowProjectEdits = false; this.taskRules.clear(); this.approvals.clear(); this.retirePlan('stoppet'); if (owner) this.checkpoints.cancel(); ++this.generation; this.engineIdentity = null;
     this.log({ kind: 'stop', title: 'Du trykkede på Stop', detail: 'AI\'en stopper. Det, den nåede at ændre, står under Ændringer.', status: 'stopped', task: this.task?.id });
     // Godkendelser, der stadig venter, kan ikke længere besvares.
     for (const entry of this.changes.activity.list()) if (['approval', 'question'].includes(entry.kind) && entry.status === 'waiting') this.log({ id: entry.id, status: 'expired', ended: Date.now() });
@@ -680,16 +690,30 @@ class ChatSession {
   // Svar på AI'ens spørgsmål. Svarene sendes til motoren og kommer i briefen med spørgsmålets korte overskrift.
   // Spring over svarer på alle spørgsmål med, at AI'en selv vælger. Et afvist spørgsmål ville stoppe opgaven i OpenCode.
   async question(input) {
-    if (input?.skip === true && this.questions?.has(input.id)) input = { id: input.id, answers: this.questions.get(input.id).map(() => [SKIP_ANSWER]), skip: true };
-    if (!this.engine || typeof input.id !== 'string' || !Array.isArray(input.answers) || input.answers.length > 10 || input.answers.some(answer => !Array.isArray(answer) || answer.length > 10 || answer.some(value => typeof value !== 'string' || value.length > 2000))) throw new Error('Ugyldigt svar.');
-    const result = await this.engine.request(`/question/${encodeURIComponent(input.id)}/reply`, 'POST', { answers: input.answers });
-    if (this.runMode === 'plan') this.planConversation.push('Svar på agentens spørgsmål: ' + JSON.stringify(input.answers));
+    const record = this.questions.get(input?.id);
+    if (input?.skip === true && record) input = { id: input.id, answers: record.questions.map(() => [SKIP_ANSWER]), skip: true };
+    if (!this.engine || typeof input?.id !== 'string' || !Array.isArray(input.answers) || input.answers.length > 10 || input.answers.some(answer => !Array.isArray(answer) || answer.length > 10 || answer.some(value => typeof value !== 'string' || value.length > 2000))) throw new Error('Ugyldigt svar.');
+    const current = () => record && record.engine === this.engine && record.generation === this.generation && record.sessionID === this.engine?.session?.id && this.running && !this.runStopped && !this.finishing;
+    if (!current() || record.submitting) throw new Error('Spørgsmålet er ikke længere aktuelt.');
+    // Lås før netkaldet: et dobbeltklik må ikke sende det samme svar to gange.
+    record.submitting = true;
+    const answers = input.answers.map(answer => [...answer]);
+    let result;
+    try { result = await record.engine.request(`/question/${encodeURIComponent(input.id)}/reply`, 'POST', { answers }); }
+    catch (error) {
+      // Et nyt forsøg er kun muligt, hvis motoren stadig venter på netop dette spørgsmål.
+      if (current() && this.questions.get(input.id) === record) record.submitting = false;
+      throw error;
+    }
+    if (!current() || record.rejected) throw new Error('Spørgsmålet er ikke længere aktuelt.');
+    this.questions.delete(input.id); this.closedQuestions.add(input.id); this.waiting = this.approvals.size > 0 || this.questions.size > 0; this.bench.chatsChanged();
+    if (this.runMode === 'plan') this.planConversation.push('Svar på agentens spørgsmål: ' + JSON.stringify(answers));
     this.log({ id: `question-${input.id}`, status: 'answered', ended: Date.now() });
-    const questions = this.questions?.get(input.id); this.questions?.delete(input.id);
-    if (questions && !input.skip) await this.bench.storeBrief(brief.normalizeBrief(brief.addAnswers(this.bench.brief, questions, input.answers))).catch(() => this.emit({ type: 'history.error', message: 'Svaret er sendt, men briefen kunne ikke gemmes.' }));
+    if (!input.skip) await this.bench.storeBrief(brief.normalizeBrief(brief.addAnswers(this.bench.brief, record.questions, answers))).catch(() => this.emit({ type: 'history.error', message: 'Svaret er sendt, men briefen kunne ikke gemmes.' }));
     return result;
   }
   async close(reset = true) {
+    this.questions.clear();
     if (reset) {
       if ((this.copy || this.bench.checkpointOwner === this)) this.checkpoints.cancel();
       await this.finishing;

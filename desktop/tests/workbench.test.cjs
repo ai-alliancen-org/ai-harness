@@ -120,13 +120,14 @@ test('planlægning lukker skrive-, shell- og ukendte værktøjer, men bevarer l�
 test('svar på planlægningsspørgsmål følger med i afklaringen, og afvist stop ændrer ikke status', async t => {
  const bench = new Workbench({directory:await temp(t), profiles, emit:()=>{}, safeStorage:{}});
  await bench.activate({root:await temp(t),name:'Prøve'}); const chat = bench.chat;
- chat.runMode='plan'; chat.planConversation=[]; chat.engine={request:async()=>true,close:async()=>{}};
+ chat.runMode='plan'; chat.planConversation=[]; chat.engine={request:async()=>true,close:async()=>{}}; chat.running=true;
+ chat.event({type:'question.asked',properties:{id:'spørgsmål',questions:[{question:'Hvem bruger siden?',header:'Brugere',options:[]}]}});
  await bench.question({id:'spørgsmål',answers:[['Kun interne brugere']]});
  assert.match(chat.planConversation[0],/Kun interne brugere/);
  chat.runStopped=false; chat.plan={id:'bevar'}; chat.finishing=Promise.resolve();
  await assert.rejects(bench.stop(),/Afslutningen/);
  assert.equal(chat.runStopped,false); assert.equal(chat.plan.id,'bevar');
- chat.finishing=null; await bench.close();
+ chat.finishing=null; chat.running=false; await bench.close();
 });
 
 test('planlægning vælger plan-agenten og beholder de samme eksplicitte tilladelser', async () => {

@@ -103,7 +103,7 @@ test('svar på AI’ens spørgsmål sendes som etiketter og kommer i briefen; sp
   const directory = await temp(t), root = path.join(directory, 'projekt'); await fs.mkdir(root);
   const bench = new Workbench({ directory: path.join(directory, 'data'), profiles, emit: () => {}, safeStorage: {} });
   await bench.activate({ root, name: 'Haven', purpose: 'Haven' }); const chat = bench.chat;
-  const calls = []; chat.engine = { request: async (url, method, body) => { calls.push([url, method, body]); return true; } }; chat.runMode = 'plan';
+  const calls = []; chat.engine = { request: async (url, method, body) => { calls.push([url, method, body]); return true; } }; chat.runMode = 'plan'; chat.running = true;
   chat.event({ type: 'question.asked', properties: { id: 'q1', questions: [{ question: 'Hvem bruger siden?', header: 'Brugere', options: [{ label: 'Naboer (anbefalet)', description: '' }] }] } });
   await assert.rejects(bench.question({ id: 'q1', answers: [[42]] }), /Ugyldigt svar/);
   await bench.question({ id: 'q1', answers: [['Naboer (anbefalet)']] });
@@ -114,7 +114,7 @@ test('svar på AI’ens spørgsmål sendes som etiketter og kommer i briefen; sp
   assert.equal(calls[1][0], '/question/q2/reply');
   assert.deepEqual(calls[1][2].answers.map(answer => answer[0].startsWith('Brugeren springer over')), [true, true], 'spring over svarer, så opgaven fortsætter');
   assert.equal(bench.brief.items.some(item => ['Farve', 'Logo'].includes(item.label)), false, 'et spring over kommer ikke i briefen');
-  chat.engine = null; await bench.close();
+  chat.running = false; chat.engine = null; await bench.close();
 });
 
 test('motoren får spørgeværktøjet; OpenCode tilbyder det ellers kun til sine egne klienter', () => {

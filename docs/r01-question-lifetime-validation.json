@@ -1,0 +1,103 @@
+{
+  "feature": "R01",
+  "validatedAt": "2026-10-23",
+  "baseRepository": "https://github.com/ai-alliancen-org/ai-harness",
+  "baseCommit": "dce68ea74a199ca214ab535a16ff22765d8ee8de",
+  "runtime": {
+    "platform": "macOS arm64",
+    "node": "22.23.3"
+  },
+  "method": {
+    "beforeInitial": "Initial 12 regression tests against the unchanged original source.",
+    "beforeFinal": "Final 16 regression tests loaded with the original chat-session.cjs source in an isolated Node module loader; production checkout not reverted.",
+    "after": "Actual ChatSession methods with controlled synthetic engine replies. Existing Workbench, planning and policy regressions included.",
+    "inference": "No real model inference; no account or credential required."
+  },
+  "results": {
+    "before-question-lifetime.tap": {
+      "tests": 12,
+      "pass": 2,
+      "fail": 10,
+      "cancelled": 0,
+      "skipped": 0,
+      "logSha256": "bfb0697eea723e4cc367fd6fb47a3dd4a2cad18f1484b933e3028c6b245fef12"
+    },
+    "before-final-question-lifetime.tap": {
+      "tests": 16,
+      "pass": 2,
+      "fail": 14,
+      "cancelled": 0,
+      "skipped": 0,
+      "logSha256": "fc8a69f69b773c041068f73a95c3acf3a0d59976aa1b8679e7b885e1adee91c6"
+    },
+    "after-question-lifetime.tap": {
+      "tests": 16,
+      "pass": 16,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "logSha256": "51c309e907fa00f8c602736c80f138da6519e3aeb926b3a85d74787527d9b43a"
+    },
+    "focused-regression.tap": {
+      "tests": 74,
+      "pass": 74,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "logSha256": "6b0831299e8117cbc93369c334f5f6f29e37d8b5ad2b98bf9f8e18926e90f7e9"
+    },
+    "desktop-full-qualified.tap": {
+      "tests": 532,
+      "pass": 530,
+      "fail": 2,
+      "cancelled": 0,
+      "skipped": 0,
+      "logSha256": "547077d7d28a4ad9f0209611bed22af9a500150bddb7c72563cca37dac712853"
+    },
+    "cli-full.tap": {
+      "tests": 26,
+      "pass": 26,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "logSha256": "73a8eedab1c5d17cf6fc2f1c2cb07e56395c023bee9957b49d5377f37ef6a50f"
+    }
+  },
+  "knownBaselineFailures": [
+    {
+      "file": "desktop/tests/approvals.test.cjs",
+      "line": 47,
+      "error": "Godkendelsen findes ikke længere."
+    },
+    {
+      "file": "desktop/tests/approvals.test.cjs",
+      "line": 74,
+      "error": "Cannot read properties of undefined (reading 'properties')"
+    }
+  ],
+  "sourceSha256": {
+    "desktop/core/chat-session.cjs": "ef8508c5b9c3e4d09b8bcaba4058da9461227f3eafe15ae48957b768616bf20b",
+    "desktop/tests/question-lifetime.test.cjs": "67287f506ed879dbdb998260ed709e44ca5fda95deafba29e70b274313ecef2f",
+    "desktop/tests/planning.test.cjs": "71dd6c63cdd187e66bcd1101a96483a442a793dfa98e3ecff2f2b003cb5d3b13",
+    "desktop/tests/workbench.test.cjs": "dc10fb05ca161be4716dee8e3fbd2c0e456763a561ac3b9db2be9a2c94ae8718"
+  },
+  "preserved": [
+    "UI and navigation",
+    "Plan selection and plan approval checks",
+    "Tool approval policy and denial flow",
+    "Per-task grants",
+    "Skip behavior",
+    "Retry after a failed transport while the same question remains pending"
+  ],
+  "excluded": [
+    "Hosted GitHub Actions",
+    "Windows runtime",
+    "Live AI/provider test",
+    "DMG or other release artifacts",
+    "Visual changes or screenshots"
+  ],
+  "limitations": [
+    "The reply lock prevents simultaneous client submissions. It does not make the engine HTTP protocol exactly-once after an ambiguous transport failure.",
+    "A reply rejected as stale does not revoke a network request already sent before Stop. Its late acknowledgement cannot append that old answer to the current brief or planning conversation."
+  ]
+}
