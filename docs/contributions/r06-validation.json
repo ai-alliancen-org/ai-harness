@@ -1,0 +1,29 @@
+{
+  "base": "dce68ea74a199ca214ab535a16ff22765d8ee8de",
+  "proposal": "R06",
+  "tests": {
+    "desktop": {
+      "tests": 517,
+      "pass": 515,
+      "fail": 2,
+      "skipped": 0
+    },
+    "cli": {
+      "tests": 26,
+      "pass": 26,
+      "fail": 0,
+      "skipped": 0
+    }
+  },
+  "scope": [
+    "Ny regressionstest kontrollerer standardregler, projekttilpasning og ændret fingerprint.",
+    "Faktisk Workbench → OpenCode → kontrolleret lokal OpenAI-kompatibel server: den viste regeltekst genfindes præcist i systembeskeden. Prøvet i desktop Samtale, desktop Planlæg og CLI Byg.",
+    "Indlæsningsprøven kontrollerer stadig projektregler med kilde, afvist afsendelse ved ændret AGENTS.md, ny modelsession og kun de valgte skills.",
+    "Native før/efter: ingen model-POST før godkendelse, nul rendererfejl og nul Git-skrivninger."
+  ],
+  "limits": "Dette er synliggørelse af eksisterende modelinstruktioner, ikke en ny dataisolations- eller sikkerhedsgaranti. Modelserveren var en kontrolleret lokal testserver, ikke en betalt eller ekstern AI. Den eksisterende lange dialog kræver stadig rulning for at se alle oplysninger.",
+  "images": {
+    "before.png": "0da4a9bc9d8ab4feef84ff8038e6a2302c384a7989eea0c8293726cdf68992e4",
+    "after.png": "d0bd0b5f4a0dd7a5e606bfca5665c447ca41023ed828c3c543aee1e68f56f3fa"
+  }
+}

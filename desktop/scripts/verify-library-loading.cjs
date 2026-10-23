@@ -45,7 +45,13 @@ async function scenario(surface, mode) {
     reference = path.join(bench.store.root, 'runtime', bench.store.projectKey(project), 'config/skills/harness-design-og-tilgaengelighed/references/tilgaengelighed.md');
     const review = await bench.prepare({ mode });
     assert.equal(review.projectInstructions.content, own);
-    const firstFingerprint = review.fingerprint;
+    assert.equal(review.rules, (await bench.skills.context(project)).rules);
+    assert.ok(review.rules.includes('FÆLLES-GRUNDLAG-02'));
+    await bench.skills.save(project, { id: 'faelles-grundregler', content: review.rules + '\nR06-SYNTETISK: Bevar brugerens funktioner.' });
+    const effective = await bench.prepare({ mode });
+    assert.notEqual(effective.fingerprint, review.fingerprint);
+    assert.match(effective.rules, /R06-SYNTETISK/);
+    const firstFingerprint = effective.fingerprint;
     await fs.writeFile(path.join(project, 'AGENTS.md'), own + 'NY-REGEL\n');
     await assert.rejects(bench.send({ text: 'Undersøg designet', fingerprint: firstFingerprint }), /har ændret sig/);
     assert.equal(requests.length, 0, 'Ingen modelkald efter en ændret instruktionsfil');
@@ -55,6 +61,8 @@ async function scenario(surface, mode) {
     const main = requests.filter(body => body.tools?.some(tool => tool.function?.name === 'skill'));
     const system = JSON.stringify(main[0].messages.filter(message => message.role === 'system'));
     assert.match(system, new RegExp('PROJEKTREGEL-' + surface)); assert.match(system, /NY-REGEL/);
+    assert.ok(main[0].messages.some(message => message.role === 'system' && typeof message.content === 'string' && message.content.includes(next.rules)), 'Den viste grundregeltekst findes i det faktiske modelkald');
+    assert.match(system, /R06-SYNTETISK/);
     assert.match(system, /Kilde: AGENTS.md/); assert.match(system, /Ved modstrid/); assert.match(system, /FÆLLES-GRUNDLAG-02/);
     assert.deepEqual([...system.matchAll(/<name>(harness-[a-z0-9-]+)<\/name>/g)].map(match => match[1]), ['harness-design-og-tilgaengelighed']);
     const tools = main.at(-1).messages.filter(message => message.role === 'tool').map(message => JSON.stringify(message.content));

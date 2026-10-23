@@ -1,0 +1,21 @@
+const { test } = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs/promises'), os = require('node:os'), path = require('node:path');
+const { Workbench } = require('../core/workbench.cjs');
+test('prepare discloses the exact effective project rules and binds changed rules', async t => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'aura-rules-disclosure-'));
+  t.after(() => fs.rm(directory, { recursive: true, force: true }));
+  const root = path.join(directory, 'project'); await fs.mkdir(root);
+  const bench = new Workbench({ directory: path.join(directory, 'profile'), profiles: path.join(__dirname, '../../profiles'), safeStorage: {}, emit() {} });
+  t.after(() => bench.close()); await bench.activate({ root, name: 'Syntetisk prøve' });
+  const server = require('node:http').createServer((req, res) => { res.setHeader('content-type', 'application/json'); res.end(JSON.stringify({ data: [{ id: 'synthetic' }] })); });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve)); t.after(() => server.close());
+  const state = await bench.saveConnection({ kind: 'compatible', name: 'Lokal prøve', baseURL: `http://127.0.0.1:${server.address().port}/v1` });
+  const selection = { connectionID: state.connections.at(-1).id, modelID: 'synthetic', mode: 'plan' };
+  const original = await bench.prepare(selection);
+  assert.equal(original.rules, (await bench.skills.context(root)).rules);
+  const rules = original.rules + '\nSyntetisk projektspecifik regel.';
+  await bench.skills.save(root, { id: 'faelles-grundregler', content: rules });
+  const changed = await bench.prepare(selection);
+  assert.equal(changed.rules, rules); assert.notEqual(changed.fingerprint, original.fingerprint);
+});

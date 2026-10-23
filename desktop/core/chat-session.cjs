@@ -207,6 +207,7 @@ class ChatSession {
     disclosure.projectDesign = require('./projects.cjs').designContext(currentProject);
     disclosure.projectGuidance = guidanceFor(bench.surface, settings.runtime);
     disclosure.projectInstructions = context.projectInstructions;
+    disclosure.rules = context.rules;
     if (['plan', 'build'].includes(mode)) disclosure.material += ' Plan og tidligere afklaring medsendes. De kan indeholde oplysninger fra tidligere valgte referencer, også efter at referencerne fravælges. Gennemgå indholdet nedenfor.';
     disclosure.planContext = mode === 'build' ? this.plan : mode === 'plan' ? this.planConversation : null;
     // En indsats sendes kun, når brugeren selv har valgt den, fx "Prøv med lav indsats". Ellers gælder udbyderens standard.
