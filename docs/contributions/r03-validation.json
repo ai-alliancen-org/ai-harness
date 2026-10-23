@@ -1,0 +1,30 @@
+{
+  "base": "dce68ea74a199ca214ab535a16ff22765d8ee8de",
+  "proposal": "R03",
+  "tests": {
+    "desktop": {
+      "tests": 518,
+      "pass": 516,
+      "fail": 2,
+      "skipped": 0
+    },
+    "cli": {
+      "tests": 26,
+      "pass": 26,
+      "fail": 0,
+      "skipped": 0
+    }
+  },
+  "scope": [
+    "Hele desktop- og CLI-suiten er kørt; nye fixtureprøver dækker både Vite og Astro med samtidige arbejdsmapper.",
+    "Vite 5.4.21 installeret i separat syntetisk projekt: originalens direkte runner afviser port 5173, mens rettelsen viser siden i den rigtige app.",
+    "To faktiske Vite 5.4.21-processer svarer på forskellige porte; den første svarer stadig, efter den anden er stoppet.",
+    "Native prøve: nul rendererfejl, nul modelkald og nul Git-skrivninger; ingen vandret side-overflow ved 980 × 720."
+  ],
+  "limits": "Portprøven er ikke en atomisk reservation frem til frameworkets binding. En efterfølgende kollision skal fortsat give en fejl. Faktisk framework- og UI-prøve er udført med Vite 5.4.21; Astro er dækket med kontrollerede API-fixtures, ikke en fysisk Astro-installation. Vite 8.3.1 kunne allerede bruge port 0 i den indledende kontrol og beskrives derfor ikke som reproduceret fejl.",
+  "images": {
+    "before.png": "416e55dabfc7b72ff84a060f2717dbce4a902f18077d4bd92129af6c93faf8d2",
+    "after.png": "bc5b49fe777be70588ba89e17d484ea8137ac0a9c414a2314ed487c5fd06b53a",
+    "after-narrow.png": "813f7246be22e8279cb010d07f5f7a69b7f7115779e69bd177b7eaef714f673b"
+  }
+}

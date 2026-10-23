@@ -3,6 +3,7 @@ const path = require('node:path');
 const { createRequire } = require('node:module');
 const { pathToFileURL } = require('node:url');
 const fs = require('node:fs');
+const net = require('node:net');
 const [root, kind] = process.argv.slice(2);
 let server;
 // komplai Run-appens SDK på /_komplai/run/, som Run serverer det på appens egen adresse. Aura leverer filen.
@@ -46,15 +47,22 @@ process.on('SIGINT', close);
   const imported = await import(pathToFileURL(entry).href);
   const framework = typeof imported[kind === 'vite' ? 'createServer' : 'dev'] === 'function' ? imported : imported.default;
   if (typeof framework?.[kind === 'vite' ? 'createServer' : 'dev'] !== 'function') throw Error('Frameworkets lokale startfunktion blev ikke fundet. Kontrollér pakkens version og installation.');
+  // Vite interprets zero as its default port. Reserve a concrete loopback
+  // candidate and keep strictPort so a later collision fails instead of routing
+  // this workspace to another server. This probe is not an atomic port lease.
+  const requestedPort = await new Promise((resolve, reject) => {
+    const probe = net.createServer(); probe.once('error', reject);
+    probe.listen(0, '127.0.0.1', () => { const port = probe.address().port; probe.close(error => error ? reject(error) : resolve(port)); });
+  });
   let port, base = '/';
   if (kind === 'vite') {
-    server = await framework.createServer({ root, clearScreen: false, plugins: [komplai], server: { host: '127.0.0.1', port: 0, strictPort: true, open: false } });
+    server = await framework.createServer({ root, clearScreen: false, plugins: [komplai], server: { host: '127.0.0.1', port: requestedPort, strictPort: true, open: false } });
     await server.listen();
     const address = server.httpServer.address();
     if (address.address !== '127.0.0.1') throw new Error('Serveren skal lytte på loopback.');
     port = address.port; base = server.config.base;
   } else if (kind === 'astro') {
-    server = await framework.dev({ root, server: { host: '127.0.0.1', port: 0, open: false }, vite: { clearScreen: false, plugins: [komplai], server: { strictPort: true, open: false } }, integrations: [{ name: 'aura-preview', hooks: { 'astro:config:done': ({ config }) => { base = config.base; } } }] });
+    server = await framework.dev({ root, server: { host: '127.0.0.1', port: requestedPort, open: false }, vite: { clearScreen: false, plugins: [komplai], server: { strictPort: true, open: false } }, integrations: [{ name: 'aura-preview', hooks: { 'astro:config:done': ({ config }) => { base = config.base; } } }] });
     if (server.address.address !== '127.0.0.1') throw new Error('Serveren skal lytte på loopback.');
     port = server.address.port;
   } else throw new Error('Ukendt framework.');
