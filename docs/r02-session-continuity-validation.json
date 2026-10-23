@@ -1,0 +1,95 @@
+{
+  "feature": "R02",
+  "base": "dce68ea74a199ca214ab535a16ff22765d8ee8de",
+  "checkedAt": "2026-10-23",
+  "scope": "Bevar samme OpenCode-session ved Planlæg → Byg, når konto, model, rute, motorversion, arbejdsmappe, referenceadgang og instruktioner er uændrede. Genstart stadig motoren med den nye tilladelsespolitik.",
+  "proofKind": "Core integration tests with a synthetic engine and a controlled loopback model catalog; no production model inference.",
+  "before": {
+    "test": "Planlæg til godkendt Byg genstarter tilladelsespolitikken og bevarer samme modelsession",
+    "result": "failed as expected on unmodified original core",
+    "expectedResume": "session-1",
+    "actualResume": null
+  },
+  "after": {
+    "newRegressionTests": {
+      "total": 16,
+      "passed": 16
+    },
+    "focused": {
+      "total": 76,
+      "passed": 76,
+      "failed": 0
+    },
+    "desktop": {
+      "total": 532,
+      "passed": 530,
+      "failed": 2
+    },
+    "cli": {
+      "total": 26,
+      "passed": 26,
+      "failed": 0
+    }
+  },
+  "baseline": {
+    "desktop": {
+      "total": 516,
+      "passed": 514,
+      "failed": 2
+    },
+    "knownFailures": [
+      {
+        "file": "desktop/tests/approvals.test.cjs",
+        "line": 47,
+        "error": "Godkendelsen findes ikke længere."
+      },
+      {
+        "file": "desktop/tests/approvals.test.cjs",
+        "line": 74,
+        "error": "Cannot read properties of undefined (reading 'properties')"
+      }
+    ]
+  },
+  "compatibility": {
+    "persistedFieldsKept": [
+      "session",
+      "fingerprint",
+      "conversation"
+    ],
+    "optionalFieldAdded": "sessionFingerprint",
+    "legacySessionPolicy": "One new model session when a saved record lacks the new binding. Local messages, plan and draft are kept. Subsequent normal reopen resumes only an exact modern binding.",
+    "recipientConsentUnchanged": true,
+    "planApprovalUnchanged": true,
+    "toolApprovalPolicyUnchanged": true
+  },
+  "coverage": [
+    "plan to approved build",
+    "same-mode active engine reuse",
+    "normal close and reopen",
+    "plan revision and stale plan/review rejection",
+    "model change",
+    "connection-id change with equal legacy metadata",
+    "connection revision change",
+    "route change",
+    "reference selection change",
+    "rules and project instructions change",
+    "engine version change",
+    "legacy history upgrade",
+    "per-task grants reset",
+    "instructions changed after review"
+  ],
+  "notClaimed": [
+    "Production model or real account acceptance",
+    "Native Electron end-to-end flow",
+    "Windows runtime acceptance",
+    "GitHub Actions or green hosted CI",
+    "Release, DMG or signing",
+    "Content hashing or new Privacy Gate checks for reference file contents"
+  ],
+  "productionFiles": [
+    {
+      "path": "desktop/core/chat-session.cjs",
+      "sha256": "90e5b882ac275c19700c03ea66c37dc21d63ef9b370944bbbd53892421b77506"
+    }
+  ]
+}

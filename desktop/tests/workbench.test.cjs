@@ -262,7 +262,7 @@ test('en Corti-forbindelse beholder miljø og nøgle, når den redigeres uden ny
 function fakeSend(bench, engines) {
  bench.engineFactory = options => { const engine = { options, active: false, resumed: Boolean(options.resume), session: { id: options.resume || `ses-${engines.length + 1}` }, pending: new Map(), sent: [], start: async () => { engine.active = true; }, send: async text => { engine.sent.push(text); }, request: async () => true, reply: async () => {}, abort: async () => {}, close: async () => { engine.active = false; } }; engines.push(engine); return engine; };
  return async (chat, text, fingerprint = 'regler-1', extra = {}) => {
-  chat.prepared = { mode: 'free', root: chat.root, connection: { id: 'c', kind: 'compatible', name: 'Prøve', baseURL: 'http://127.0.0.1:1/v1' }, model: { id: 'test' }, route: null, references: [], fileRefs: [], view: null, autoCheckpoint: false, startup: null,
+  chat.prepared = { mode: 'free', root: chat.root, sessionFingerprint: 'session-' + fingerprint, connection: { id: 'c', kind: 'compatible', name: 'Prøve', baseURL: 'http://127.0.0.1:1/v1' }, model: { id: 'test' }, route: null, references: [], fileRefs: [], view: null, autoCheckpoint: false, startup: null,
    disclosure: { fingerprint, consentKey: 'samtykke', modelName: 'test', provider: 'Prøve' }, context: { rules: '', skills: [], titles: [], features: { versioner: false }, integrations: [] } };
   return bench.send({ chat: chat.id, text, fingerprint, ...extra });
  };
@@ -326,7 +326,7 @@ test('en samtale fortsætter sin AI-session, når forbindelse, model og regler e
  await bench.activate({ root, name: 'Prøve' });
  await send(bench.chat, 'Første besked'); bench.chat.event({ type: 'session.idle' }); await bench.finishing;
  assert.equal(engines[0].options.resume, null);
- assert.deepEqual((await bench.history.readChat(root, bench.chat.id)).opencode, { session: 'ses-1', fingerprint: 'regler-1' });
+ assert.deepEqual((await bench.history.readChat(root, bench.chat.id)).opencode, { session: 'ses-1', fingerprint: 'regler-1', sessionFingerprint: 'session-regler-1' });
  // Appen lukkes og åbnes igen: samme regler fortsætter sessionen, andre regler starter en ny.
  await bench.close(); await bench.activate({ root, name: 'Prøve' });
  await send(bench.chat, 'Anden besked'); bench.chat.event({ type: 'session.idle' }); await bench.finishing;

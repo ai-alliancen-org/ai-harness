@@ -207,6 +207,7 @@ class ChatSession {
     disclosure.projectDesign = require('./projects.cjs').designContext(currentProject);
     disclosure.projectGuidance = guidanceFor(bench.surface, settings.runtime);
     disclosure.projectInstructions = context.projectInstructions;
+    const sessionMaterial = disclosure.material;
     if (['plan', 'build'].includes(mode)) disclosure.material += ' Plan og tidligere afklaring medsendes. De kan indeholde oplysninger fra tidligere valgte referencer, også efter at referencerne fravælges. Gennemgå indholdet nedenfor.';
     disclosure.planContext = mode === 'build' ? this.plan : mode === 'plan' ? this.planConversation : null;
     // En indsats sendes kun, når brugeren selv har valgt den, fx "Prøv med lav indsats". Ellers gælder udbyderens standard.
@@ -230,15 +231,22 @@ class ChatSession {
     // Filhenvisninger ændrer ikke AI'ens regler og starter derfor ikke en ny modelsession. De indgår i samtykket nedenfor.
     // Indsatsen sættes på gatewayen ved hver besked og starter ikke en ny modelsession; samtalens historik bevares.
     const { planContext, conversation, historyIncluded, fileReferences, fileReferenceText, previewReference, previewReferenceText, brief: briefContext, workspace: localWorkspace, effort: chosenEffort, effortLevels, ...consent } = disclosure;
-    // Grundregler, skills og funktioner indgår, så en ændring starter en ny modelsession med de nye instruktioner.
+    // Den fulde afsendelsesbinding genstarter motoren med den aktuelle tilladelsespolitik.
     disclosure.fingerprint = crypto.createHash('sha256').update(JSON.stringify(consent) + JSON.stringify({ connectionRevision: selection.connection.revision || null, rules: context.rules, skills: context.skills, features: context.features, projectInstructions: context.projectInstructions, surface: bench.surface, autoCheckpoint, commandIsolation, autoCommandsSnapshot })).digest('hex');
+    // Hukommelsen følger samme konto, model, regler og referenceadgang gennem
+    // Planlæg/Byg og planrevisioner. Den giver ingen nye værktøjstilladelser.
+    // Startpunktet beskriver aktuelle projektfiler; øvrige designvalg er bundet.
+    const { mode: policyMode, planID: approvedPlan, projectDesign, ...sessionConsent } = consent;
+    const { startingPoint, ...sessionDesign } = projectDesign;
+    const sessionFingerprint = crypto.createHash('sha256').update(JSON.stringify({ version: 1, connectionID: selection.connection.id, engineVersion: require('./engine.cjs').VERSION, workspaceRoot: this.root, ...sessionConsent, material: sessionMaterial, projectDesign: sessionDesign }) + JSON.stringify({ connectionRevision: selection.connection.revision || null, rules: context.rules, skills: context.skills, features: context.features, projectInstructions: context.projectInstructions, surface: bench.surface, autoCheckpoint, autoCommands: approvalSettings.autoCommands === true })).digest('hex');
+    disclosure.sessionFingerprint = sessionFingerprint;
     // Resuméet før afsendelse vises igen, når modtager, model, vilkår, pris eller delt materiale ændrer sig. Skift fra plan til byg er ikke en ny modtager.
     Object.assign(disclosure, modelConsent.review(selection.connection.id, disclosure, settings, context.projectInstructions?.hash));
     disclosure.modelName = selection.model.name || selection.model.id;
     // Forhåndsvisningens størrelse til før/efter-billederne. Kun tal; siden findes i hovedprocessen.
     const view = input.view && Number.isFinite(input.view.width) && Number.isFinite(input.view.height) ? { width: Math.round(input.view.width), height: Math.round(input.view.height) } : null;
     if ((bench.connectionVersions.get(input.connectionID) || 0) !== connectionVersion) throw new Error('Forbindelsen blev ændret. Gennemgå oplysningerne igen.');
-    this.prepared = { mode, ...selection, disclosure, references, fileRefs: checkedRefs, previewTarget: target, view, context, autoCheckpoint, commandIsolation, commandSandboxSupported: commandSupport.available, autoCommandsSnapshot, startup, runtime: settings.runtime, root: this.root };
+    this.prepared = { mode, ...selection, disclosure, sessionFingerprint, references, fileRefs: checkedRefs, previewTarget: target, view, context, autoCheckpoint, commandIsolation, commandSandboxSupported: commandSupport.available, autoCommandsSnapshot, startup, runtime: settings.runtime, root: this.root };
     this.preparedInvalidated = false;
     return disclosure;
   }
@@ -296,7 +304,10 @@ class ChatSession {
       // Automatiske versioner kræver både projektets valg og funktionen Versioner og fortryd.
       if (!this.copy) bench.checkpointOwner = this;
       await this.checkpoints.begin(projectRoot, !this.copy && prepared.autoCheckpoint === true && prepared.context.features.versioner === true && !['chat', 'plan'].includes(prepared.mode), input.text); checkStopped();
-      if (this.engineIdentity !== prepared.disclosure.fingerprint || !this.engine?.active || prepared.commandIsolation) {
+      const savedSession = this.data.opencode;
+      const sameSession = typeof prepared.sessionFingerprint === 'string' && savedSession?.sessionFingerprint === prepared.sessionFingerprint;
+      const sessionIdentityChanged = prepared.sessionFingerprint && !sameSession;
+      if (this.engineIdentity !== prepared.disclosure.fingerprint || sessionIdentityChanged || !this.engine?.active || prepared.commandIsolation) {
         await this.close(false); await bench.closeOthers(this); checkStopped();
         this.commandSandbox = prepared.commandIsolation ? await require('./command-sandbox.cjs').prepare({ workspaceRoot: this.root, scratchRoot: this.scratchRoot, directory: path.join(bench.store.root, 'sandboxes', bench.store.projectKey(projectRoot), this.id, this.task.id + '-policy') }) : null;
         checkStopped();
@@ -311,12 +322,14 @@ class ChatSession {
         provider.name = 'Valgt forbindelse'; provider.models[prepared.model.id].name = prepared.model.id;
         checkStopped();
         // Samtalen fortsætter sin tidligere AI-session, når forbindelse, model og regler er de samme som sidst.
-        const resume = this.data.opencode?.fingerprint === prepared.disclosure.fingerprint ? this.data.opencode.session : null;
+        // Ældre politikbindinger dokumenterer ikke samme konto og sessionsregler.
+        // Start én ny modelsession; samtale og plan på disk bevares.
+        const resume = sameSession ? savedSession.session : null;
         this.engine = bench.engineFactory({ root: this.root, directory: path.join(bench.store.root, 'runtime', bench.store.projectKey(this.root)), provider, model: prepared.model, references: prepared.references, mode: prepared.mode, skills: prepared.context.skills, resume, sandbox: this.commandSandbox, onEvent: event => { if (this.engine === instance) this.event(event); } });
         const instance = this.engine;
         await this.engine.start(); checkStopped(); this.engineIdentity = prepared.disclosure.fingerprint;
         this.engineConversation = this.engine.resumed ? this.data.opencode?.conversation || '' : prepared.disclosure.conversation || '';
-        const opencode = { session: this.engine.session?.id || null, fingerprint: prepared.disclosure.fingerprint, ...(this.engineConversation ? { conversation: this.engineConversation } : {}) };
+        const opencode = { session: this.engine.session?.id || null, fingerprint: prepared.disclosure.fingerprint, ...(prepared.sessionFingerprint ? { sessionFingerprint: prepared.sessionFingerprint } : {}), ...(this.engineConversation ? { conversation: this.engineConversation } : {}) };
         if (opencode.session) this.data = await bench.history.updateChat(projectRoot, this.id, data => { data.opencode = opencode; }).catch(() => this.data);
         if (!this.engine.resumed) this.emit({ type: 'session.new' });
         this.log(this.engine.resumed ? { kind: 'session', title: 'AI-sessionen fortsætter', detail: 'Samme AI og samme samtale som sidst.', status: 'completed', task: this.task.id } : { kind: 'session', title: 'Ny AI-session', detail: this.engineConversation ? 'Den tidligere samtale følger med som kontekst.' : 'Plan og afklaring følger med.', status: 'completed', task: this.task.id });
