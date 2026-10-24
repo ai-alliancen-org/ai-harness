@@ -1,0 +1,8 @@
+{
+  "delayedRealFilesystemRead": true,
+  "escapeIgnoredWhileCommitting": true,
+  "confirmedAttachmentVisible": true,
+  "sourceUnchanged": true,
+  "rendererErrors": [],
+  "gitWrites": 0
+}

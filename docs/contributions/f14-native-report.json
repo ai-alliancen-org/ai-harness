@@ -1,0 +1,13 @@
+{
+  "baseline": "F13, so screenshots isolate only the F14 folder addition",
+  "actualEngine": "OpenCode 1.18.33",
+  "model": "controlled synthetic SSE response",
+  "folderChoiceInitiallyUnchecked": true,
+  "explicitSubsetOnly": true,
+  "selectedExactTextSent": true,
+  "unselectedTextSent": false,
+  "absoluteSourceFolderSent": false,
+  "sourceFilesUnchanged": true,
+  "rendererErrors": [],
+  "gitWrites": 0
+}

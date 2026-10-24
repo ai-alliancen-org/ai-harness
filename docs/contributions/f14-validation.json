@@ -1,0 +1,30 @@
+{
+  "base": "dce68ea74a199ca214ab535a16ff22765d8ee8de",
+  "proposal": "F14",
+  "tests": {
+    "desktop": {
+      "tests": 540,
+      "pass": 538,
+      "fail": 2,
+      "skipped": 0
+    },
+    "cli": {
+      "tests": 26,
+      "pass": 26,
+      "fail": 0,
+      "skipped": 0
+    }
+  },
+  "scope": [
+    "24 fokuserede fil-, mappe-, IPC- og Workbench-prøver består: eksplicit delmængde, brede mapper, dybde, symlink-udskiftning og projektskift under native mappevalg.",
+    "Native Electron-prøve med rigtig OpenCode 1.18.33 og kontrolleret lokal SSE-server: kun præcis tekst fra den valgte fil sendes. Tekst fra fravalgt fil og absolut kildefolder sendes ikke; kildefiler er uændrede.",
+    "Mappevalg er uden forhåndsmarkering. Ingen rendererfejl eller Git-skrivninger."
+  ],
+  "limits": "Afhængig PR: diffen mod originalens main indeholder F13, indtil #29 er flettet og denne branch kan opdateres. F14’s særskilte ændring er mappeopslag, eksplicit kandidatudvalg og mappeknappen; førbilledet viser F13. Kun egnede UTF-8-tekstfiler inden for F13’s grænser, ikke PDF/OCR, overvågning, indeksering eller vedvarende mappeadgang. Ingen fuld Privacy Gate eller OS-sandbox. Fjernelse af et aktuelt filvalg fjerner ikke allerede delt tekst fra AI-historik. Plan- og værktøjsgodkendelser giver fortsat kun de normale projektrettigheder.",
+  "images": {
+    "before.png": "301e0c8ae9321c1f6ce65dde28c9e4dc35f225636b5c4792f7c03354f7f7f749",
+    "after.png": "a8cc29a71da8af890262c372ca5133c9f88146b558ed578703df520bde6bc476",
+    "after-choose.png": "e203c8fc4998b9b73e3bdb37fcd20281e8d660b4c5cde498050db6bc763074ba",
+    "after-review.png": "39fe3422f0adfc170236d9acfbf8100ce24458ab954447988db156e06526a737"
+  }
+}
