@@ -1,0 +1,33 @@
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs/promises'),os=require('node:os'),path=require('node:path'),http=require('node:http');
+const {mediaSnapshot,addImages}=require('../core/chat-media.cjs'),{ChatMaterials}=require('../core/chat-materials.cjs'),{startGateway}=require('../core/gateway.cjs');
+const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==','base64');
+test('images are bounded, re-encoded and source/normalized snapshots cannot be substituted after review',async t=>{
+ const root=await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(),'aura-image-test-')));t.after(()=>fs.rm(root,{recursive:true,force:true}));const file=path.join(root,'screen.png');await fs.writeFile(file,png);
+ const service=new ChatMaterials({normalizeImage:async()=>({data:png,mime:'image/png'})}),chat={id:'fixture',project:{root},generation:0};
+ const offer=await service.offerFiles(chat,[file]);assert.equal(JSON.stringify(offer).includes('base64'),false);const ref=x=>({scope:x.scope,revision:x.revision});
+ const review=await service.preview(chat,{...ref(offer),ids:[offer.candidates[0].id]});assert.equal(review.files[0].width,1);assert.match(review.files[0].dataURL,/^data:image\/png;base64,/);
+ const selected=await service.attach(chat,{...ref(review),token:review.token}),prepared=await service.resolveSelection(chat,ref(selected));await service.assertPrepared(chat,prepared);
+ prepared.files[0].dataURL='data:image/png;base64,forged';await assert.rejects(service.assertPrepared(chat,prepared),/ændret/);
+ await assert.rejects(mediaSnapshot(png,'image',async()=>({data:Buffer.alloc(1024*1024+1),mime:'image/png'})));
+ await assert.rejects(mediaSnapshot(Buffer.from('not-an-image'),'image',async()=>({data:png,mime:'image/png'})));
+ await assert.rejects(mediaSnapshot(png,'image',undefined),/ikke tilgængelig/);
+});
+test('normalized image payloads use each existing provider protocol, never paths or raw source bytes',async()=>{
+ const image=await mediaSnapshot(png,'image',async()=>({data:png,mime:'image/png'}));
+ for(const flags of [{},{responses:true},{anthropic:true},{mistral:true}]){const body=flags.responses?{input:[{role:'user',content:'Describe'}]}:{messages:[{role:'user',content:'Describe'}]};addImages(body,[image],flags);const content=(body.input||body.messages)[0].content;assert.equal(content.length,2);assert.match(JSON.stringify(content),/base64/);}
+ assert.throws(()=>addImages({messages:[]},[image]),/brugerbesked/);
+});
+test('the actual gateway refuses unknown image support and clears prior images between sends',async t=>{
+ const received=[],server=http.createServer(async(req,res)=>{let raw='';for await(const part of req)raw+=part;received.push(JSON.parse(raw));res.end('{}');});await new Promise(r=>server.listen(0,'127.0.0.1',r));t.after(()=>{server.closeAllConnections();server.close();});
+ const image=await mediaSnapshot(png,'image',async()=>({data:png,mime:'image/png'}));
+ for(const vision of [undefined,true]){const gateway=await startGateway({kind:'compatible',baseURL:`http://127.0.0.1:${server.address().port}/v1`},{id:'fixture',capabilities:{vision}},'');try{gateway.setImages([image]);const send=()=>fetch(gateway.url+'/chat/completions',{method:'POST',headers:{authorization:'Bearer '+gateway.token,'content-type':'application/json'},body:JSON.stringify({model:'fixture',messages:[{role:'user',content:'Describe'}]})});const reply=await send();assert.equal(reply.status,vision?200:502);if(vision){assert.equal(received.at(-1).messages[0].content[1].type,'image_url');gateway.setImages([]);await send();assert.equal(received.at(-1).messages[0].content,'Describe');}}finally{await gateway.close();}}
+ assert.equal(received.length,2);
+});
+
+test('real gateway HTTP payloads preserve the reviewed image for Responses, Anthropic and Mistral',async t=>{
+ const received=[],server=http.createServer(async(req,res)=>{let raw='';for await(const chunk of req)raw+=chunk;received.push(JSON.parse(raw));res.end('{}');});await new Promise(r=>server.listen(0,'127.0.0.1',r));t.after(()=>{server.closeAllConnections();server.close();});const image=await mediaSnapshot(png,'image',async()=>({data:png,mime:'image/png'}));
+ for(const [kind,protocol,endpoint] of [['compatible','responses','responses'],['anthropic','anthropic','messages'],['mistral','openai','chat/completions']]){const gateway=await startGateway({kind,protocol,baseURL:`http://127.0.0.1:${server.address().port}/v1`},{id:'fixture',capabilities:{vision:true}},'');try{gateway.setImages([image]);const message={role:'user',content:'Describe'},body={model:'fixture',...(protocol==='responses'?{input:[message]}:{messages:[message]})};const result=await fetch(gateway.url+'/'+endpoint,{method:'POST',headers:{authorization:'Bearer '+gateway.token,'content-type':'application/json'},body:JSON.stringify(body)});assert.equal(result.status,200);const content=(received.at(-1).input||received.at(-1).messages)[0].content;assert.equal(content.length,2);assert.ok(JSON.stringify(content).includes(image.dataURL.split(',')[1]));}finally{await gateway.close();}}
+});
+test('pending images are absent during compaction and installed only for the subsequent reviewed send',async t=>{
+ const {Workbench}=require('../core/workbench.cjs'),root=await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(),'aura-image-compact-')));t.after(()=>fs.rm(root,{recursive:true,force:true}));const project=path.join(root,'project');await fs.mkdir(project);const bench=new Workbench({directory:path.join(root,'data'),profiles:path.resolve(__dirname,'../../profiles'),safeStorage:{},emit(){}});t.after(()=>bench.close());await bench.activate({root:project,name:'Syntetisk'});const chat=bench.chat,observed=[],image=await mediaSnapshot(png,'image',async()=>({data:png,mime:'image/png'}));let images=['old'];chat.gateway={setImages:value=>images=value,setEffort(){},close:async()=>{}};chat.engine={active:true,messages:async()=>[{}],summarize:async()=>observed.push(['compact',images.length]),send:async()=>observed.push(['send',images.length]),close:async()=>{}};chat.engineIdentity='fixture';bench.chatMaterials={assertPrepared:async()=>{}};chat.prepared={root:project,mode:'chat',connection:{id:'fixture',kind:'compatible',baseURL:'http://127.0.0.1:1/v1'},model:{id:'fixture',capabilities:{vision:true}},references:[],context:{rules:'',skills:[],features:{}},disclosure:{fingerprint:'fixture'},chatMaterials:{files:[image]}};await bench.send({text:'Describe',fingerprint:'fixture',compact:true});assert.deepEqual(observed,[['compact',0],['send',1]]);
+});

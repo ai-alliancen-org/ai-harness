@@ -32,7 +32,7 @@ class Workbench {
     // Versionen efter en opgave hører til den samtale, hvis opgave gemmes.
     this.git = new GitVersions();
     this.checkpoints = new Checkpoints(this.git, event => { const owner = this.checkpointOwner; if (owner) { owner.checkpointEvent(event); owner.emit(event); } else emit(event); });
-    this.engineFactory = engineFactory; this.profiles = profiles; this.emit = emit; this.catalogs = new Map(); this.catalogRequests = new Map(); this.connectionVersions = new Map();
+    this.engineFactory = engineFactory; this.profiles = profiles; this.emit = emit; this.catalogs = new Map(); this.catalogTimes = new Map(); this.supportEvidence = []; this.catalogRequests = new Map(); this.connectionVersions = new Map();
     this.chats = new Map(); this.chatID = null; this.claims = new Map(); this.project = null; this.previewSelections = new Map();
     // Samtalernes Ændringer og Aktivitet, så længe appen er åben, også når projektet lukkes og åbnes igen.
     this.memory = new Map(); this.lastChatID = null; this.copies = new Copies(this.store); this.allocation = Promise.resolve();
@@ -279,7 +279,7 @@ class Workbench {
     const models = await connections.listModels(connection, this.store.decrypt(connection));
     // Et sent katalogsvar må ikke genindføre adgang efter redigering, fjernelse eller en nyere kontrol.
     if (this.catalogRequests.get(id) !== request) throw new Error('Forbindelsen blev ændret eller kontrolleret igen. Hent modellerne på ny.');
-    this.catalogs.set(id, models); return models;
+    this.catalogs.set(id, models); this.catalogTimes.set(id, new Date().toISOString()); return models;
   }
   async routes(id, modelID) { const connection = await this.connection(id); connections.assertSupported(connection); return connections.routes(connection, this.store.decrypt(connection), modelID); }
   async selection(input) {

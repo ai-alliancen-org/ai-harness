@@ -1,0 +1,9 @@
+{
+  "realEngine": "OpenCode 1.18.33",
+  "model": "controlled synthetic SSE server",
+  "exactReviewedMaterialInActualRequest": true,
+  "rawSourcePathSent": false,
+  "sourceChangeBlocksNextRequest": true,
+  "rendererErrors": [],
+  "gitWrites": 0
+}

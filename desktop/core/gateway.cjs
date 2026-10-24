@@ -7,7 +7,7 @@ const IDLE_LIMIT = 120_000, TOTAL_LIMIT = 20 * 60_000;
 // Kun agentmotoren får en midlertidig adgangskode. Den rigtige modelnøgle bliver i hovedprocessen.
 async function startGateway(connection, model, key, route, onFailure = () => {}, { idleLimit = IDLE_LIMIT, totalLimit = TOTAL_LIMIT, onProgress = () => {}, root = '', effort: initialEffort = null } = {}) {
   // Brugerens valgte indsats kan skifte mellem beskeder uden at starte en ny modelsession.
-  let effort = initialEffort;
+  let effort = initialEffort, images = [];
   assertSupported(connection);
   const token = randomBytes(32).toString('hex');
   const active = new Set();
@@ -31,6 +31,10 @@ async function startGateway(connection, model, key, route, onFailure = () => {},
       for await (const chunk of req) { size += chunk.length; if (size > 4_000_000) throw new Error('Beskeden er for stor.'); chunks.push(chunk); }
       const body = JSON.parse(Buffer.concat(chunks).toString());
       if (body.model !== model.id) throw new Error('Modelskift kræver et nyt valg i appen.');
+      if (images.length) {
+        if (!require('./model-support.cjs').imageAllowed(model, route)) throw Error('Billedinput er ikke dokumenteret for den valgte model/rute.');
+        require('./chat-media.cjs').addImages(body, images, { responses, anthropic, mistral: connection.kind === 'mistral' });
+      }
       delete body.models; delete body.route; delete body.plugins;
       if (responses) {
         body.store = false;
@@ -79,6 +83,6 @@ async function startGateway(connection, model, key, route, onFailure = () => {},
   });
   await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
   origin = `http://127.0.0.1:${server.address().port}`;
-  return { url: `${origin}/v1`, token, setEffort: value => { effort = value || null; }, abort: () => { stopped = true; for (const controller of active) controller.abort(); }, close: () => new Promise(resolve => { stopped = true; for (const controller of active) controller.abort(); server.close(resolve); server.closeAllConnections(); }) };
+  return { url: `${origin}/v1`, token, setImages: value => { images = structuredClone(value); }, setEffort: value => { effort = value || null; }, abort: () => { stopped = true; for (const controller of active) controller.abort(); }, close: () => new Promise(resolve => { stopped = true; for (const controller of active) controller.abort(); server.close(resolve); server.closeAllConnections(); }) };
 }
 module.exports = { startGateway };

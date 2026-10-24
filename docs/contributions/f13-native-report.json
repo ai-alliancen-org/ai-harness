@@ -1,0 +1,12 @@
+{
+  "realEngine": "OpenCode 1.18.33",
+  "model": "controlled synthetic SSE response",
+  "actualRequests": 1,
+  "exactReviewedTextSent": true,
+  "absoluteSourcePathSent": false,
+  "changedSourceBlocked": true,
+  "draftPreserved": true,
+  "rawRendererPathRejected": true,
+  "rendererErrors": [],
+  "gitWrites": 0
+}

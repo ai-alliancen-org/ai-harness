@@ -1,0 +1,31 @@
+{
+  "base": "dce68ea74a199ca214ab535a16ff22765d8ee8de",
+  "proposal": "F16",
+  "tests": {
+    "desktop": {
+      "tests": 552,
+      "pass": 550,
+      "fail": 2,
+      "skipped": 0
+    },
+    "cli": {
+      "tests": 26,
+      "pass": 26,
+      "fail": 0,
+      "skipped": 0
+    }
+  },
+  "scope": [
+    "Unit- og faktiske HTTP-adapterprøver dækker format, størrelsesgrænser, manipuleret input, ændrede kilder, model/rute og nulstilling mellem opgaver.",
+    "Komprimeringsprøve bekræfter nul ventende billeder ved opsummering og ét ved den efterfølgende godkendte afsendelse.",
+    "Native Electron + OpenCode mod kontrolleret server: gennemgået normaliseret billede i faktisk forespørgsel, ingen rå kildesti, ændring blokerer næste afsendelse og kladde bevares.",
+    "980-pixels visning og renderer kontrolleret uden nye fejl."
+  ],
+  "limits": "Originalens navigation, onboarding, projekter, planer og værktøjsgodkendelser bevares. De viste tillæg til de eksisterende kontroller er særskilt godkendt. Afhænger af F13 (#29) og F09. Billedets synlige indhold sendes til den valgte AI efter gennemgangen; dette er ikke OCR, anonymisering eller fuld Privacy Gate. Billedstøtte fra en rigtig produktionsmodel er ikke kvalificeret.",
+  "images": {
+    "before.png": "cb499492033610982848e8203f8cfc3a5df9c030e250ead06e4f71c5613ec2dc",
+    "after.png": "2249af4fca665f8c734782819e963d61262bce8fbaf375db931f8cf29e604c81",
+    "after-changed.png": "eaa7ac8d269f75388497a17a820220483a01db56c632d1747c4d59d16db8b293",
+    "after-narrow.png": "871d3f61ca71ef0fe112e500ac7f0b41bec30361bae2fd3c33075d13ad7c8169"
+  }
+}

@@ -34,6 +34,8 @@ Beskriv, hvad du vil lave, og arbejd videre med AI’en i et lokalt projekt. Sam
 
 - **Afklar og planlæg.** Beskriv brugerne, opgaven og de vigtigste krav. Gennemgå AI’ens forslag, før du beder den bygge.
 - **Følg ændringerne.** Gennemgå filændringer og de handlinger, der kræver din godkendelse. Fanerne Plan, Ændringer, Kode og Aktivitet samler detaljerne.
+- **Medtag udvalgte tekstfiler.** Vælg **Vedhæft filer** i samtalen, gennemgå indholdet, og godkend den konkrete afsendelse. Se [filvalg, grænser og før/efterprøven](docs/contributions/f13.md).
+- **Medtag et billede.** Samme filvalg kan gennemgå PNG/JPEG før deling med en model og eventuel rute med angivet billedstøtte. Se [billedgennemgang og størrelsesgrænser](docs/contributions/f16.md).
 - **Se og afprøv resultatet.** Brug forhåndsvisningen til at prøve løsningen i forskellige skærmstørrelser. Understøttede webprojekter kan startes gennem appen.
 - **Gem og fortryd.** Brug lokale Git-versioner til at følge arbejdet og gennemgå en tidligere version, før du gendanner den.
 
