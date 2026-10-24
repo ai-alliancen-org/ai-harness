@@ -16,6 +16,7 @@ const { startGateway } = require('./gateway.cjs');
 const { toolEntry, toolFiles, approvalTarget, approvalTitles } = require('./activity.cjs');
 const { taskSummary, sessionSummary, fileDetail, sessionAttribution, hash } = require('./change-review.cjs');
 const projectFiles = require('./project-files.cjs');
+const { materialText } = require('./chat-materials.cjs');
 const { cleanOutput } = require('./dev-server.cjs');
 const brief = require('./brief.cjs');
 const previewEdit = require('./preview-edit.cjs');
@@ -184,6 +185,8 @@ class ChatSession {
     if (!Array.isArray(fileRefs) || fileRefs.length > 10) throw new Error('Vælg højst 10 filhenvisninger.');
     const checkedRefs = [];
     for (const ref of fileRefs) checkedRefs.push(await projectFiles.checkReference(this.root, ref).catch(error => { throw new Error(`${ref?.path || 'Filen'}: ${error.message}`); }));
+    const chatMaterials = input.chatMaterials == null ? null : await bench.chatMaterials?.resolveSelection(this, input.chatMaterials);
+    if (input.chatMaterials != null && !chatMaterials) throw new Error('Gennemgå filvalget igen.');
     const context = await bench.skills.context(projectRoot);
     context.projectInstructions = await projectInstructions(this.root);
     const settings = await bench.store.project(projectRoot);
@@ -234,11 +237,17 @@ class ChatSession {
     disclosure.fingerprint = crypto.createHash('sha256').update(JSON.stringify(consent) + JSON.stringify({ connectionRevision: selection.connection.revision || null, rules: context.rules, skills: context.skills, features: context.features, projectInstructions: context.projectInstructions, surface: bench.surface, autoCheckpoint, commandIsolation, autoCommandsSnapshot })).digest('hex');
     // Resuméet før afsendelse vises igen, når modtager, model, vilkår, pris eller delt materiale ændrer sig. Skift fra plan til byg er ikke en ny modtager.
     Object.assign(disclosure, modelConsent.review(selection.connection.id, disclosure, settings, context.projectInstructions?.hash));
+    if (chatMaterials) {
+      disclosure.sessionFingerprint = disclosure.fingerprint;
+      disclosure.chatMaterials = chatMaterials;
+      disclosure.fingerprint = crypto.createHash('sha256').update(JSON.stringify([disclosure.sessionFingerprint, chatMaterials.sha256, crypto.randomUUID()])).digest('hex');
+      disclosure.accepted = false;
+    }
     disclosure.modelName = selection.model.name || selection.model.id;
     // Forhåndsvisningens størrelse til før/efter-billederne. Kun tal; siden findes i hovedprocessen.
     const view = input.view && Number.isFinite(input.view.width) && Number.isFinite(input.view.height) ? { width: Math.round(input.view.width), height: Math.round(input.view.height) } : null;
     if ((bench.connectionVersions.get(input.connectionID) || 0) !== connectionVersion) throw new Error('Forbindelsen blev ændret. Gennemgå oplysningerne igen.');
-    this.prepared = { mode, ...selection, disclosure, references, fileRefs: checkedRefs, previewTarget: target, view, context, autoCheckpoint, commandIsolation, commandSandboxSupported: commandSupport.available, autoCommandsSnapshot, startup, runtime: settings.runtime, root: this.root };
+    this.prepared = { mode, chatMaterials, ...selection, disclosure, references, fileRefs: checkedRefs, previewTarget: target, view, context, autoCheckpoint, commandIsolation, commandSandboxSupported: commandSupport.available, autoCommandsSnapshot, startup, runtime: settings.runtime, root: this.root };
     this.preparedInvalidated = false;
     return disclosure;
   }
@@ -251,12 +260,14 @@ class ChatSession {
   async sendPrepared(input) {
     if (this.running) throw new Error('Der er allerede en opgave i gang i denne samtale.');
     const bench = this.bench, prepared = this.prepared, projectRoot = this.project.root;
-    if (this.preparedInvalidated || !prepared || prepared.root !== this.root || input.fingerprint !== prepared.disclosure.fingerprint) throw new Error('Gennemgå de aktuelle dataoplysninger før afsendelse.');
+    if (this.preparedInvalidated || !prepared || prepared.used || prepared.root !== this.root || input.fingerprint !== prepared.disclosure.fingerprint) throw new Error('Gennemgå de aktuelle dataoplysninger før afsendelse.');
     if (bench.connectionRemovals.has(prepared.connection.id)) throw new Error('Forbindelsen er ved at blive fjernet. Vælg en anden forbindelse.');
     connections.assertSupported(prepared.connection);
     if (typeof input.text !== 'string' || !input.text.trim() || input.text.length > 30000) throw new Error('Skriv en besked på højst 30.000 tegn.');
     if (prepared.mode === 'build' && prepared.disclosure.planID !== this.plan?.id) throw new Error('Planen har ændret sig. Gennemgå den igen.');
     if (Object.hasOwn(prepared.context, 'projectInstructions') && JSON.stringify(await projectInstructions(this.root)) !== JSON.stringify(prepared.context.projectInstructions)) throw new Error('Projektets AGENTS.md har ændret sig. Gennemgå oplysningerne igen før afsendelse.');
+    await bench.chatMaterials?.assertPrepared(this, prepared.chatMaterials);
+    if (prepared.chatMaterials) prepared.used = true; // Keep allocation metadata, but never reuse this reviewed send.
     const generation = ++this.generation; this.runStopped = false;
     const checkStopped = () => { if (generation !== this.generation) throw new Error('Opgaven blev stoppet før afsendelse.'); };
     // Kun én samtale ad gangen kan arbejde i den samme mappe.
@@ -265,7 +276,7 @@ class ChatSession {
     if (prepared.mode === 'free') { this.retirePlan('direkte'); this.planConversation = []; }
     // Beskeden, som den faktisk sendes: brugerens tekst og eventuelle henvisninger, der er vist i Før du sender.
     // Samtalen viser målet som én linje; den fulde beskrivelse af elementet står i Før du sender.
-    const text = input.text + (prepared.disclosure.fileReferenceText || '') + (prepared.disclosure.previewReferenceText || '');
+    const text = input.text + (prepared.disclosure.fileReferenceText || '') + (prepared.disclosure.previewReferenceText || '') + materialText(prepared.chatMaterials);
     const shown = input.text + (prepared.disclosure.fileReferenceText || '') + (prepared.disclosure.previewReference ? `\n\nMål i forhåndsvisningen: ${prepared.disclosure.previewReference}` : '');
     this.runMode = prepared.mode; this.runConnectionID = prepared.connection.id; this.runText = new Map(); this.runTools = new Map(); this.runRoles = new Map(); this.allowProjectEdits = false; this.taskRules = new Set(); this.approvals.clear(); this.runFinish = null; this.runFailure = null;
     this.usageBase = this.currentUsage(); this.runSteps = new Map(); this.runPrice = connections.priceFor(prepared.connection, prepared.model, prepared.route);
@@ -296,7 +307,7 @@ class ChatSession {
       // Automatiske versioner kræver både projektets valg og funktionen Versioner og fortryd.
       if (!this.copy) bench.checkpointOwner = this;
       await this.checkpoints.begin(projectRoot, !this.copy && prepared.autoCheckpoint === true && prepared.context.features.versioner === true && !['chat', 'plan'].includes(prepared.mode), input.text); checkStopped();
-      if (this.engineIdentity !== prepared.disclosure.fingerprint || !this.engine?.active || prepared.commandIsolation) {
+      if (this.engineIdentity !== (prepared.disclosure.sessionFingerprint || prepared.disclosure.fingerprint) || !this.engine?.active || prepared.commandIsolation) {
         await this.close(false); await bench.closeOthers(this); checkStopped();
         this.commandSandbox = prepared.commandIsolation ? await require('./command-sandbox.cjs').prepare({ workspaceRoot: this.root, scratchRoot: this.scratchRoot, directory: path.join(bench.store.root, 'sandboxes', bench.store.projectKey(projectRoot), this.id, this.task.id + '-policy') }) : null;
         checkStopped();
@@ -311,12 +322,12 @@ class ChatSession {
         provider.name = 'Valgt forbindelse'; provider.models[prepared.model.id].name = prepared.model.id;
         checkStopped();
         // Samtalen fortsætter sin tidligere AI-session, når forbindelse, model og regler er de samme som sidst.
-        const resume = this.data.opencode?.fingerprint === prepared.disclosure.fingerprint ? this.data.opencode.session : null;
+        const resume = this.data.opencode?.fingerprint === (prepared.disclosure.sessionFingerprint || prepared.disclosure.fingerprint) ? this.data.opencode.session : null;
         this.engine = bench.engineFactory({ root: this.root, directory: path.join(bench.store.root, 'runtime', bench.store.projectKey(this.root)), provider, model: prepared.model, references: prepared.references, mode: prepared.mode, skills: prepared.context.skills, resume, sandbox: this.commandSandbox, onEvent: event => { if (this.engine === instance) this.event(event); } });
         const instance = this.engine;
-        await this.engine.start(); checkStopped(); this.engineIdentity = prepared.disclosure.fingerprint;
+        await this.engine.start(); checkStopped(); this.engineIdentity = (prepared.disclosure.sessionFingerprint || prepared.disclosure.fingerprint);
         this.engineConversation = this.engine.resumed ? this.data.opencode?.conversation || '' : prepared.disclosure.conversation || '';
-        const opencode = { session: this.engine.session?.id || null, fingerprint: prepared.disclosure.fingerprint, ...(this.engineConversation ? { conversation: this.engineConversation } : {}) };
+        const opencode = { session: this.engine.session?.id || null, fingerprint: (prepared.disclosure.sessionFingerprint || prepared.disclosure.fingerprint), ...(this.engineConversation ? { conversation: this.engineConversation } : {}) };
         if (opencode.session) this.data = await bench.history.updateChat(projectRoot, this.id, data => { data.opencode = opencode; }).catch(() => this.data);
         if (!this.engine.resumed) this.emit({ type: 'session.new' });
         this.log(this.engine.resumed ? { kind: 'session', title: 'AI-sessionen fortsætter', detail: 'Samme AI og samme samtale som sidst.', status: 'completed', task: this.task.id } : { kind: 'session', title: 'Ny AI-session', detail: this.engineConversation ? 'Den tidligere samtale følger med som kontekst.' : 'Plan og afklaring følger med.', status: 'completed', task: this.task.id });
@@ -346,6 +357,7 @@ class ChatSession {
         checkStopped();
         this.log({ kind: 'session', title: 'Samtalen er gjort kortere', detail: 'AI’en har sammenfattet samtalen og fortsætter derfra. Planen og filerne er bevaret.', status: 'completed', task: this.task.id });
       }
+      await bench.chatMaterials?.assertPrepared(this, prepared.chatMaterials);
       checkStopped(); await this.engine.send(text, system); checkStopped();
       // De senest accepterede vilkår huskes for projektet, så de samme oplysninger ikke vises igen ved hver opgave.
       await modelConsent.remember(bench.store, projectRoot, prepared.disclosure.consentKey);

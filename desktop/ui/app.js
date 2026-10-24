@@ -685,7 +685,7 @@ async function loadRoutes(saved = '') {
   for (const route of routes) $('#route-select').append(option(route.id, route.name));
   if (routes.some(route => route.id === saved)) $('#route-select').value = saved;
 }
-function selection() { return { effort: view?.effort || null, includeHistory: $('#include-history').checked, mode: $('#work-mode').value, planID: activePlan?.id, connectionID: $('#connection-select').value, modelID: $('#model-select').value, routeID: $('#route-select').value, references: [...document.querySelectorAll('#reference-choices input:checked')].map(el => el.value), fileRefs: window.workspace?.references() || [], previewTarget: window.workspace?.target()?.id || null, view: window.previewViewSize?.() || null, chat: view.id }; }
+function selection() { return { chatMaterials:window.chatMaterials?.selection() || null, effort: view?.effort || null, includeHistory: $('#include-history').checked, mode: $('#work-mode').value, planID: activePlan?.id, connectionID: $('#connection-select').value, modelID: $('#model-select').value, routeID: $('#route-select').value, references: [...document.querySelectorAll('#reference-choices input:checked')].map(el => el.value), fileRefs: window.workspace?.references() || [], previewTarget: window.workspace?.target()?.id || null, view: window.previewViewSize?.() || null, chat: view.id }; }
 const detailLabels = { projectInstructions: 'Projektets egne regler, der sendes', workspace: 'Arbejdsmappe', mode: 'Arbejdsmåde', brief: 'Projektbrief, der sendes', previewReferenceText: 'Valgt element, der sendes', conversation: 'Tidligere samtale, der sendes', projectGuidance: 'Appens vejledning om projektvalg og design', planContext: 'Plan og afklaring, der sendes', projectChoices: 'Projektets opstartsvalg', projectDesign: 'Projektets designvalg', fileReferences: 'Filhenvisninger i beskeden', connection: 'Forbindelse', model: 'Model', endpoint: 'Serveradresse', recipients: 'Modtagere', region: 'Behandlingssted', retention: 'Opbevaring', training: 'Brug til træning', price: 'Pris og gratisbegrænsninger', capabilities: 'Modelmuligheder', material: 'Hvad sendes?', references: 'Udvalgte private referencer', skills: 'Skills, AI’en kan hente', localStorage: 'Lokal historik og yderligere netværk', security: 'Forbindelsens sikkerhed', source: 'Kilde', checkedAt: 'Dokumentation kontrolleret', evidence: 'Grundlag' };
 // Kort resumé i almindeligt dansk. Alle oplysninger ligger under "Se alle oplysninger".
 function showData(data, canSend) {
@@ -719,6 +719,7 @@ function showData(data, canSend) {
     else dd.textContent = text;
     $('#data-details').append(node('dt', label), dd);
   }
+  window.ChatMaterials.disclose(data.chatMaterials);
   $('#accept-send').hidden = !canSend; $('#data-dialog').showModal();
 }
 async function sendNow(data, text) {
@@ -785,7 +786,7 @@ function applyRunning() {
   $('#task-next-note').hidden = !running;
   $('#include-history').disabled = running;
   setupControls();
-  renderStatus(); window.previewEdit?.available();
+  renderStatus(); window.previewEdit?.available(); window.chatMaterials?.sync();
 }
 function showSkill() {
   const skill = skillList.find(s => s.id === $('#skill-select').value); if (!skill) return;
@@ -1847,3 +1848,5 @@ $('#support-feedback').onclick = () => action(() => call('supportFeedback'));
 
 // Udgiv forbinder komplai Run fra sin egen dialog; appens funktioner følger med.
 window.addEventListener('harness:komplai-connected', () => action(async () => { state = await call('connectionState'); renderConnections(); applyFeatures(); }));
+
+window.ChatMaterials.connect({read:()=>({root:current?.root,chat:view.id,running:running||projectLoading}),invoke:(method,value,owner)=>call(method,value,owner),invalidate:()=>{acceptedFingerprint=null;pendingSend=null;if($('#data-dialog').open)$('#data-dialog').close();}});

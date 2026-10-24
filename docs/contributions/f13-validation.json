@@ -1,0 +1,33 @@
+{
+  "base": "dce68ea74a199ca214ab535a16ff22765d8ee8de",
+  "proposal": "F13",
+  "tests": {
+    "desktop": {
+      "tests": 534,
+      "pass": 532,
+      "fail": 2,
+      "skipped": 0
+    },
+    "cli": {
+      "tests": 26,
+      "pass": 26,
+      "fail": 0,
+      "skipped": 0
+    }
+  },
+  "scope": [
+    "18 fokuserede fil-, IPC- og Workbench-prøver består, inklusive stiforfalskning, stale scope, byteændring, symlink, størrelse, UTF-8, engangsgodkendelse, kopiallokering og ændret forbindelse under opstart.",
+    "Native Electron-prøve gennem den rigtige OpenCode 1.18.33 og en kontrolleret lokal SSE-server: præcis gennemgået tekst modtages, absolut kildefilsti medsendes ikke, og en efterfølgende ændret fil giver intet nyt modelkald. AI-svaret er en syntetisk testrespons.",
+    "Kladden bevares ved afvist filændring; et renderer-forsøg på selv at levere filsti afvises. Ingen rendererfejl eller Git-skrivninger. Responsiv visning er afprøvet ved 980×720.",
+    "Native Escape-regression med forsinket fillæsning: den igangværende vedhæftning kan ikke skjules ved at lukke dialogen; præcis én tilføjelse og ingen rendererfejl."
+  ],
+  "limits": "Kun almindelig UTF-8-tekst/kode; PDF, billeder/OCR, vedvarende filvalg og hele mapper er ikke en del af F13. Ingen påstand om fuld Privacy Gate eller OS-sandbox. Fjernelse af et aktuelt filvalg sletter ikke tekst, som allerede findes i AI’ens samtalehistorik. Kilderne ændres ikke, og ingen skriveadgang eller nye værktøjstilladelser gives. Originalens andre filhenvisninger og referencer fungerer fortsat.",
+  "images": {
+    "before.png": "e8ae57e14878d261b02cabd708455ba4d6ab9f395f5213842868900c5edd87e5",
+    "after.png": "a6213a131a3d563fed61c428b3c1f47c768dfcd7e8f1f45438d1a4cc6cc1ad1c",
+    "after-review.png": "582b643a73bd8ff93892e81e3e8a4284dfaf66c08078d489a441f77bdb893750",
+    "after-disclosure.png": "b87ec3b49df064a85016ce12fbd276860af4a2302fbe4dc3e9f39d827ebac2e7",
+    "after-changed.png": "dd7ba43bd1ba32099b5a3540d88a21a9deb580c8913b2162c568c412dd276301",
+    "after-narrow.png": "1ba83a05e8290621672b8e838f98a8d1179c05af04d1b03a7770759ae1fda2b0"
+  }
+}
