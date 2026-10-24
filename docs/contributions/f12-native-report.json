@@ -1,0 +1,13 @@
+{
+  "retainedMessages": 80,
+  "initialRendered": 20,
+  "pagesOf": 20,
+  "allLoadedInOrder": true,
+  "duplicateMessages": 0,
+  "modelOrHTTPRequestsDuringLoad": 0,
+  "draftPlanAndModePreserved": true,
+  "reloadRestoresPagingAndDraft": true,
+  "rendererErrors": [],
+  "gitWrites": 0,
+  "productionCredentials": false
+}

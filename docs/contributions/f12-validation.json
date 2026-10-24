@@ -1,0 +1,29 @@
+{
+  "base": "dce68ea74a199ca214ab535a16ff22765d8ee8de",
+  "proposal": "F12",
+  "tests": {
+    "desktop": {
+      "tests": 519,
+      "pass": 517,
+      "fail": 2,
+      "skipped": 0
+    },
+    "cli": {
+      "tests": 26,
+      "pass": 26,
+      "fail": 0,
+      "skipped": 0
+    }
+  },
+  "scope": [
+    "Tre fokuserede visningsprøver består: op til 200 poster, komplet rækkefølge uden dubletter, tom historik, Unicode, store enkeltbeskeder og uændrede originale poster.",
+    "Native Electron-prøve med 80 faktisk gemte beskeder: 20 → 40 → 80 vises i korrekt rækkefølge. Ingen HTTP-/modelkald, dubletter eller ændret kladde, plan eller arbejdsform.",
+    "Genindlæsning viser igen seneste side og bevarer den gemte kladde. Ingen rendererfejl eller Git-skrivninger."
+  ],
+  "limits": "Kun beskeder, som originalens eksisterende lager stadig har bevaret, kan indlæses. Originalens opbevaringsloft på 200 beskeder/200.000 tegn ændres ikke, og allerede bortskåret historik genskabes ikke. En enkelt ældre besked over visningsgrænsen vises hel, så tekst ikke afkortes. Funktionen komprimerer ikke modellen og ændrer ikke sessionshukommelsen eller datatilladelser.",
+  "images": {
+    "before.png": "289b948dd6ed78c544f637381a0b8f14c354418f36a9900a51d6c1367b608cb0",
+    "after.png": "9f7548caa4de38998015b56e85881fe4e6c9451fa182b00dbfb9ffd5fd323305",
+    "after-loaded.png": "0983f87c3f77ad2f4c07930cd54bfff516a604794d6340684569fb6af9c07e52"
+  }
+}

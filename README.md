@@ -34,6 +34,7 @@ Beskriv, hvad du vil lave, og arbejd videre med AI’en i et lokalt projekt. Sam
 
 - **Afklar og planlæg.** Beskriv brugerne, opgaven og de vigtigste krav. Gennemgå AI’ens forslag, før du beder den bygge.
 - **Følg ændringerne.** Gennemgå filændringer og de handlinger, der kræver din godkendelse. Fanerne Plan, Ændringer, Kode og Aktivitet samler detaljerne.
+- **Læs tidligere beskeder.** Åbn en gemt samtale, og vælg **Indlæs tidligere beskeder** over beskederne for at hente næste gemte del. Det starter ingen AI-opgave. Se [visningsindlæsning, grænser og før/efterprøven](docs/contributions/f12.md).
 - **Se og afprøv resultatet.** Brug forhåndsvisningen til at prøve løsningen i forskellige skærmstørrelser. Understøttede webprojekter kan startes gennem appen.
 - **Gem og fortryd.** Brug lokale Git-versioner til at følge arbejdet og gennemgå en tidligere version, før du gendanner den.
 
