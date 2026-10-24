@@ -1,0 +1,28 @@
+{
+  "base": "dce68ea74a199ca214ab535a16ff22765d8ee8de",
+  "proposal": "T04",
+  "tests": {
+    "desktop": {
+      "tests": 528,
+      "pass": 526,
+      "fail": 2,
+      "skipped": 0
+    },
+    "cli": {
+      "tests": 26,
+      "pass": 26,
+      "fail": 0,
+      "skipped": 0
+    }
+  },
+  "scope": [
+    "Prøver dækker dirty kilde, ændret/manglende/ekstra payload, links, specialnavne som __proto__, falsk kildebevis og en faktisk ad-hoc-signeret macOS-binær.",
+    "Faktisk lokal pakke: 5.222 runtime-poster kontrolleret mod forberedelsens inventering.",
+    "Negativ prøve: en ekstra runtime-fil overses af den gamle kontrol, afvises af den nye, og den gendannede pakke består igen.",
+    "Den pakkede app åbner i isoleret profil med begrænset PATH og medfølgende OpenCode/Git/Node/npm; projektfiler og preview fungerer uden Git-skrivninger."
+  ],
+  "limits": "Originalens navigation, onboarding, projekter, planer og værktøjsgodkendelser bevares. De viste tillæg til de eksisterende kontroller er særskilt godkendt. En lokal kilde-/integritetskontrol, ikke bevis for en troværdig byggecomputer, Developer ID, notarisering eller ekstern CI. Den pakkede app er prøvet usigneret; den separate signing-test bruger en faktisk ad-hoc-signatur. Ingen ny DMG eller release. Windows/Intel er ikke fysisk prøvet.",
+  "images": {
+    "after.png": "d56f0d25166ae22a936799d58ff46e2bdcef61494cb50a5d732482d1fa5e3ed9"
+  }
+}

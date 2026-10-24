@@ -99,6 +99,8 @@ npm start
 
 `runtime:prepare` henter og kontrollerer de versioner af de medfølgende værktøjer, som projektet har låst. Vælg derefter din AI-forbindelse i appen, eller fortsæt uden AI for at se dig omkring. Adgang og eventuel betaling til model- og hostingtjenester håndteres særskilt.
 
+Ved lokal pakning bindes produktfilerne til en Git-commit, og runtime-filerne kontrolleres mod de låste arkiver. Se [pakkens kildebevis, kontrolkommando og begrænsninger](docs/contributions/t04.md).
+
 Se [installation, opsætning og lokale testkommandoer](https://github.com/ai-alliancen-org/ai-harness/blob/main/desktop/README.md).
 
 ## Teknologi, data og betastatus

@@ -1,0 +1,13 @@
+{
+  "status": "bestået",
+  "checks": [
+    "pakket app",
+    "isoleret brugerdata",
+    "begrænset PATH",
+    "medfølgende OpenCode/Git/Node/npm",
+    "faktiske filer fra pakkens projektfunktion og profiler",
+    "rigtigt preview",
+    "eksisterende mappe uden Git åbnes uden ændring af historik"
+  ],
+  "limitation": "Ingen Git-skrivninger eller testcommits. Projektoprettelsens automatiske version og Gem version er ikke afprøvet. Ikke en separat ren computer; ingen ekstern AI eller Windows-kørsel på Mac."
+}

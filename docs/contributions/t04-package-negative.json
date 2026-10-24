@@ -1,0 +1,25 @@
+{
+  "clean": {
+    "sourceIdentity": {
+      "sourceCommit": "8c1764e795748f0a46eec01737625e1cbfd19fc5",
+      "files": 150
+    },
+    "version": "0.6.0-beta.1",
+    "target": "darwin-arm64",
+    "sourceFiles": 115,
+    "profileFiles": 32,
+    "runtime": {
+      "opencode": "1.18.33",
+      "git": "2.53.0",
+      "node": "22.23.3"
+    },
+    "runtimePayload": {
+      "files": 5222,
+      "sha256": "712305aadde1875fe2dda2413e50f09a2502d355f5c814ab28fac442dfed337a"
+    },
+    "limitation": "Filkontrol mod arbejdsmappe og låsefil. Ikke installation, signeringskontrol eller afprøvning på en anden computer."
+  },
+  "baselineIgnoredExtraRuntimeFile": true,
+  "newGateRejectedExtraRuntimeFile": true,
+  "restoredPackagePasses": true
+}

@@ -38,11 +38,18 @@ async function verify(resources, target) {
   assert(lock.targets[target], 'Ukendt platform'); assert.equal(manifest.target, target);
   assert.deepEqual(manifest.versions, { opencode: lock.opencode, git: lock.git, node: lock.node });
   assert.deepEqual(manifest.archives, lock.targets[target]);
-  return { version: packed.version, target, sourceFiles: names.length + 1, profileFiles: profiles.length, runtime: manifest.versions, limitation: 'Filkontrol mod arbejdsmappe og låsefil. Ikke installation, signeringskontrol eller afprøvning på en anden computer.' };
+  const expected = JSON.parse(await fs.readFile(path.join(root, '.runtime', target, 'manifest.json'), 'utf8'));
+  const finalPayloads = target.startsWith('darwin-') ? await require('./signed-runtime-proof.cjs').expected(resources, target, expected.payloads) : null;
+  const runtimePayload = await require('./runtime-integrity.cjs').verifyRuntime(path.join(resources, 'runtime'), manifest, expected, lock, target, finalPayloads);
+  const proof = JSON.parse(await fs.readFile(path.join(resources, 'source-proof.json'), 'utf8'));
+  const expectedProof = await require('./package-source-proof.cjs').sourceProof(root, ['package.json', 'package-lock.json', 'runtime-lock.json', '../LICENSE', ...names, ...profiles.map(f => '../profiles/' + f)]);
+  assert.deepEqual(proof.files, expectedProof.files, 'Kildebeviset skal omfatte alle aktuelle produktfiler');
+  const sourceIdentity = await require('./package-source-proof.cjs').verify(root, proof);
+  return { sourceIdentity, version: packed.version, target, sourceFiles: names.length + 1, profileFiles: profiles.length, runtime: manifest.versions, runtimePayload, limitation: 'Filkontrol mod arbejdsmappe og låsefil. Ikke installation, signeringskontrol eller afprøvning på en anden computer.' };
 }
 if (require.main === module) {
   const [resources, target] = process.argv.slice(2);
   if (!resources || !target) { console.error('Angiv pakkens Resources/resources-mappe og runtime-platform.'); process.exitCode = 1; }
   else verify(path.resolve(resources), target).then(result => console.log(JSON.stringify(result))).catch(error => { console.error(error.message); process.exitCode = 1; });
 }
-module.exports = { verify };
+module.exports = { verify, files };
