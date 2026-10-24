@@ -33,7 +33,7 @@ Projektet tager udgangspunkt i kommunernes behov og henvender sig til udviklere,
 Beskriv, hvad du vil lave, og arbejd videre med AI’en i et lokalt projekt. Samtalen står ved siden af arbejdsfladen, hvor du kan se resultatet og gennemgå det arbejde, der ligger bag.
 
 - **Afklar og planlæg.** Beskriv brugerne, opgaven og de vigtigste krav. Gennemgå AI’ens forslag, før du beder den bygge.
-- **Følg ændringerne.** Gennemgå filændringer og de handlinger, der kræver din godkendelse. Fanerne Plan, Ændringer, Kode og Aktivitet samler detaljerne.
+- **Følg ændringerne.** Gennemgå filændringer og de handlinger, der kræver din godkendelse. Ved lange forslag kan **Vis flere linjer** indlæse resten før godkendelse; se [gennemgang af alle diff-linjer](docs/contributions/f31.md). Fanerne Plan, Ændringer, Kode og Aktivitet samler detaljerne.
 - **Se og afprøv resultatet.** Brug forhåndsvisningen til at prøve løsningen i forskellige skærmstørrelser. Understøttede webprojekter kan startes gennem appen.
 - **Gem og fortryd.** Brug lokale Git-versioner til at følge arbejdet og gennemgå en tidligere version, før du gendanner den.
 

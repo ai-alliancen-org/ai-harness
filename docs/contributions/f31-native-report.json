@@ -1,0 +1,16 @@
+{
+  "realEngine": "OpenCode 1.18.33",
+  "model": "controlled synthetic tool-call stream",
+  "before": {
+    "visibleRows": 400,
+    "remainingAvailableBeforeApproval": false
+  },
+  "after": {
+    "all905RowsReadableBeforePermission": true,
+    "noFileBeforeApproval": true,
+    "exactFileWrittenAfterOneApproval": true,
+    "scrollPreserved": true
+  },
+  "rendererErrors": [],
+  "gitWrites": 0
+}

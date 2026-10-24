@@ -1,0 +1,29 @@
+{
+  "base": "dce68ea74a199ca214ab535a16ff22765d8ee8de",
+  "proposal": "F31",
+  "tests": {
+    "desktop": {
+      "tests": 516,
+      "pass": 514,
+      "fail": 2,
+      "skipped": 0
+    },
+    "cli": {
+      "tests": 26,
+      "pass": 26,
+      "fail": 0,
+      "skipped": 0
+    }
+  },
+  "scope": [
+    "Faktisk Electron + OpenCode 1.18.33 mod kontrolleret lokal modelserver: 905 foreslåede linjer kan læses som 400 → 800 → 905 før godkendelse.",
+    "Ingen fil skrives før tilladelse; én konkret godkendelse skriver præcis de 905 linjer.",
+    "Scroll bevares; ingen rendererfejl eller Git-skrivninger i nativeprøven."
+  ],
+  "limits": "Originalens navigation, onboarding, projekter, planer og værktøjsgodkendelser bevares. De viste tillæg til de eksisterende kontroller er særskilt godkendt. Dette gør den modtagne diff fuldt læsbar. Det garanterer ikke, at en ekstern motor altid sender en komplet eller korrekt diff.",
+  "images": {
+    "before.png": "a9121751299c9be22e9cadacfd3f3deb59590623864a571d694e7b2ccec3c1c7",
+    "after.png": "d3e5402b81a16deee5c3123982ee1f10286de305361f69336396a959af5cea5b",
+    "after-complete.png": "8754b6094fc019de8cf813396357551d355ac54e4928a06e7c59fb3c79e268f0"
+  }
+}

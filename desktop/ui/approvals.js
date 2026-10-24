@@ -28,16 +28,28 @@
     return { title, effect };
   }
   function diffRows(diff) {
-    const box = node('div', undefined, 'diff approval-diff');
-    for (const row of diff.rows.slice(0, 400)) {
-      if (row.type === 'gap') { box.append(node('div', '⋯', 'diff-gap')); continue; }
-      const kind = row.type === '+' ? 'add' : row.type === '-' ? 'del' : 'same';
-      const line = node('div', undefined, `diff-row ${kind}`), sign = node('span', row.type === ' ' ? '' : row.type === '+' ? '+' : '−', 'sign'); sign.setAttribute('aria-hidden', 'true');
-      const text = node('span', undefined, 'code'); if (kind !== 'same') text.append(node('span', kind === 'add' ? 'Tilføjet: ' : 'Fjernet: ', 'visually-hidden')); text.append(row.text || ' ');
-      line.append(node('span', row.old ?? '', 'ln'), node('span', row.new ?? '', 'ln'), sign, text); box.append(line);
+    const container = node('div'), box = node('div', undefined, 'diff approval-diff');
+    box.setAttribute('role', 'region'); box.setAttribute('aria-label', 'Foreslået filændring'); box.tabIndex = 0;
+    const status = node('p', '', 'hint'), more = node('button', 'Vis flere linjer', 'text-button');
+    status.setAttribute('role', 'status'); more.type = 'button';
+    let shown = 0;
+    function appendRows() {
+      const scroll = box.scrollTop;
+      for (const row of diff.rows.slice(shown, shown + 400)) {
+        if (row.type === 'gap') { box.append(node('div', '⋯', 'diff-gap')); continue; }
+        const kind = row.type === '+' ? 'add' : row.type === '-' ? 'del' : 'same';
+        const line = node('div', undefined, `diff-row ${kind}`), sign = node('span', row.type === ' ' ? '' : row.type === '+' ? '+' : '−', 'sign'); sign.setAttribute('aria-hidden', 'true');
+        const text = node('span', undefined, 'code'); if (kind !== 'same') text.append(node('span', kind === 'add' ? 'Tilføjet: ' : 'Fjernet: ', 'visually-hidden')); text.append(row.text || ' ');
+        line.append(node('span', row.old ?? '', 'ln'), node('span', row.new ?? '', 'ln'), sign, text); box.append(line);
+      }
+      shown = Math.min(shown + 400, diff.rows.length); box.scrollTop = scroll;
+      status.textContent = `${shown} af ${diff.rows.length} diff-linjer vises.`;
+      more.hidden = shown === diff.rows.length;
+      if (more.hidden && document.activeElement === more) box.focus({ preventScroll: true });
     }
-    if (diff.rows.length > 400) box.append(node('div', 'Ændringen er lang. Resten ses under Ændringer, når den er gemt.', 'diff-gap'));
-    return box;
+    more.onclick = appendRows; appendRows(); container.append(box);
+    if (diff.rows.length > 400) container.append(status, more);
+    return container;
   }
   const pending = new WeakMap(), receipts = new WeakMap();
   const groups = v => { if (!pending.has(v)) pending.set(v, new Map()); return pending.get(v); };
