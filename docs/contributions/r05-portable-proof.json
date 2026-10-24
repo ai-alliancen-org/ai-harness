@@ -1,0 +1,10 @@
+{
+  "platform": "darwin",
+  "architecture": "arm64",
+  "engineVersion": "1.18.33",
+  "actualSessionCreated": true,
+  "ownedProcesses": 2,
+  "survivorsAfterOwnerSIGKILL": 0,
+  "modelRequests": 0,
+  "credentialsUsed": false
+}

@@ -5,7 +5,7 @@ module.exports = {
   appId: 'org.ai-alliancen.harness', productName: 'Aura',
   directories: { output: 'release', buildResources: 'packaging' },
   files: ['main.cjs', 'preload.cjs', 'core/**/*', 'ui/**/*', 'package.json'],
-  asar: true, asarUnpack: ['core/dev-server-runner.cjs', 'core/command-sandbox-runner.mjs', 'node_modules/@anthropic-ai/sandbox-runtime/**/*', 'node_modules/@pondwader/socks5-server/**/*', 'node_modules/commander/**/*', 'node_modules/node-forge/**/*', 'node_modules/zod/**/*'], npmRebuild: false,
+  asar: true, asarUnpack: ['core/engine-guardian.cjs', 'core/dev-server-runner.cjs', 'core/command-sandbox-runner.mjs', 'node_modules/@anthropic-ai/sandbox-runtime/**/*', 'node_modules/@pondwader/socks5-server/**/*', 'node_modules/commander/**/*', 'node_modules/node-forge/**/*', 'node_modules/zod/**/*'], npmRebuild: false,
   extraResources: profileResources,
   artifactName: 'Aura-${version}-${os}-${arch}.${ext}',
   mac: { target: ['dmg','zip'], category: 'public.app-category.developer-tools', icon: 'packaging/icon.png', identity: process.env.HARNESS_SIGN_IDENTITY || null, hardenedRuntime: true, entitlements: 'packaging/entitlements.mac.plist', entitlementsInherit: 'packaging/entitlements.mac.plist', sign: require('./scripts/sign-mac.cjs').sign, notarize: false },

@@ -1,0 +1,29 @@
+{
+  "base": "dce68ea74a199ca214ab535a16ff22765d8ee8de",
+  "proposal": "R05",
+  "tests": {
+    "desktop": {
+      "tests": 519,
+      "pass": 517,
+      "fail": 2,
+      "skipped": 0
+    },
+    "cli": {
+      "tests": 26,
+      "pass": 26,
+      "fail": 0,
+      "skipped": 0
+    }
+  },
+  "scope": [
+    "Tre faktiske procesprøver: SIGKILL af ejer, uventet motorstop med TERM-ignorerende efterkommer, og normal guardian-lukning. En separat prøveproces overlever; Electron-flaget arves ikke.",
+    "Før/efterprøve med den låste, rigtige OpenCode-motor: opretter session, validerer effektiv konfiguration og måler overlevende ejede processer efter faktisk SIGKILL af ejer. Ingen modelkald eller konti bruges.",
+    "Native Electron-prøve af original og ændret app: projektåbning, skrivefelt og modelvalg synlige; ingen rendererfejl og ingen Git-skrivninger.",
+    "Gentag den rigtige motorprøve med node desktop/scripts/verify-engine-guardian.cjs efter runtime:prepare. Den starter ingen AI-opgave og læser ingen gemt nøgle."
+  ],
+  "limits": "Beskyttelsen omfatter motorens egen POSIX-procesgruppe. Det er procesoprydning, ikke en sikkerhedssandbox eller en garanti for processer, som bevidst løsriver sig med en ny session/procesgruppe. macOS Apple Silicon er faktisk afprøvet; Linux er ikke fysisk afprøvet, og Windows beholder sin tidligere adfærd. De to kendte baselinefejl i godkendelsestestene er ikke ændret af denne PR.",
+  "images": {
+    "before.png": "0c703e655c2c6ae39fe52bd9f1001360a05e9577f0c5adac54fa9f3397a214a7",
+    "after.png": "d4bc573dc5ea80f23abf278fc1233cc6d73fbadc2c7abb91e90e86c85865ff02"
+  }
+}

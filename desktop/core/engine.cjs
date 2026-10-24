@@ -214,7 +214,18 @@ class OpenCodeEngine {
     this.config.plugin = [readGuard.pluginURL, ...(this.sandbox ? [this.sandbox.pluginURL] : [])];
     if (/\{(?:env|file):/.test(JSON.stringify(this.config))) throw new Error('Konfigurationen indeholder en ikke tilladt variabelhenvisning.');
     // Terminalklienten styrer Stop via API'et; dens Ctrl+C må ikke også ramme motorens procesgruppe.
-    this.child = spawn(executable, ['serve', '--hostname', '127.0.0.1', '--port', '0'], { cwd: this.root, env: isolatedEnv(this.directory, this.config, password, { commandIsolation: Boolean(this.sandbox) }), detached: this.detached, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+    const args = ['serve', '--hostname', '127.0.0.1', '--port', '0'];
+    const environment = isolatedEnv(this.directory, this.config, password, { commandIsolation: Boolean(this.sandbox) });
+    if (process.platform === 'win32') {
+      // Windows has no POSIX process groups. Preserve its existing direct-owner
+      // shutdown until a tested Job Object implementation is available.
+      this.child = spawn(executable, args, { cwd:this.root, env:environment, detached:this.detached, windowsHide:true, stdio:['ignore','pipe','pipe'] });
+    } else {
+      const guardianNode = require('./runtime.cjs').get()?.node || process.execPath;
+      const guardian = path.join(__dirname, 'engine-guardian.cjs').replace(/app\.asar([/\\])/, 'app.asar.unpacked$1');
+      environment.ELECTRON_RUN_AS_NODE = '1';
+      this.child = spawn(guardianNode, [guardian, executable === 'opencode' ? executable : path.resolve(executable), ...args], { cwd:this.root, env:environment, detached:this.detached, windowsHide:true, stdio:['ignore','pipe','pipe','ipc'] });
+    }
     // Ingen rå proceslogs sendes til UI; de kan indeholde projektindhold.
     this.child.stderr.resume();
     this.child.on('exit', () => { if (this.active) { this.active = false; this.handleEvent({ type: 'engine.error', message: 'Agentmotoren stoppede. Start opgaven igen for at oprette en ny session.', failure: { kind: 'engine' } }); } });

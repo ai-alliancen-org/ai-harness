@@ -1,0 +1,22 @@
+{
+  "platform": "darwin",
+  "architecture": "arm64",
+  "results": [
+    {
+      "phase": "before",
+      "engineVersion": "1.18.33",
+      "actualSessionCreated": true,
+      "ownedProcesses": 1,
+      "survivorsAfterOwnerSIGKILL": 1
+    },
+    {
+      "phase": "after",
+      "engineVersion": "1.18.33",
+      "actualSessionCreated": true,
+      "ownedProcesses": 2,
+      "survivorsAfterOwnerSIGKILL": 0
+    }
+  ],
+  "remoteModelRequests": 0,
+  "credentialsUsed": false
+}
