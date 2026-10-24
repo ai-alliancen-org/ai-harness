@@ -1,0 +1,30 @@
+{
+  "base": "dce68ea74a199ca214ab535a16ff22765d8ee8de",
+  "proposal": "F05",
+  "tests": {
+    "desktop": {
+      "tests": 527,
+      "pass": 525,
+      "fail": 2,
+      "skipped": 0
+    },
+    "cli": {
+      "tests": 26,
+      "pass": 26,
+      "fail": 0,
+      "skipped": 0
+    }
+  },
+  "scope": [
+    "11 fokuserede prøver består: engangsbrug, udløb, binding til alle redigerbare felter, falsk afsender/subframe, crash/annullering/lukning og genåbning på macOS.",
+    "Native Electron-prøve: faktisk sandbox/context isolation og særskilt session kontrolleres; DevTools kan ikke åbnes. Syntetisk nøgle lagres krypteret og når ikke den almindelige formular gennem det normale flow. Rå nøgle via save-IPC afvises; ændret formular ugyldiggør kvittering.",
+    "Originalens native opstartsforløb består efter testmigration: ti udbydere, lokal opstart uden netværk, kontrolleret katalog, fejl/genoprettelse, modelvalg, genstart og manglende Git. Ingen produktionsnøgler bruges.",
+    "Ingen rendererfejl eller Git-skrivninger i den isolerede nøgleprøve."
+  ],
+  "limits": "Skærmer manuel AI-nøgleindtastning fra den almindelige renderer; det er ikke en påstand om beskyttelse mod kompromitteret hovedproces, operativsystem, udklipsholder eller skærmoptagelse. Andre hemmelighedsformularer i appen er ikke ændret. Faktisk provider-login og macOS-nøgleringsdialog med en produktionskonto er ikke afprøvet; prøven bruger safeStorage med syntetiske data og en kontrolleret lokal katalogserver. Eksisterende credential-/bundle-/profilidentiteter og krypteringsservice ændres ikke.",
+  "images": {
+    "before.png": "c6fd3664a937143835233d88771e10a12d4f2a9a22c9db24306d20f69114d089",
+    "after.png": "7bf2748d4d2ce3ee8a999b1300527f1f2f56a1e2a5d4846d7503ca1451ad4a99",
+    "after-secure.png": "cb54233916a252b14bb9d213e8387436aa5750fe927f55a9db9a94d83c318829"
+  }
+}

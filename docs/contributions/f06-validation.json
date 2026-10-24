@@ -1,0 +1,33 @@
+{
+  "base": "dce68ea74a199ca214ab535a16ff22765d8ee8de",
+  "proposal": "F06",
+  "tests": {
+    "desktop": {
+      "tests": 533,
+      "pass": 531,
+      "fail": 2,
+      "skipped": 0
+    },
+    "cli": {
+      "tests": 26,
+      "pass": 26,
+      "fail": 0,
+      "skipped": 0
+    }
+  },
+  "scope": [
+    "15 fokuserede credentialprøver består, herunder forkert afsender/formål, engangsbrug, kontogeneration og en faktisk GitHub-klasse med forsinket OAuth-save, der ikke må overskrive en nyere manuel indtastning.",
+    "Native Electron-prøve gennem brugerflade, separat nøglevindue, kvittering, hovedproces, eksisterende GitHub.request og safeStorage. Den logiske /user-modtager er låst til GitHub; selve transportsvaret kommer fra en kontrolleret lokal server med et syntetisk token.",
+    "Delingsformularen har intet token/passwordfelt. Normalflowet lægger ikke token i dens DOM eller formularværdier; gemte indstillinger indeholder kun krypteret token. Rå token og falsk kvittering afvises uden et ekstra API-kald.",
+    "Annullering af nøgleindtastning bevarer den gemte konto. Ingen rendererfejl eller Git-skrivninger.",
+    "To faktiske native lukningsraces består: forsinket Cancel-IPC og forsinket kvitteringssvar efter indtastning. Ingen efterfølgende nøglepopup, token-save, netværkskald eller kontoændring.",
+    "To vedvarende UI-regressionstests kører den faktiske hosting.js med kontrollerede IPC-promises og bekræfter, at en lukket formular hverken åbner nøglefelt eller videresender en senere kvittering."
+  ],
+  "limits": "Afhængig PR: diffen mod originalens main indeholder F05, indtil den er flettet og denne branch kan opdateres. Førbilledet viser F05, så GitHub-ændringen kan vurderes separat. Der er ikke brugt en rigtig GitHub-konto, ændret tokenrettigheder, oprettet repository eller udført eksternt push i native prøven. De eksisterende enhedsprøver af publishing og lokale Git-servere indgår fortsat i desktopgaten. Dette afgrænser manuel GitHub-tokenindtastning fra den almindelige renderer; kompromitteret hovedproces/OS og andre credentialformularer er ikke omfattet.",
+  "images": {
+    "before.png": "31680233dcab955424a1abc9ef705fcf366125ac4572bca050f076f282cf9a99",
+    "after.png": "42feeaaebd54fec56adf844419eaccd522665eb19ed36e985fa313e3c8a8ca05",
+    "after-secure.png": "f1db5fc2512cbeff2784353442c8934b8754a802ee736011b283a73f278d8fd5",
+    "after-connected.png": "c8c0f8aa92ca48aeec6a750c69f361637e22ac60013d18d6fa082a9f4143e424"
+  }
+}

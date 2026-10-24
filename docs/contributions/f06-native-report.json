@@ -1,0 +1,14 @@
+{
+  "baseline": "F05, so screenshots isolate only the GitHub-token addition",
+  "nativeIsolatedGithubWindow": true,
+  "hostingFormPasswordFields": 0,
+  "logicalDestination": "https://api.github.com/user",
+  "transport": "controlled loopback response; no actual GitHub account or push",
+  "syntheticTokenEncrypted": true,
+  "rawTokenBypassRejected": true,
+  "forgedReceiptRejected": true,
+  "cancelPreservesAccount": true,
+  "accountVerificationRequests": 1,
+  "rendererErrors": [],
+  "gitWrites": 0
+}

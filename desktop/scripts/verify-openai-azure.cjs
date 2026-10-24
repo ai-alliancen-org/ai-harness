@@ -77,7 +77,7 @@ const helpers = require('./ui-test-helpers.cjs');
         await page.fill('#azure-endpoint', 'https://aura-demo.openai.azure.com'); await page.fill('#azure-deployment', 'kommunens-kodemodel');
         await page.screenshot({ path: path.join(root, 'azure-opsatning.png') });
       }
-      await page.fill('#api-key', keys[kind]); await page.click('#save-connection');
+      await require('./ui-test-helpers.cjs').enterCredential(page, keys[kind]); await page.click('#save-connection');
       await page.waitForFunction(() => document.querySelector('#setup').dataset.step === 'saved' && !document.querySelector('#setup-continue').disabled);
       await page.click('#setup-continue'); await page.waitForSelector('#workspace:not([hidden])');
       await helpers.taskOptions(page);

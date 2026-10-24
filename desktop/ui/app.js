@@ -152,6 +152,7 @@ chatContent.addEventListener('wheel', event => { if (event.deltaY < 0) view.foll
 new MutationObserver(() => { if (view.followChat) chatContent.scrollTop = chatContent.scrollHeight; updateChatScroll(); }).observe(chatContent, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['hidden'] });
 $('#chat-latest').onclick = () => { view.followChat = true; chatContent.scrollTop = chatContent.scrollHeight; updateChatScroll(); };
 let guidedSetup = false, setupStep = 'choice';
+let connectionReceipt=null, connectionTicket=0;
 let setupActive = false, setupGeneration = 0, verifiedConnection = '', recovery = '';
 let preferredConnection = '', autoConnect = false;
 try { preferredConnection = localStorage.getItem('harness.preferredConnection') || ''; } catch {}
@@ -202,7 +203,7 @@ const providerCards = [
   { kind: 'openrouter', name: 'OpenRouter', text: 'OpenRouter API.' }
 ];
 function providerPicker() {
-  $('#api-key').value = '';
+  clearConnectionReceipt();
   $('#setup-provider').dataset.view = 'choose'; $('#setup-provider-body').hidden = true; $('#provider-cards').hidden = false;
   $('#setup-title').textContent = 'Hvem vil du forbinde?'; $('#setup-subtitle').textContent = 'Vælg den udbyder eller server, du har adgang til.'; $('#setup-title').focus();
 }
@@ -274,7 +275,7 @@ async function leaveSetup(useAI) {
   const returningToConnections = Boolean(repeatSetup);
   autoConnect = returningToConnections && !useAI ? repeatSetup.autoConnect : useAI;
   repeatSetup = null;
-  ++setupGeneration; ++localDiscoveryGeneration; $('#api-key').value = ''; moveConnectionForm(false);
+  ++setupGeneration; ++localDiscoveryGeneration; clearConnectionReceipt(); moveConnectionForm(false);
   guidedSetup = false; completeIntroduction('guided');
   document.body.classList.remove('setup-guided'); setupActive = false; $('#setup').hidden = true; $('#workspace').hidden = !current; $('#onboarding').hidden = Boolean(current);
   $('#view-title').textContent = current ? 'Arbejdsområde' : 'Projektopstart'; setupControls();
@@ -562,12 +563,12 @@ function fillConnection(connection) {
 function editConnection(connection) {
   moveConnectionForm(false); editingConnection = connection.id;
   $('#connection-form').reset(); $('#connection-id').value = connection.id; $('#provider-kind').value = connection.kind; updateProvider(); fillConnection(connection);
-  $('#api-key').value = ''; $('#clear-key').checked = false;
+  clearConnectionReceipt(); $('#clear-key').checked = false;
   $('#connection-feedback').textContent = connectionChecks.get(connection.id)?.detail || ''; connectionView('edit');
   $('#connection-use').disabled = projectLoading;
   $('#connection-use').focus();
 }
-$('#connection-back').onclick = () => { $('#api-key').value = ''; connectionView('list'); renderConnectionList(); $('#connections-search').focus(); };
+$('#connection-back').onclick = () => { clearConnectionReceipt(); connectionView('list'); renderConnectionList(); $('#connections-search').focus(); };
 $('#connection-add').onclick = () => { $('#connections-dialog').close(); showSetup(); };
 $('#connections-setup').onclick = () => {
   repeatSetup = { autoConnect }; $('#connections-dialog').close(); showSetup('', true);
@@ -575,7 +576,7 @@ $('#connections-setup').onclick = () => {
 $('#connection-use').onclick = () => action(async () => {
   const id = editingConnection;
   preferredConnection = id; try { localStorage.setItem('harness.preferredConnection', id); } catch {}
-  $('#api-key').value = ''; $('#connections-dialog').close();
+  clearConnectionReceipt(); $('#connections-dialog').close();
   if (current) {
     const saved = $('#connection-select').value === id ? { modelID: $('#model-select').value, routeID: $('#route-select').value } : {};
     $('#connection-select').value = id; autoConnect = true; openTaskSettings(); await loadModels(saved);
@@ -644,6 +645,7 @@ function renderKeyGuide(kind) {
   $('#key-guide-summary').textContent = guide ? 'Har du ikke en nøgle? Sådan får du en' : 'Hvor finder jeg min nøgle?';
 }
 function updateProvider() {
+  clearConnectionReceipt();
   const definition = state?.definitions[$('#provider-kind').value]; if (!definition) return;
   const help = { openai: 'Brug en OpenAI API-nøgle. Den afregnes separat fra dit ChatGPT-abonnement.', azure: 'Brug API-nøglen og deployment-navnet fra din Azure OpenAI- eller Foundry-ressource.', corti: 'Du skal bruge en nøgle fra Corti Models i et projekt i EU, EU-S eller Frankrig. Appen skifter aldrig automatisk til USA eller en anden model.', alexandra: 'Du skal bruge en API-nøgle fra Alexandra AI Platform. Appen bruger kun platformens egen adresse i Danmark. Adgangen til den enkelte model styres af din organisation.', mistral: 'Du skal bruge en API-nøgle fra Mistral.', anthropic: 'Du skal bruge en API-nøgle fra Anthropic. Et Claude Pro- eller Max-abonnement kan ikke bruges her.', openrouter: 'Brug din OpenRouter-nøgle. Du vælger selv model og den udbyder, der modtager dine data. Gratis modeller er markeret i listen.', zen: 'Brug en nøgle fra OpenCode Zen. Zens gratis modeller virker ikke i Aura, fordi Zen kun giver gratis adgang fra OpenCodes egne programmer. Zens modeller kører i USA.', ollama: 'Forbind til en Ollama-server, som allerede kører. Kontrollér adressen nedenfor; appen installerer ikke modeller.', compatible: 'Brug adressen fra din organisation eller egen modelserver. Serveren kan køre lokalt eller på jeres netværk.' };
   $('#provider-info').dataset.info = help[$('#provider-kind').value]; renderKeyGuide($('#provider-kind').value);
@@ -912,8 +914,7 @@ $('#connection-form').onsubmit = event => {
     $('#save-connection').disabled = true;
     const generation = setupGeneration, guided = setupActive && setupStep === 'provider';
     const previousIDs = new Set(state.connections.map(c => c.id));
-    const input = { id: $('#connection-id').value || undefined, kind: $('#provider-kind').value, name: $('#connection-name').value, baseURL: $('#provider-kind').value === 'azure' ? $('#azure-endpoint').value : $('#base-url').value, deployment: $('#azure-deployment').value, protocol: $('#azure-protocol').value, apiKey: $('#api-key').value, clearKey: $('#clear-key').checked };
-    $('#api-key').value = '';
+    const input = connectionInput(); if(connectionReceipt)input.keyReceipt=connectionReceipt; connectionReceipt=null;
     try {
       state = await call('saveConnection', input); if (input.id) connectionChecks.clear(input.id);
       const stillGuided = guided && setupActive && setupStep === 'provider' && generation === setupGeneration;
@@ -978,7 +979,7 @@ for (const id of ['support-dialog', 'connections-dialog', 'features-dialog']) do
   const active = document.activeElement;
   if (active === document.body || !active?.checkVisibility({ checkVisibilityCSS: true })) $('#settings-toggle').focus();
 });
-$('#connections-dialog').addEventListener('close', () => { $('#api-key').value = ''; });
+$('#connections-dialog').addEventListener('close', () => { clearConnectionReceipt(); });
 setInterval(async () => { if (!current || polling) return; polling = true; const project = current, root = current.workspaceRoot; try { const next = await call('revision'); if (current !== project || current.workspaceRoot !== root || !next) return; if (revision && next !== revision) $('#preview').src = current.previewURL; revision = next; $('#preview-status').textContent = 'Lokal forhåndsvisning'; } catch { $('#preview-status').textContent = 'Kan ikke læse siden – kontrollér projektfilerne'; } finally { polling = false; } }, 1500);
 action(async () => { $('#create').disabled = true; $('#create').textContent = 'Åbner projektmappen …'; try { state = await call('connectionState'); renderConnections(); updateProvider(); await loadDesigns(); await loadStartup(); applyFeatures(); renderLocation(await call('projectLocation')); restoreIdeaDraft(); showIdeaExamples(); await refreshRecent(); setupControls(); for (const id of ['#welcome-build', '#welcome-example', '#welcome-open']) $(id).disabled = false; if ($('#welcome-dialog').open) $('#welcome-title').focus(); else { $('#purpose').focus(); await reopenLast(); } } finally { projectLoading = false; $('#create').disabled = false; applyRunning(); } });
 // Kom tilbage: det senest åbnede projekt åbnes igen ved start, så man fortsætter, hvor man slap.
@@ -1250,7 +1251,7 @@ $('#welcome-skip').onclick = leaveIntroduction;
 $('#welcome-dialog').addEventListener('close', () => { if (!$('#welcome-dialog').open) document.body.classList.remove('introduction-open'); });
 $('#welcome-dialog').addEventListener('cancel', event => { event.preventDefault(); leaveIntroduction(); });
 $('#intro-button').onclick = () => showIntroduction();
-$('#setup-back').onclick = () => { if (setupStep === 'features-pick') setupPage('features'); else if (setupStep === 'provider' && $('#setup-provider').dataset.view === 'details') providerPicker(); else if (setupStep !== 'choice') { $('#api-key').value = ''; setupPage('choice'); } else if (repeatSetup) action(() => leaveSetup(false)); else if (guidedSetup) showIntroduction('start'); else action(() => leaveSetup(false)); };
+$('#setup-back').onclick = () => { if (setupStep === 'features-pick') setupPage('features'); else if (setupStep === 'provider' && $('#setup-provider').dataset.view === 'details') providerPicker(); else if (setupStep !== 'choice') { clearConnectionReceipt(); setupPage('choice'); } else if (repeatSetup) action(() => leaveSetup(false)); else if (guidedSetup) showIntroduction('start'); else action(() => leaveSetup(false)); };
 async function beginGuidedProject() {
   if (current) { await $('#new').onclick(); if (current) return; }
   closeIntroduction(); showSetup('', true);
@@ -1847,3 +1848,13 @@ $('#support-feedback').onclick = () => action(() => call('supportFeedback'));
 
 // Udgiv forbinder komplai Run fra sin egen dialog; appens funktioner følger med.
 window.addEventListener('harness:komplai-connected', () => action(async () => { state = await call('connectionState'); renderConnections(); applyFeatures(); }));
+
+function connectionInput(){return {id:$('#connection-id').value||undefined,kind:$('#provider-kind').value,name:$('#connection-name').value,baseURL:$('#provider-kind').value==='azure'?$('#azure-endpoint').value:$('#base-url').value,deployment:$('#azure-deployment').value,protocol:$('#azure-protocol').value,clearKey:$('#clear-key').checked};}
+function clearConnectionReceipt(){connectionReceipt=null;connectionTicket++;$('#credential-status').textContent='Ingen ny nøgle valgt';void call('credentialCancel').catch(()=>{});}
+$('#credential-open').onclick=()=>action(async()=>{
+  clearConnectionReceipt();const ticket=connectionTicket,configuration=connectionInput(),identity=JSON.stringify(configuration);$('#credential-open').disabled=true;
+  try{const result=await call('credentialEntry',{purpose:'connection',configuration});if(ticket!==connectionTicket||JSON.stringify(connectionInput())!==identity)return;if(!result.canceled){connectionReceipt=result.keyReceipt;$('#credential-status').textContent='Ny nøgle klar til at gemme';}}
+  finally{$('#credential-open').disabled=false;}
+});
+for(const id of ['connection-name','base-url','azure-endpoint','azure-deployment','azure-protocol','clear-key'])$('#'+id).addEventListener('input',clearConnectionReceipt);
+$('#connection-form').addEventListener('reset',clearConnectionReceipt);

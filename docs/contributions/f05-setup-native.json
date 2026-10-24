@@ -1,0 +1,14 @@
+{
+  "status": "bestået",
+  "checks": [
+    "første start uden netværkskald",
+    "lokal adgang og bevaret projektkladde",
+    "opsætning og katalogkontrol",
+    "tomt katalog og utilgængelig server",
+    "genoprettet forbindelse",
+    "modelvalg i åbnet projekt",
+    "fejl før afsendelse bevarer besked og filer",
+    "genstart kræver ny kontrol",
+    "manglende Git blokerer ikke lokal adgang"
+  ]
+}

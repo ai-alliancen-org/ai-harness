@@ -90,10 +90,19 @@ function supportReport() {
   return require('./core/diagnostics.cjs').diagnostics({ version: app.getVersion(), platform: process.platform, arch: process.arch, packaged: app.isPackaged, versions: require('./core/runtime.cjs').get()?.versions, project: Boolean(currentProject()), running: workbench?.running, preview: currentSpace().devServer?.state, failures });
 }
 function shutdown() {
-  if (!shuttingDown) shuttingDown = (async () => { github?.cancel(); deploymentSetup?.promte.cancelAll(); await registry?.close(); await closeSpaces(); })().finally(() => { shuttingDown = null; });
+  if (!shuttingDown) shuttingDown = (async () => { credentialEntry.revoke(); github?.cancel(); deploymentSetup?.promte.cancelAll(); await registry?.close(); await closeSpaces(); })().finally(() => { shuttingDown = null; });
   return shuttingDown;
 }
 const uiURL = 'harness://app/index.html';
+const credentialEntry = require('./core/credential-entry.cjs').createCredentialEntry({ BrowserWindow, ipcMain, safeStorage, parent:() => window, createSession:() => {
+  const isolated = session.fromPartition(`credential-${crypto.randomUUID()}`, { cache:false });
+  const files = ['credential-entry.html','credential-entry.css','credential-entry.js'].map(file => require('node:url').pathToFileURL(path.join(__dirname, 'ui', file)).href);
+  isolated.webRequest.onBeforeRequest((details, callback) => callback({ cancel:!files.includes(details.url) }));
+  isolated.setPermissionRequestHandler((_wc, _permission, callback) => callback(false));
+  isolated.setPermissionCheckHandler(() => false);
+  isolated.on('will-download', event => event.preventDefault());
+  return isolated;
+} });
 const profileRoot = app.isPackaged ? path.join(process.resourcesPath, 'profiles') : path.join(__dirname, '..', 'profiles');
 if (app.isPackaged) require('./core/runtime.cjs').configure(process.resourcesPath);
 
@@ -493,12 +502,12 @@ handle('git:automatic', value => exclusive(async () => {
 function hostingIdle() { /* Login og udgivelsesvalg ændrer ikke projektfiler. */ }
 async function sharingContext() { return { projectName: currentProject()?.name || '', viewingCopy: Boolean(currentChat()?.copy), copyCount: currentProject() ? (await workbench.chatList()).filter(chat => chat.isolated).length : 0 }; }
 handle('hosting:state', async () => ({ context: await sharingContext(), ...await github.state(), project: Boolean(currentProject()), publication: currentProject() ? await publishing.status(currentProject().root).catch(error => ({ message: error.message, selected: null })) : null }));
-handle('hosting:token', token => exclusive(async () => { hostingIdle(); publishing.reviews.clear(); return github.connectToken(token); }));
-handle('hosting:login', () => exclusive(async () => { hostingIdle(); return github.startLogin(); }));
-handle('hosting:poll', id => exclusive(async () => { hostingIdle(); publishing.reviews.clear(); return github.poll(id); }));
-handle('hosting:cancel', () => { github.cancel(); return true; });
+handle('hosting:token', token => exclusive(async () => { hostingIdle(); publishing.reviews.clear(); return github.connectToken(credentialEntry.github(token, github.generation)); }));
+handle('hosting:login', () => exclusive(async () => { hostingIdle(); credentialEntry.cancelGithub(); return github.startLogin(); }));
+handle('hosting:poll', id => exclusive(async () => { hostingIdle(); credentialEntry.cancelGithub(); publishing.reviews.clear(); return github.poll(id); }));
+handle('hosting:cancel', () => { credentialEntry.cancelGithub(); github.cancel(); return true; });
 handle('hosting:browser', () => { if (!github.pending) throw new Error('Start login først.'); return shell.openExternal('https://github.com/login/device'); });
-handle('hosting:disconnect', () => exclusive(async () => { hostingIdle(); publishing.reviews.clear(); return github.disconnect(); }));
+handle('hosting:disconnect', () => exclusive(async () => { hostingIdle(); credentialEntry.cancelGithub(); publishing.reviews.clear(); return github.disconnect(); }));
 handle('hosting:catalog', () => exclusive(async () => { hostingIdle(); return { owners: await github.owners(), repositories: await github.repositories() }; }));
 handle('hosting:create', input => exclusive(async () => { hostingIdle(); return github.create(input); }));
 handle('hosting:attach', fullName => exclusive(() => publishing.attach(requireProject(), fullName)));
@@ -577,7 +586,12 @@ handle('komplai:publish-overview', () => deployments.providers.komplai.overview(
 handle('komplai:publish-address', value => deployments.providers.komplai.address(value?.slug, value?.appId));
 handle('komplai:publish-disconnect', () => exclusive(() => require('./core/komplai.cjs').disconnectPublishing(workbench.store)));
 handle('connections:state', () => workbench.state(requestChatID()));
-handle('connections:save', value => exclusive(() => workbench.saveConnection(value)));
+handle('credential:cancel', () => { credentialEntry.revoke(); return true; });
+handle('credential:entry', value => {
+  if (value?.purpose !== 'github') return credentialEntry.request(value);
+  return require('./core/github-credential.cjs').requestGithubCredential(github, credentialEntry, value);
+});
+handle('connections:save', value => exclusive(() => workbench.saveConnection(credentialEntry.connection(value))));
 handle('connections:remove', value => exclusive(() => workbench.removeConnection(value)));
 handle('connections:models', value => workbench.models(value));
 handle('connections:routes', value => workbench.routes(value.connectionID, value.modelID));
@@ -957,4 +971,4 @@ app.whenReady().then(async () => {
   app.on('activate', () => { if (!window) createWindow(); });
 });
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
-app.on('before-quit', event => { komplaiLogin.cancel(); if (quitReady) return; event.preventDefault(); shutdown().finally(() => { quitReady = true; app.quit(); }); });
+app.on('before-quit', event => { credentialEntry.close(); komplaiLogin.cancel(); if (quitReady) return; event.preventDefault(); shutdown().finally(() => { quitReady = true; app.quit(); }); });

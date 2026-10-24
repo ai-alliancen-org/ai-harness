@@ -1,0 +1,10 @@
+{
+  "actualNativeIPC": true,
+  "closedDuringDelayedCancelOpensNoKeyWindow": true,
+  "closedAfterSecureReceiptMakesNoSaveRequest": true,
+  "accountUnchanged": true,
+  "tokenSaveRequests": 0,
+  "networkRequests": 0,
+  "rendererErrors": [],
+  "gitWrites": 0
+}

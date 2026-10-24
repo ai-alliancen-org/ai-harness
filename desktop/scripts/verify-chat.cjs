@@ -52,7 +52,7 @@ const { run } = require('../core/git.cjs');
   console.log('Git-opstart og checkpoint-tilvalg bestået');
   const key='syntetisk-noegle-kun-til-test';
   await require('./ui-test-helpers.cjs').addConnection(page,{name:'Lokal testmodel',baseURL:`http://127.0.0.1:${server.address().port}/v1`,apiKey:key});
-  assert.equal(await page.inputValue('#api-key'),'');
+  assert.equal(await page.locator('#connection-form input[type=password]').count(), 0);
   const stateResult=await page.evaluate(()=>window.harness.connectionState());
   assert.equal(stateResult.value.connections[0].hasKey,true);
   assert.equal(JSON.stringify(stateResult).includes(key),false);

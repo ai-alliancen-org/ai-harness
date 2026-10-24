@@ -1,6 +1,6 @@
 (() => {
   const $ = selector => document.querySelector(selector);
-  let review = null, creation = null, login = null, timer = null, focus = null, selected = false;
+  let review = null, creation = null, login = null, timer = null, focus = null, selected = false, authEpoch = 0;
   const view = window.ShareView;
   function rows(id, values) { $(id).replaceChildren(...values.flatMap(([label, value]) => { const dt = document.createElement('dt'), dd = document.createElement('dd'); dt.textContent = label; dd.textContent = value || 'Ikke oplyst'; return [dt, dd]; })); }
   async function api(method, value) { const result = await window.harness[method](value); if (!result.ok) throw new Error(result.error); return result.value; }
@@ -37,13 +37,13 @@
       else { login = null; $('#hosting-device').hidden = true; invalidate(); await refresh(); $('#hosting-feedback').textContent = 'GitHub-adgangen er gemt krypteret. Hent konti og repositories for at fortsætte.'; }
     } catch (error) { if (login === id) { await cancelLogin().catch(() => {}); $('#hosting-feedback').textContent = error.message; } }
   }
-  const open = () => { creation = null; $('#hosting-create-confirm').hidden = true; $('#hosting-technical').open = false; $('#hosting-account').open = false; $('#hosting-dialog').showModal(); invalidate(); act(refresh); };
+  const open = () => { ++authEpoch; creation = null; $('#hosting-create-confirm').hidden = true; $('#hosting-technical').open = false; $('#hosting-account').open = false; $('#hosting-dialog').showModal(); invalidate(); act(refresh); };
   $('#setup-hosting').onclick = open; $('#publish-button').onclick = open;
-  $('#hosting-dialog').addEventListener('close', () => { $('#hosting-token').value = ''; cancelLogin().catch(() => {}); });
+  $('#hosting-dialog').addEventListener('close', () => { ++authEpoch; cancelLogin().catch(() => {}); });
   $('#hosting-login').onclick = () => act(async () => { const value = await api('hostingLogin'); login = value.id; $('#hosting-code').textContent = value.code; $('#hosting-device').hidden = false; timer = setTimeout(() => poll(value.id), value.retryAfter); });
   $('#hosting-browser').onclick = () => act(() => api('hostingBrowser'));
   $('#hosting-cancel').onclick = () => act(cancelLogin);
-  $('#hosting-token-form').onsubmit = event => { event.preventDefault(); const token = $('#hosting-token').value; $('#hosting-token').value = ''; act(async () => { await cancelLogin(); await api('hostingToken', token); invalidate(); await refresh(); $('#hosting-feedback').textContent = 'Konto kontrolleret og adgang gemt krypteret.'; }); };
+  $('#hosting-token-form').onsubmit = event => { event.preventDefault(); const ticket = authEpoch, current = () => ticket === authEpoch && $('#hosting-dialog').open; act(async () => { await cancelLogin(); if (!current()) return; const result = await api('credentialEntry', { purpose: 'github' }); if (!current() || result.canceled) return; await api('hostingToken', { keyReceipt: result.keyReceipt }); if (!current()) return; invalidate(); await refresh(); if (current()) $('#hosting-feedback').textContent = 'Konto kontrolleret og adgang gemt krypteret.'; }); };
   $('#hosting-disconnect').onclick = () => act(async () => { await cancelLogin(); await api('hostingDisconnect'); invalidate(); $('#hosting-repositories').replaceChildren(); $('#hosting-owner').replaceChildren(); await refresh(); });
   $('#hosting-catalog').onclick = () => act(async () => {
     const result = await api('hostingCatalog');
