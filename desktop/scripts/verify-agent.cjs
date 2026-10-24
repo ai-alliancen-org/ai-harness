@@ -42,7 +42,7 @@ async function until(check, description) { for (let i=0;i<300;i++) { if (await c
   const selection={connectionID:state.connections[0].id,modelID:'test-model',references:[]};
   await assert.rejects(bench.prepare({...selection,mode:'build',planID:'ukendt'}),/seneste plan/);
   const planning=await bench.prepare({...selection,mode:'plan'});
-  await bench.send({text:'Planlæg en startside. Prøv også at skrive en fil; det skal afvises.',fingerprint:planning.fingerprint});
+  await bench.send({text:'Planlæg en startside. Prøv også at skrive en fil; det skal afvises.',fingerprint:planning.fingerprint, contextBinding: planning.contextBinding});
   await until(()=>!bench.running,'plan færdig');
   assert.equal(await fs.readFile(path.join(project,'public/index.html'),'utf8'),'<h1>Før</h1>');
   assert.ok(bench.chat.plan?.text, 'Planen skal kunne godkendes');
@@ -50,6 +50,7 @@ async function until(check, description) { for (let i=0;i<300;i++) { if (await c
   assert.match(bench.chat.plan.context,/Arbejdsnote før værktøjskald/);
   const planRequests=requests.filter(r=>r.tools?.length);
   assert.ok(planRequests.length);
+  for (const part of planning.appContext.components) assert.ok(planRequests.some(r=>r.messages.some(m=>typeof m.content==='string' && m.content.includes(part.text))), 'Exact reviewed planning fragment: '+part.id);
   assert.ok(planRequests.every(r=>!r.tools.some(t=>['write','edit','bash'].includes(t.function.name))), 'Skrive- og shellværktøjer må ikke udbydes i planlægning');
   assert.ok(planRequests.some(r=>r.messages.some(m=>m.role==='tool')), 'Det fremprovokerede skriveforsøg skal være behandlet');
   const { projectGuidance } = require('../core/project-guidance.cjs');
@@ -59,7 +60,7 @@ async function until(check, description) { for (let i=0;i<300;i++) { if (await c
   await assert.rejects(bench.prepare({...selection,mode:'build',planID:'forældet'}),/seneste plan/);
   const disclosure=await bench.prepare({...selection,mode:'build',planID});
   await assert.rejects(bench.send({text:'Test',fingerprint:'forkert'}));
-  await bench.send({text:'Skriv startsiden som aftalt.',fingerprint:disclosure.fingerprint});
+  await bench.send({text:'Skriv startsiden som aftalt.',fingerprint:disclosure.fingerprint, contextBinding: disclosure.contextBinding});
   await until(()=>!bench.running,'agenten færdig');
   const errors=events.filter(e=>['session.error','engine.error'].includes(e.type));
   assert.deepEqual(errors,[],JSON.stringify(errors));
@@ -75,9 +76,9 @@ async function until(check, description) { for (let i=0;i<300;i++) { if (await c
   preview=await startPreview(project);assert.match(await(await fetch(preview.url)).text(),/Bygget gennem agenten/);
   // Uden tilstand er det Samtale, der ikke må skrive. Direkte arbejde vælges eksplicit.
   await bench.close();permission='reject';await fs.writeFile(path.join(project,'public/index.html'),'<h1>Bevar</h1>');
-  const declined=await bench.prepare({...selection,mode:'free'});await bench.send({text:'Prøv igen.',fingerprint:declined.fingerprint});await until(()=>!bench.running,'afvist handling');assert.equal(bench.chat.plan,null,'Direkte arbejde ugyldiggør tidligere plan');
+  const declined=await bench.prepare({...selection,mode:'free'});await bench.send({text:'Prøv igen.',fingerprint:declined.fingerprint, contextBinding: declined.contextBinding});await until(()=>!bench.running,'afvist handling');assert.equal(bench.chat.plan,null,'Direkte arbejde ugyldiggør tidligere plan');
   assert.equal(await fs.readFile(path.join(project,'public/index.html'),'utf8'),'<h1>Bevar</h1>');
-  await bench.close();mode='wait';const canceled=await bench.prepare({...selection,mode:'free'});await bench.send({text:'Vent på svar.',fingerprint:canceled.fingerprint});await pause(1000);await bench.stop();assert.equal(bench.running,false);
+  await bench.close();mode='wait';const canceled=await bench.prepare({...selection,mode:'free'});await bench.send({text:'Vent på svar.',fingerprint:canceled.fingerprint, contextBinding: canceled.contextBinding});await pause(1000);await bench.stop();assert.equal(bench.running,false);
   console.log(JSON.stringify({status:'bestået',root,checks:['planlægning afviser fremprovokeret skriveforsøg','plan og afklaring følger til bygning','forældet plan afvises','afslutning viser faktiske filændringer','rigtig OpenCode-motor','kontrolleret modelserver','krævet datagennemgang','værktøjskald og godkendelse','rigtig filændring','preview fra disk','afvist ændring bevaret','stop'],model:'Simuleret kompatibel API, ikke en ekstern AI-model'}));
  }catch(error){console.error(error);console.error(JSON.stringify(events.filter(e=>/error|permission/.test(e.type))));process.exitCode=1;}
  finally {await bench.close();await preview?.close();server.closeAllConnections();await new Promise(resolve=>server.close(resolve));}

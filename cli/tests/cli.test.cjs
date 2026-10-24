@@ -239,3 +239,11 @@ test('en afvist opgave viser sit eget resultat, også når forrige opgave ændre
   assert.doesNotMatch(ui.output, /Der blev ikke ændret filer/);
 });
 module.exports = { UI };
+
+test('CLI sends the same message and context binding that were prepared and disclosed',async t=>{
+ const {app,project}=await fixture(t);await app.open(project);app.selection={connectionID:'test',modelID:'test'};app.mode='chat';
+ app.bench.connection=async()=>({kind:'compatible'});let prepared,sent;
+ app.bench.prepare=async input=>{prepared=input;return {accepted:true,fingerprint:'recipient',contextBinding:'reviewed-context'};};
+ app.bench.send=async input=>{sent=input;};await app.submit('Syntetisk besked');
+ assert.equal(prepared.text,'Syntetisk besked');assert.deepEqual(sent,{text:prepared.text,fingerprint:'recipient',contextBinding:'reviewed-context'});
+});

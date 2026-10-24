@@ -79,12 +79,12 @@ test('Samtale til Byg bevarer idéen uden plan, også efter kladdens mode er æn
   const input = { connectionID: connection.id, modelID: 'test', mode: 'free', includeHistory: false };
   const disclosure = await bench.prepare(input);
   assert.equal(disclosure.historyIncluded, true); assert.match(disclosure.conversation, /17 blå cykler/);
-  await bench.send({ text: 'Sæt i gang!', fingerprint: disclosure.fingerprint });
+  await bench.send({ text: 'Sæt i gang!', fingerprint: disclosure.fingerprint, contextBinding: disclosure.contextBinding });
   assert.equal(engines[0].sent[0].text, 'Sæt i gang!'); assert.match(engines[0].sent[0].system, /17 blå cykler/);
   assert.doesNotMatch(engines[0].sent[0].system, /Aktuel arbejdsmåde: Samtale/);
   bench.chat.event({ type: 'session.idle' }); await bench.chat.finishing;
   const second = await bench.prepare(input); assert.equal(second.fingerprint, disclosure.fingerprint, 'overdragelsens historik starter ikke endnu en tom motor');
-  await bench.send({ text: 'Fortsæt med detaljerne', fingerprint: second.fingerprint });
+  await bench.send({ text: 'Fortsæt med detaljerne', fingerprint: second.fingerprint, contextBinding: second.contextBinding });
   assert.equal(engines.length, 1); assert.equal(engines[0].sent[1].system.match(/17 blå cykler/g).length, 1);
   bench.chat.event({ type: 'session.idle' }); await bench.chat.finishing;
 });
@@ -112,7 +112,7 @@ test('simuleret Windows bevarer filopgaver og enkeltgodkendelse trods en husket 
   t.mock.method(require('../core/command-sandbox.cjs'), 'support', async () => ({ available: false, platform: 'win32', reason: 'Isolation understøttes endnu ikke på Windows.' }));
   const input = { connectionID: connection.id, modelID: 'test', mode: 'free' }, disclosure = await bench.prepare(input);
   assert.equal(bench.chat.prepared.commandIsolation, false);
-  await bench.send({ text: 'Ret projektfilen', fingerprint: disclosure.fingerprint });
+  await bench.send({ text: 'Ret projektfilen', fingerprint: disclosure.fingerprint, contextBinding: disclosure.contextBinding });
   assert.equal(engines[0].options.sandbox, null, 'en filopgave kan starte som før');
   engines[0].pending.set(p.id, p); await bench.chat.permissionAsked({ type: 'permission.asked', properties: p });
   const permission = events.filter(event => event.type === 'permission.asked').at(-1);
@@ -137,7 +137,7 @@ test('gamle forbindelser og workspace-v1 åbner og kan sende uden nye tilvalg p�
   bench.selection = async () => ({ connection: await bench.connection(connection.id), model: { id: 'gammel-model' }, route: null });
   bench.skills.context = async () => ({ rules: '', skills: [], titles: [], features: {}, integrations: [] });
   const disclosure = await bench.prepare({ connectionID: connection.id, modelID: 'gammel-model', mode: 'free' });
-  await bench.send({ text: 'Sæt i gang!', fingerprint: disclosure.fingerprint });
+  await bench.send({ text: 'Sæt i gang!', fingerprint: disclosure.fingerprint, contextBinding: disclosure.contextBinding });
   assert.equal(engines[0].options.sandbox, null); assert.match(engines[0].sent[0].system, /Bevar den eksisterende idé/);
   bench.chat.event({ type: 'session.idle' }); await bench.chat.finishing;
   assert.equal((await bench.connection(connection.id)).secret, connection.secret);

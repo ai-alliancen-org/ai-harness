@@ -27,7 +27,7 @@ const { openProject } = require('../core/projects.cjs');
   await bench.activate(await openProject(project));
   const state=await bench.saveConnection({kind:'compatible',name:'Lokal webtest',baseURL:`http://127.0.0.1:${server.address().port}/v1`});
   const info=await bench.prepare({connectionID:state.connections[0].id,modelID:'test-model',references:[]});
-  await bench.send({text:'Læs designguiden og en relevant underside.',fingerprint:info.fingerprint});
+  await bench.send({text:'Læs designguiden og en relevant underside.',fingerprint:info.fingerprint, contextBinding: info.contextBinding});
   const deadline=Date.now()+90000;while(bench.running&&Date.now()<deadline)await new Promise(r=>setTimeout(r,100));
   assert.equal(bench.running,false);assert.ok(results.some(r=>r.includes('designelementer')),'Forsiden skal indeholde undersidehenvisninger');
   assert.ok(results.some(r=>r.includes('#2f3234')),'Undersidens faktiske farvedata skal nå værktøjsresultatet');

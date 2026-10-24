@@ -39,6 +39,8 @@ Beskriv, hvad du vil lave, og arbejd videre med AI’en i et lokalt projekt. Sam
 
 Projektfilerne ligger på din computer. Du kan åbne dem i en anden editor og fortsætte arbejdet dér. AI-modellen vælges separat og kan køre hos en udbyder eller på en modelserver, du har adgang til.
 
+I **Før du sender → Se alle oplysninger** kan du gennemgå appens præcise tekstfragmenter under **Sporbar kontekst**. Se [kontekstbinding, afgrænsning og afprøvning](docs/contributions/f08.md).
+
 ### Vælg den hjælp, du har brug for
 
 Under **Indstillinger → Funktioner** vælger du blandt andet planlægning, versioner, design, kodekvalitet og hjælp til sikkerhed og data. Valgene kan gælde alle projekter eller kun det aktuelle. Integrationer som Adresser og CVR vælges til særskilt.

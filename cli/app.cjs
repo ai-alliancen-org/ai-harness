@@ -120,13 +120,13 @@ class Application {
       this.ui.line(this.bench.chat.plan.text);
       if (!await this.ui.confirm('Byg efter denne plan?')) return;
     }
-    const data = await this.bench.prepare({ ...this.selection, mode: this.mode, planID: this.bench.chat.plan?.id, references: this.references, includeHistory: this.includeHistory });
+    const data = await this.bench.prepare({ ...this.selection, text, mode: this.mode, planID: this.bench.chat.plan?.id, references: this.references, includeHistory: this.includeHistory });
     check();
     if (!await disclose(this.ui, data)) return;
     check();
     this.parts.clear(); this.tools.clear(); this.review = null;
     this.ui.line('\nAI arbejder. Ctrl+C stopper opgaven; filer, der allerede er ændret, bliver liggende.');
-    await this.bench.send({ text, fingerprint: data.fingerprint });
+    await this.bench.send({ text, fingerprint: data.fingerprint, contextBinding: data.contextBinding });
     while (this.bench.running || this.bench.finishing) await pause(50);
     await this.queue; this.flush();
     this.result();

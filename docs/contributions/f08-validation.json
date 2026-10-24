@@ -1,0 +1,30 @@
+{
+  "base": "dce68ea74a199ca214ab535a16ff22765d8ee8de",
+  "proposal": "F08",
+  "tests": {
+    "desktop": {
+      "tests": 525,
+      "pass": 523,
+      "fail": 2,
+      "skipped": 0
+    },
+    "cli": {
+      "tests": 27,
+      "pass": 27,
+      "fail": 0,
+      "skipped": 0
+    }
+  },
+  "scope": [
+    "Unitprøver kontrollerer ændret besked, gammel binding, ændrede regler under opstart/komprimering, ændret plan med samme id og gentagne afsendelser i projektkopi.",
+    "Gyldig planlægning sender de præcise gennemgåede fragmenter og den aktuelle besked. CLI-happy-path kontrollerer bindingen.",
+    "Faktisk OpenCode verify-agent: læsning under plan, afvist fremprovokeret skrivning, godkendt bygning, afvisning og stop består.",
+    "verify-library-loading består for desktop/samtale, desktop/plan og CLI/direkte arbejde. Native appgennemgang sammenholdes med det faktiske kontrollerede modelkald."
+  ],
+  "limits": "Originalens navigation, onboarding, projekter, planer og værktøjsgodkendelser bevares. De viste tillæg til de eksisterende kontroller er særskilt godkendt. Omfatter appens egne tekstfragmenter. Motorens automatiske historik, værktøjsdefinitioner og dynamiske scratch-/kopiinstruktioner er eksplicit udenfor. Dette er ikke fuld Privacy Gate eller en komplet netværkskontrol. Afhænger af R06 (#26); gennemgå og flet den forudsætning først.",
+  "images": {
+    "before.png": "ee90c977a1bc2d69433b6eed84f9d120970d542811fd300b5b50e0b255a87bd4",
+    "after.png": "e104d20a5b42fab9738f93d96393302fa9c53745caab18039fc7cb82da7a2166",
+    "after-narrow.png": "3f0b1c01858d2f66f7f69b563b938a668da4c6b476f4b28f3a85546442f6f3ab"
+  }
+}

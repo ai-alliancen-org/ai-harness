@@ -1,0 +1,64 @@
+{
+  "agent": {
+    "status": "bestået",
+    "checks": [
+      "planlægning afviser fremprovokeret skriveforsøg",
+      "plan og afklaring følger til bygning",
+      "forældet plan afvises",
+      "afslutning viser faktiske filændringer",
+      "rigtig OpenCode-motor",
+      "kontrolleret modelserver",
+      "krævet datagennemgang",
+      "værktøjskald og godkendelse",
+      "rigtig filændring",
+      "preview fra disk",
+      "afvist ændring bevaret",
+      "stop"
+    ],
+    "model": "Simuleret kompatibel API, ikke en ekstern AI-model"
+  },
+  "library": {
+    "status": "bestået",
+    "results": [
+      {
+        "surface": "desktop",
+        "mode": "chat",
+        "modelkald": 8,
+        "betalteKald": 0,
+        "kontroller": [
+          "projektregler med kilde",
+          "ny gennemgang og modelsession ved ændring",
+          "kun valgte skills",
+          "skill og reference læst",
+          "fravalgt skill afvist"
+        ]
+      },
+      {
+        "surface": "desktop",
+        "mode": "plan",
+        "modelkald": 8,
+        "betalteKald": 0,
+        "kontroller": [
+          "projektregler med kilde",
+          "ny gennemgang og modelsession ved ændring",
+          "kun valgte skills",
+          "skill og reference læst",
+          "fravalgt skill afvist"
+        ]
+      },
+      {
+        "surface": "cli",
+        "mode": "free",
+        "modelkald": 8,
+        "betalteKald": 0,
+        "kontroller": [
+          "projektregler med kilde",
+          "ny gennemgang og modelsession ved ændring",
+          "kun valgte skills",
+          "skill og reference læst",
+          "fravalgt skill afvist"
+        ]
+      }
+    ]
+  }
+}
