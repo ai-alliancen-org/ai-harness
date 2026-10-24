@@ -31,7 +31,8 @@ async function prepare(target = `${process.platform}-${process.arch}`) {
   const sources = path.join(output, 'sources'); await fs.mkdir(sources);
   for (const entry of lock.sources || []) await download(entry, path.join(sources, entry.name));
   await fs.cp(path.join(root, 'packaging', 'licenses'), path.join(output, 'licenses'), { recursive: true });
-  await fs.writeFile(path.join(output, 'manifest.json'), JSON.stringify({ target, versions: {opencode:lock.opencode,git:lock.git,node:lock.node}, sources:lock.sources, archives:entries }, null, 2));
+  const payloads = await require('./runtime-integrity.cjs').inventory(output);
+  await fs.writeFile(path.join(output, 'manifest.json'), JSON.stringify({ target, versions: {opencode:lock.opencode,git:lock.git,node:lock.node}, sources:lock.sources || [], archives:entries, payloads }, null, 2));
   return output;
 }
 if (require.main === module) prepare(process.argv[2]).catch(error => { console.error(error.message); process.exitCode = 1; });

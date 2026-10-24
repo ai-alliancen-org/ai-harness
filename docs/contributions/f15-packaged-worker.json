@@ -1,0 +1,9 @@
+{
+  "packaged": true,
+  "pages": 2,
+  "extractedText": true,
+  "source": "synthetic PDF fixture",
+  "limitedPATH": true,
+  "worker": "unpacked worker with bundled Node",
+  "externalRequests": 0
+}

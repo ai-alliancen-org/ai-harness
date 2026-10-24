@@ -1,0 +1,31 @@
+{
+  "base": "dce68ea74a199ca214ab535a16ff22765d8ee8de",
+  "proposal": "F15",
+  "tests": {
+    "desktop": {
+      "tests": 569,
+      "pass": 567,
+      "fail": 2,
+      "skipped": 0
+    },
+    "cli": {
+      "tests": 26,
+      "pass": 26,
+      "fail": 0,
+      "skipped": 0
+    }
+  },
+  "scope": [
+    "Faktisk PDF.js-ekstraktion af syntetisk flersidet PDF, ugyldig/textless/for stor PDF, kildeændring og samme hemmelighedsværn for TXT/PDF.",
+    "Workerens tidsfrist og unormale afslutning medfører afvisning.",
+    "Native app + OpenCode mod kontrolleret server: præcis gennemgået tekst, ingen PDF-bytes/kildesti, kildeændring blokerer næste afsendelse.",
+    "Faktisk pakket app med begrænset PATH udtrækker to syntetiske sider gennem den medfølgende worker og Node. Pakkens kilde-/runtimebevis består."
+  ],
+  "limits": "Originalens navigation, onboarding, projekter, planer og værktøjsgodkendelser bevares. De viste tillæg til de eksisterende kontroller er særskilt godkendt. Afhænger af F16, F09, F13 (#29) og T04. Den separate worker er afgrænset, men er ikke en fuld OS-sandbox. Ingen OCR, layoutrekonstruktion eller garanti for korrekt tekst fra enhver PDF; brugeren skal gennemgå teksten. Ingen ekstern produktionsmodel er afprøvet.",
+  "images": {
+    "before.png": "2510884d558ee11033f1512d10832bec20cd841d8e2d9d93af629b92b9d69517",
+    "after.png": "919473d8b633b1268e08de05427eacd748d85b608f752e7096ee22ee78335401",
+    "after-changed.png": "9b9bea0737399241b98474b51fd681c7d3f386a9e0dec7dd23bcc4d006918021",
+    "after-narrow.png": "1ab9ba6ebcda8ef01ec85d0dce2b6c1e1b2aa9b96dee8392013000b3c1ead165"
+  }
+}
