@@ -719,6 +719,18 @@ function showData(data, canSend) {
     else dd.textContent = text;
     $('#data-details').append(node('dt', label), dd);
   }
+  if (data.modelSupport) {
+    const support = data.modelSupport, dd = node('dd'), fold = node('details');
+    fold.append(node('summary', 'Katalogoplysninger og faktiske prøver'));
+    const word = value => value === true ? 'angivet' : value === false ? 'ikke angivet som understøttet' : 'ukendt';
+    fold.append(node('p', `Katalog · værktøjer: ${word(support.catalog.model.tools)} · billeder: ${word(support.catalog.model.images)}`));
+    if (support.catalog.route) fold.append(node('p', `Valgt rute · værktøjer: ${word(support.catalog.route.tools)} · billeder: ${word(support.catalog.route.images)}`));
+    fold.append(node('p', support.catalog.checkedAt ? `Katalog læst: ${support.catalog.checkedAt}` : 'Katalogets kontroltidspunkt er ukendt.', 'hint'));
+    if (!support.measurements.length) fold.append(node('p', 'Ingen faktisk prøve registreret for denne forbindelse, model og rute.'));
+    for (const item of support.measurements) fold.append(node('p', `${item.capability === 'images' ? 'Billeder' : 'Værktøjer'} · ${item.outcome === 'passed' ? 'bestået' : 'fejlet'} · ${item.environment === 'controlled' ? 'kontrolleret testserver' : 'udbyderprøve'} · ${item.at} · ${item.method}`));
+    fold.append(node('p', support.note, 'hint'), node('pre', JSON.stringify(support.binding, null, 2))); dd.append(fold);
+    $('#data-details').append(node('dt', 'Prøvegrundlag for modelstøtte'), dd);
+  }
   $('#accept-send').hidden = !canSend; $('#data-dialog').showModal();
 }
 async function sendNow(data, text) {

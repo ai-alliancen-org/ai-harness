@@ -105,6 +105,8 @@ Se [installation, opsætning og lokale testkommandoer](https://github.com/ai-all
 
 Aura er en Electron-app til Mac og Windows med OpenCode som lokal kodeagent. Vi bruger en fast version gennem en adapter; AI-modellen er et separat valg. Grundregler og skills kommer fra det samme bibliotek, uanset om du bruger Aura eller dit eget kodeværktøj.
 
+Datagennemgangen skelner mellem modelkatalogets oplysninger og observationer fra gennemførte værktøjsforløb. Se [modelstøtte, konkrete observationer og deres begrænsninger](docs/contributions/f09.md).
+
 Lokale projektfiler betyder ikke, at al databehandling er lokal. En ekstern model eller hostingtjeneste kan modtage kode og data. Den konkrete brug skal derfor vurderes ud fra de valgte tjenester, adgangsforhold og organisationens krav.
 
 Appen har endnu ikke fælles organisationslogin, en isoleret sandbox for hele agenten eller et revisionsspor med verificerede godkendere. Et komplet forløb fra download til drift er heller ikke afprøvet på en almindelig testers egen computer. Instruktionerne erstatter ikke en vurdering af sikkerhed, persondata eller drift.

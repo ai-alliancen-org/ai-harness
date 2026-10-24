@@ -235,6 +235,7 @@ class ChatSession {
     // Resuméet før afsendelse vises igen, når modtager, model, vilkår, pris eller delt materiale ændrer sig. Skift fra plan til byg er ikke en ny modtager.
     Object.assign(disclosure, modelConsent.review(selection.connection.id, disclosure, settings, context.projectInstructions?.hash));
     disclosure.modelName = selection.model.name || selection.model.id;
+    disclosure.modelSupport = require('./model-support.cjs').report(selection.connection, selection.model, selection.route, { catalogAt: bench.catalogTimes.get(selection.connection.id) || null, evidence: bench.supportEvidence || [] });
     // Forhåndsvisningens størrelse til før/efter-billederne. Kun tal; siden findes i hovedprocessen.
     const view = input.view && Number.isFinite(input.view.width) && Number.isFinite(input.view.height) ? { width: Math.round(input.view.width), height: Math.round(input.view.height) } : null;
     if ((bench.connectionVersions.get(input.connectionID) || 0) !== connectionVersion) throw new Error('Forbindelsen blev ændret. Gennemgå oplysningerne igen.');
@@ -267,6 +268,7 @@ class ChatSession {
     // Samtalen viser målet som én linje; den fulde beskrivelse af elementet står i Før du sender.
     const text = input.text + (prepared.disclosure.fileReferenceText || '') + (prepared.disclosure.previewReferenceText || '');
     const shown = input.text + (prepared.disclosure.fileReferenceText || '') + (prepared.disclosure.previewReference ? `\n\nMål i forhåndsvisningen: ${prepared.disclosure.previewReference}` : '');
+    this.supportSelection = { connection: prepared.connection, model: prepared.model, route: prepared.route };
     this.runMode = prepared.mode; this.runConnectionID = prepared.connection.id; this.runText = new Map(); this.runTools = new Map(); this.runRoles = new Map(); this.allowProjectEdits = false; this.taskRules = new Set(); this.approvals.clear(); this.runFinish = null; this.runFailure = null;
     this.usageBase = this.currentUsage(); this.runSteps = new Map(); this.runPrice = connections.priceFor(prepared.connection, prepared.model, prepared.route);
     if (prepared.mode === 'plan') {
@@ -600,6 +602,12 @@ class ChatSession {
         if (status === 'idle' && this.runMode === 'build' && this.plan) { this.plan = { ...this.plan, builtAt: Date.now() }; this.emit({ type: 'plan.updated', root: this.project.root, plan: this.plan }); }
         const reply = planningReply(this.runRoles || new Map(), this.runText || new Map());
         const text = conversationMode.visible(reply.text);
+        if (status === 'idle' && text && !this.runFailure && this.supportSelection && [...(this.runTools?.values() || [])].some(part => part.state?.status === 'completed')) {
+          const selected = this.supportSelection, evidence = require('./model-support.cjs');
+          bench.supportEvidence ||= [];
+          bench.supportEvidence.push(evidence.toolRun(selected.connection, selected.model, selected.route));
+          bench.supportEvidence = bench.supportEvidence.slice(-100);
+        }
         const intent = conversationMode.action(reply.text);
         const concrete = conversationMode.concretePlan(text);
         if (status === 'idle' && intent === 'stay') {

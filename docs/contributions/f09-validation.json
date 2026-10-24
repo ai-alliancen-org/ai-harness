@@ -1,0 +1,29 @@
+{
+  "base": "dce68ea74a199ca214ab535a16ff22765d8ee8de",
+  "proposal": "F09",
+  "tests": {
+    "desktop": {
+      "tests": 529,
+      "pass": 527,
+      "fail": 2,
+      "skipped": 0
+    },
+    "cli": {
+      "tests": 26,
+      "pass": 26,
+      "fail": 0,
+      "skipped": 0
+    }
+  },
+  "scope": [
+    "13 fokuserede prøver dækker præcis binding, ukendte/negative katalogfelter, ugyldige observationer, pakket core og faktiske HTTP-katalogsvar.",
+    "Hændelsesprøver: afsluttet værktøj + svar giver observation; ingen værktøj, værktøjsfejl, manglende svar, motorfejl og stop giver ingen.",
+    "Native app + faktisk OpenCode læser syntetisk fil gennem kontrolleret modelserver; den registrerede observation vises i den eksisterende dialog."
+  ],
+  "limits": "Originalens navigation, onboarding, projekter, planer og værktøjsgodkendelser bevares. De viste tillæg til de eksisterende kontroller er særskilt godkendt. En gennemført opgave er kun en observation af netop det forløb, ikke generel modelkvalifikation. Produktionsudbydere er ikke afprøvet. Ingen syntetiske visionresultater indsættes som produktionsbevis; observationerne forsvinder ved genstart.",
+  "images": {
+    "before.png": "4f5c545d1a8fa830e6fc6c1bada6740cf465301e23ab99d032db823de15e0311",
+    "after.png": "61598c3dbc82486a597202d76d66fe937e14e5bd854dd64922a65ceb3ab09301",
+    "after-observation.png": "5bfad31e9e53a16f1c8d48dc353b48db61c2e0a7b74e29cff5431c8c9bcfdee9"
+  }
+}
