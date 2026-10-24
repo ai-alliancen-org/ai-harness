@@ -47,14 +47,15 @@ const http = require('node:http');
     assert.equal(await page.locator('#provider-cards button').count(), 10, 'De ti AI-udbydere vises på lige vilkår.');
     assert.equal(await page.locator('#provider-cards [data-kind=komplai], #provider-kind option[value=komplai]').count(), 0, 'komplai Run hører kun til i Udgiv.');
     assert.equal(await page.isVisible('#provider-kind'), false, 'formularen vises først efter valg');
-    assert.equal(await page.isVisible('#api-key'), false, 'nøglefeltet vises først efter valg af udbyder');
+    assert.equal(await page.locator('#connection-form input[type=password]').count(), 0, 'AI-nøgler indtastes i et separat sikkert vindue');
+    assert.equal(await page.isVisible('#credential-open'), false, 'den sikre indtastning vises først efter valg af udbyder');
     for(const [kind, address] of [['corti', 'https://ai.eu.corti.app/v1'], ['mistral', 'https://api.mistral.ai/v1'], ['alexandra', 'https://inference.alexandra.dk/v1']]) {
       await page.click(`#provider-cards [data-kind="${kind}"]`);
-      assert.equal(await page.isVisible('#api-key'), true);
+      assert.equal(await page.isVisible('#credential-open'), true);
       assert.equal(await page.inputValue('#base-url'), address);
       assert.equal(await page.locator('#base-url').evaluate(el => el.readOnly), true);
       assert.equal(await page.isDisabled('#save-connection'), false);
-      assert.equal(await page.isDisabled('#api-key'), false);
+      assert.equal(await page.isDisabled('#credential-open'), false);
       await page.click('#setup-back');
     }
     assert.equal(await page.locator('#provider-kind option[value=promte]').count(), 0);

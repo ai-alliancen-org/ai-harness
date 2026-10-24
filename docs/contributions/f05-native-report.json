@@ -1,0 +1,21 @@
+{
+  "nativeIsolatedPasswordWindow": true,
+  "flags": {
+    "sandbox": true,
+    "contextIsolation": true,
+    "nodeIntegration": false,
+    "devTools": false,
+    "separateSession": true
+  },
+  "connectionFormPasswordFields": 0,
+  "normalFlowMainRendererReceivedKey": false,
+  "syntheticKeyStoredEncrypted": true,
+  "rawKeyBypassRejected": true,
+  "formChangeRevokesReceipt": true,
+  "cancelPreservesForm": true,
+  "testHelperVerified": true,
+  "localCatalogRequests": 1,
+  "productionCredentials": false,
+  "rendererErrors": [],
+  "gitWrites": 0
+}

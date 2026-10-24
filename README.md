@@ -99,6 +99,8 @@ npm start
 
 `runtime:prepare` henter og kontrollerer de versioner af de medfølgende værktøjer, som projektet har låst. Vælg derefter din AI-forbindelse i appen, eller fortsæt uden AI for at se dig omkring. Adgang og eventuel betaling til model- og hostingtjenester håndteres særskilt.
 
+AI-forbindelsens nøgle indtastes gennem **Indtast nøgle sikkert** i et separat vindue. Vælg **Brug denne nøgle**, og gem derefter forbindelsen i den oprindelige formular. Se [nøgleindtastningens afgrænsning og før/efterprøven](docs/contributions/f05.md).
+
 Se [installation, opsætning og lokale testkommandoer](https://github.com/ai-alliancen-org/ai-harness/blob/main/desktop/README.md).
 
 ## Teknologi, data og betastatus

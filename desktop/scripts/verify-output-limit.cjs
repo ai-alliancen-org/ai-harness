@@ -54,7 +54,7 @@ async function main() {
     await app.evaluate(({ dialog }, folder) => { dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [folder] }); }, project);
     await page.click('#open'); await page.waitForSelector('#workspace:not([hidden])');
     await helpers.openSetup(page); await page.click('#setup-add-provider'); await page.click('#provider-cards [data-kind="corti"]');
-    await page.fill('#api-key', 'syntetisk-corti-noegle'); await page.click('#save-connection');
+    await require('./ui-test-helpers.cjs').enterCredential(page, 'syntetisk-corti-noegle'); await page.click('#save-connection');
     await page.waitForFunction(() => document.querySelector('#setup').dataset.step === 'saved' && !document.querySelector('#setup-continue').disabled);
     await page.click('#setup-continue'); await page.waitForSelector('#workspace:not([hidden])');
     await page.waitForFunction(() => document.querySelector('#model-select').value === 'corti-s1');

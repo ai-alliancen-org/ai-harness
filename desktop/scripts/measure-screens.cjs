@@ -89,7 +89,7 @@ const server = http.createServer(async (req, res) => {
     await click('#setup-add-provider'); await measure('udbydere', '#setup', 'Opsætning: udbyder');
     await click('#provider-cards [data-kind="anthropic"]'); await measure('noegle', '#setup', 'Opsætning: nøgle til Claude');
     task = null; await win.locator('.key-guide > summary').click(); await measure('noeglehjaelp', '#setup', 'Opsætning: sådan får du en nøgle'); await win.locator('.key-guide > summary').click(); task = 'Forbind Claude med en nøgle';
-    await win.fill('#api-key', 'syntetisk-noegle-kun-til-maaling'); await click('#save-connection');
+    await require('./ui-test-helpers.cjs').enterCredential(win, 'syntetisk-noegle-kun-til-maaling'); await click('#save-connection');
     await win.locator('#setup-ai').filter({ hasText: /virker|svarer/ }).waitFor(); await measure('forbindelse', '#setup', 'Opsætning: forbindelsen virker');
     await click('#setup-continue'); task = null;
     await win.locator('#setup-title').filter({ hasText: 'Hvad skal Aura hjælpe med?' }).waitFor(); await measure('funktioner-start', '#setup', 'Første start: funktioner');

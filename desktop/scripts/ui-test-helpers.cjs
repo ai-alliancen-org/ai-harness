@@ -104,12 +104,20 @@ async function openSetup(page) {
 }
 // En forbindelse tilføjes ad samme vej som en bruger: Tilføj forbindelse › Jeg har en adgangsnøgle › udbyderens kort.
 // Svarer serveren med modeller, fortsætter prøven med forbindelsen; ellers vælger den senere.
+async function enterCredential(page, value) {
+  const opened = page.context().waitForEvent('page', { timeout:20000 });
+  await page.click('#credential-open');
+  const secure = await opened;
+  await secure.locator('#credential').fill(value);
+  await secure.click('button[type=submit]');
+  await page.waitForFunction(() => document.querySelector('#credential-status').textContent === 'Ny nøgle klar til at gemme');
+}
 async function addConnection(page, { kind = 'compatible', name, baseURL, apiKey } = {}) {
   await openSetup(page); await page.click('#setup-add-provider'); await page.click(`#provider-cards [data-kind="${kind}"]`);
   if ((name !== undefined || baseURL !== undefined) && !await page.locator('#connection-advanced').evaluate(el => el.open)) await page.click('#connection-advanced > summary');
   if (name !== undefined) await page.fill('#connection-name', name);
   if (baseURL !== undefined) await page.fill('#base-url', baseURL);
-  if (apiKey) await page.fill('#api-key', apiKey);
+  if (apiKey) await enterCredential(page, apiKey);
   await page.click('#save-connection');
   await page.waitForFunction(() => document.querySelector('#setup').dataset.step === 'saved' && !/Henter/.test(document.querySelector('#setup-ai').textContent));
   if (await page.isVisible('#setup-continue') && await page.isEnabled('#setup-continue')) await page.click('#setup-continue'); else await page.click('#setup-local');
@@ -125,4 +133,4 @@ async function firstVersion(page, projectDir, title) {
   await fs.writeFile(index, (await fs.readFile(index, 'utf8')).replace('HER BEGYNDER DIN IDÉ', 'FØRSTE VERSION'));
   await page.frameLocator('#preview').locator('h1').filter({ hasText: title }).waitFor({ timeout: 15000 });
 }
-module.exports = { firstVersion, openSetup, addConnection, enableSharing, skipIntroduction, toOnboarding, menuClick, taskOptions, closeTaskOptions, selectMode, previewOptions, projectOptions, isolateDocuments, chooseLocation, openExistingProject, forbidGitWrites, assertNoGitWrites };
+module.exports = { enterCredential, firstVersion, openSetup, addConnection, enableSharing, skipIntroduction, toOnboarding, menuClick, taskOptions, closeTaskOptions, selectMode, previewOptions, projectOptions, isolateDocuments, chooseLocation, openExistingProject, forbidGitWrites, assertNoGitWrites };
