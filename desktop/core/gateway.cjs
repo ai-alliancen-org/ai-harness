@@ -1,6 +1,7 @@
 const http = require('node:http');
 const { randomBytes } = require('node:crypto');
 const { usesResponses, assertSupported } = require('./connections.cjs');
+const network = require('./network-journal.cjs');
 const { StreamProgress } = require('./stream-progress.cjs');
 
 const IDLE_LIMIT = 120_000, TOTAL_LIMIT = 20 * 60_000;
@@ -21,7 +22,7 @@ async function startGateway(connection, model, key, route, onFailure = () => {},
     const controller = new AbortController(); active.add(controller);
     res.on('close', () => { controller.abort(); active.delete(controller); });
     // Et langt svar må gerne tage tid, så længe der kommer data. Stilstand i to minutter afbryder kaldet.
-    const idle = new AbortController(); let idleTimer, reachedUpstream = false;
+    const idle = new AbortController(); let idleTimer, reachedUpstream = false, observedResponse;
     const touch = () => { clearTimeout(idleTimer); idleTimer = setTimeout(() => idle.abort(), idleLimit); };
     try {
       const responses = usesResponses(connection);
@@ -57,9 +58,10 @@ async function startGateway(connection, model, key, route, onFailure = () => {},
       touch();
       const progress = new StreamProgress({ emit: onProgress, root });
       reachedUpstream = true;
-      const response = await fetch(`${base}${responses ? '/responses' : anthropic ? '/messages' : '/chat/completions'}`, { method: 'POST', headers, body: JSON.stringify(body), signal: AbortSignal.any([controller.signal, idle.signal, AbortSignal.timeout(totalLimit)]), redirect: 'error' });
+      const response = observedResponse = await network.observedFetch(`${base}${responses ? '/responses' : anthropic ? '/messages' : '/chat/completions'}`, { method: 'POST', headers, body: JSON.stringify(body), signal: AbortSignal.any([controller.signal, idle.signal, AbortSignal.timeout(totalLimit)]), redirect: 'error' }, { category: 'model', purpose: 'model-response', provider: connection.kind, timeoutSignal: idle.signal });
       if (!response.ok) {
         await response.body?.cancel();
+        network.finishResponse(response, { outcome: 'failed', error: { status: response.status } });
         // Forbigående fejl (408, 429 og 5xx) videresendes, så OpenCode genforsøger (docs/decisions.md). Aura låser
         // ikke forbindelsen og viser ingen fejl, så et nyt forsøg kan lykkes. Retry-After følger med.
         if (response.status === 408 || response.status === 429 || response.status >= 500) {
@@ -76,10 +78,12 @@ async function startGateway(connection, model, key, route, onFailure = () => {},
       }
       res.writeHead(200, { 'content-type': response.headers.get('content-type') || 'application/json', 'cache-control': 'no-store' });
       const sse = (response.headers.get('content-type') || '').includes('text/event-stream');
-      for await (const chunk of response.body) { touch(); if (res.destroyed) break; res.write(chunk); try { progress.write(chunk, sse); } catch { /* Fremdrift må ikke afbryde svaret. */ } }
+      for await (const chunk of response.body) { network.observeResponseChunk(response, chunk); touch(); if (res.destroyed) break; res.write(chunk); try { progress.write(chunk, sse); } catch { /* Fremdrift må ikke afbryde svaret. */ } }
       try { progress.end(sse); } catch { /* Selve svaret er allerede sendt videre. */ }
+      network.finishResponse(response, { outcome: controller.signal.aborted ? 'cancelled' : 'completed' });
       res.end();
-    } catch {
+    } catch (error) {
+      network.finishResponse(observedResponse, { outcome: controller.signal.aborted ? 'cancelled' : 'failed', error: idle.signal.aborted ? { kind: 'idle' } : error });
       if (idle.signal.aborted) fail(`Modellen svarede ikke i ${idleLimit >= 60_000 ? `${Math.round(idleLimit / 60_000)} min` : `${Math.max(1, Math.round(idleLimit / 1000))} s`}, så forbindelsen blev afbrudt. Din besked er bevaret.`, 'idle');
       // En netfejl, før modellen har svaret (forbindelse nægtet, DNS, afbrudt), er forbigående: den sendes videre som 502, så OpenCode kan
       // prøve igen, og forbindelsen låses ikke. En strøm, der afbrydes midt i svaret, er stadig endelig, fordi svaret er ufuldstændigt.

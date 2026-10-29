@@ -44,6 +44,10 @@ Ved fejl fra modelserveren stopper forbindelsen, så agentmotorens genforsøg ik
 
 **Indstillinger → Hjælp og feedback** viser appversion og en lokal fejlrapport med faste statusfelter. Rapporten indeholder ingen samtaler, projektfiler, stier, serveradresser, kontonavne eller API-nøgler. Den gemmes og deles kun efter brugerens eget valg. Samme sted findes vejledning til at installere næste testversion med bevarede projekter og indstillinger.
 
+**Aktivitet → Dan rapport** viser Auras registrerede model- og katalogkald med destinationens værtsnavn, status, tid til svarheaders, første indholdsbytes og afslutning. Et igangværende kald viser den observerede fase og forløbne tid på tidspunktet for **Opdatér**. Det er ikke et mål for udbyderens interne kø eller tidspunktet for første teksttoken.
+
+Rapporten er fælles for appens projekter og gemmer højst 2.000 registreringer i appens private datamappe. Prompts, svar, API-nøgler, headers, fulde URL'er og filstier registreres ikke. CSV/JSON-eksport vælges med en lokal gemmedialog og indeholder filtrene, dækningsoversigten og begrænsningerne. Integrationer, forhåndsvisning, Git, opdateringer, underprocesser og andre programmers trafik er ikke dækket; manglende registrering betyder ikke nul trafik. Rapporten tilføjer ingen modelkald, genforsøg eller tilladelser. `npm run test:network-report` afprøver dialogen med den rigtige Electron-app og to kontrollerede lokale HTTP-kald, uden en rigtig AI eller brugerprofil.
+
 ## Start fra kildekoden
 
 Kræver Node.js 22.12 eller nyere og npm. Kør `npm run runtime:prepare` én gang; det henter og kontrollerer den OpenCode-version, som står i `runtime-lock.json` (i dag 1.18.33), til `desktop/.runtime`. Appen søger i `HARNESS_OPENCODE_PATH`, i `desktop/.runtime`, i `~/.opencode/bin/` og på PATH og bruger kun den låste version. Den installerer eller opgraderer ikke OpenCode. Kør fra `desktop/`:

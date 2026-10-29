@@ -24,6 +24,7 @@
     "test:chat-feedback": "node scripts/verify-chat-feedback.cjs",
     "test:conversation-progress": "node scripts/verify-conversation-progress.cjs",
     "test:layout": "node scripts/verify-layout.cjs",
+    "test:network-report": "node scripts/verify-network-report.cjs",
     "test:connections": "node scripts/verify-connections.cjs",
     "test:openai-azure": "node scripts/verify-openai-azure.cjs",
     "test:mistral": "node scripts/verify-mistral.cjs",
