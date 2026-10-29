@@ -456,7 +456,7 @@ class ChatSession {
       const diff = this.runStopped && this.runBefore ? await changes(this.root, this.runBefore).catch(() => null) : null;
       const task = await this.finishTask(this.runStopped ? 'stopped' : 'error', diff);
       if (this.runStopped) { this.emit(this.runReview('stopped', diff, task)); this.afterImage(task); }
-      await this.saveHistory(this.runStopped ? 'stopped' : 'error'); await this.close(); this.emit({ type: 'run.status', status: this.runStopped ? 'stopped' : 'error' }); bench.chatsChanged(); throw error;
+      await this.saveHistory(this.runStopped ? 'stopped' : 'error'); await this.close(); this.emit({ type: 'run.status', status: this.runStopped ? 'stopped' : 'error', planRetained: this.runMode === 'build' && Boolean(this.plan) }); bench.chatsChanged(); throw error;
     } finally { this.starting = false; }
   }
 
@@ -661,6 +661,13 @@ class ChatSession {
   }
   event(event) {
     const p = event.properties || {}, bench = this.bench, owner = (this.copy || bench.checkpointOwner === this);
+    if (event.type === 'engine.recovery') {
+      if (!this.running || this.runStopped || this.finishing) return;
+      const phase = event.recovery?.phase;
+      const details = { retrying: 'Aura genopretter forbindelsen til den samme agentsession.', checking: 'Aura kontrollerer, om agenten allerede modtog beskeden. Beskeden sendes ikke igen.', recovered: 'Forbindelsen er genoprettet. Den eksisterende samtale fortsætter.' };
+      this.log({ kind: 'session', title: phase === 'recovered' ? 'Forbindelsen er genoprettet' : 'Genoptager forbindelsen', detail: details[phase], status: phase === 'recovered' ? 'completed' : 'running', task: this.task?.id });
+      return;
+    }
     if (event.compacting || this.compacting) {
       if (event.type === 'message.part.updated' && p.part?.type === 'step-finish' && this.runSteps && !this.runSteps.has(p.part.id)) { this.runSteps.set(p.part.id, p.part.tokens || {}); this.contextUsage.observe(p.part); this.emit({ type: 'usage', usage: this.currentUsage(), contextUsage: this.contextUsage.snapshot() }); }
       if (['session.error', 'engine.error'].includes(event.type)) this.runFailure = { kind: event.failure?.kind || sessionFailure(p.error), message: String(event.message || p.error?.data?.message || 'Sammenfatningen mislykkedes.').slice(0, 800) };
@@ -705,7 +712,7 @@ class ChatSession {
       const status = event.type === 'session.idle' ? 'idle' : 'error';
       this.finishing = (owner ? this.checkpoints.finish() : Promise.resolve()).then(async () => {
         if (this.runStopped) return;
-        if (status === 'error') { this.retirePlan('fejl'); await this.close(false); }
+        if (status === 'error') { if (this.runMode !== 'build') this.retirePlan('fejl'); await this.close(false); }
         // En bygget plan kan genåbnes og bygges igen; tidspunktet står ved planen.
         if (status === 'idle' && this.runMode === 'build' && this.plan) { this.plan = { ...this.plan, builtAt: Date.now() }; this.emit({ type: 'plan.updated', root: this.project.root, plan: this.plan }); }
         const reply = planningReply(this.runRoles || new Map(), this.runText || new Map());
@@ -735,7 +742,7 @@ class ChatSession {
         this.afterImage(task);
       }).catch(async () => { await this.finishTask(status, null).catch(() => {}); this.emit({ ...this.runReview('error', null, null), unavailable: true }); }).finally(() => {
         this.running = false; this.waiting = false; this.allowProjectEdits = false; this.taskRules.clear(); this.approvals.clear(); this.finishing = null; bench.release(this);
-        this.emit({ type: 'run.status', status: this.runStopped ? 'stopped' : status }); bench.chatsChanged();
+        this.emit({ type: 'run.status', status: this.runStopped ? 'stopped' : status, planRetained: this.runMode === 'build' && Boolean(this.plan) }); bench.chatsChanged();
       });
     }
     if (['message.part.updated', 'message.part.delta', 'message.updated', 'session.error', 'engine.error', 'permission.asked', 'permission.replied', 'question.asked', 'question.replied', 'question.rejected', 'session.diff'].includes(event.type)) this.emit(event);
@@ -743,7 +750,7 @@ class ChatSession {
   async stop() {
     if (this.finishing) throw new Error('Afslutningen er i gang. Vent på resultatet.');
     const bench = this.bench, owner = (this.copy || bench.checkpointOwner === this);
-    this.runStopped = true; this.expireQuestions(); this.allowProjectEdits = false; this.taskRules.clear(); this.approvals.clear(); this.retirePlan('stoppet'); if (owner) this.checkpoints.cancel(); ++this.generation; this.engineIdentity = null;
+    this.runStopped = true; this.expireQuestions(); this.allowProjectEdits = false; this.taskRules.clear(); this.approvals.clear(); if (this.runMode !== 'build') this.retirePlan('stoppet'); if (owner) this.checkpoints.cancel(); ++this.generation; this.engineIdentity = null;
     this.log({ kind: 'stop', title: 'Du trykkede på Stop', detail: 'AI\'en stopper. Det, den nåede at ændre, står under Ændringer.', status: 'stopped', task: this.task?.id });
     // Godkendelser, der stadig venter, kan ikke længere besvares.
     for (const entry of this.changes.activity.list()) if (['approval', 'question'].includes(entry.kind) && entry.status === 'waiting') this.log({ id: entry.id, status: 'expired', ended: Date.now() });
@@ -757,7 +764,7 @@ class ChatSession {
       this.emit(this.runReview('stopped', diff, task));
       this.afterImage(task);
     }
-    await this.saveHistory('stopped'); this.emit({ type: 'run.status', status: this.starting ? 'starting' : 'stopped' }); bench.chatsChanged();
+    await this.saveHistory('stopped'); this.emit({ type: 'run.status', status: this.starting ? 'starting' : 'stopped', planRetained: this.runMode === 'build' && Boolean(this.plan) }); bench.chatsChanged();
   }
   async reply(input) {
     if (!this.engine) throw new Error('Ingen aktiv agent.');

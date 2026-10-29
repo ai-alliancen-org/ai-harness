@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const { OpenCodeEngine, SUMMARIZE_TIMEOUT_MS } = require('../core/engine.cjs');
 
 function engine(events = []) {
-  const value = new OpenCodeEngine({ root: '/syntetisk', directory: '/syntetisk-data', model: { id: 'model-a' }, onEvent: event => events.push(event) });
+  const value = new OpenCodeEngine({ root: '/syntetisk', directory: '/syntetisk-data', model: { id: 'model-a' }, recovery: { delays: [1, 2, 3] }, onEvent: event => events.push(event) });
   value.active = true; value.session = { id: 'session-a' }; return value;
 }
 test('sammenfatning bruger modeltimeout og afventer idle efter HTTP-svaret', async () => {

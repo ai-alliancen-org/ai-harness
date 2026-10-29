@@ -6,6 +6,8 @@ const os = require('node:os');
 const { randomBytes } = require('node:crypto');
 const { pathToFileURL } = require('node:url');
 const run = promisify(execFile);
+const { EngineEvents } = require('./engine-events.cjs');
+const { setTimeout: delay } = require('node:timers/promises');
 // Skal svare til runtime-lock.json, som ikke kommer med i den pakkede app. En unit-test holder de to ens.
 const VERSION = '1.18.33';
 
@@ -188,10 +190,10 @@ async function writeReadGuard(directory, root, references, skills = []) {
 }
 class OpenCodeEngine {
   // resume: en tidligere OpenCode-session for samme samtale. Findes den ikke længere, oprettes en ny.
-  constructor({ root, directory, provider, model, references = [], mode = 'free', skills = [], resume = null, sandbox = null, detached = false, onEvent = () => {} }) { Object.assign(this, { root, directory, provider, model, references, mode, skills, resume, sandbox, detached, onEvent }); this.pending = new Map(); this.active = false; this.resumed = false; }
+  constructor({ root, directory, provider, model, references = [], mode = 'free', skills = [], resume = null, sandbox = null, detached = false, recovery = {}, onEvent = () => {} }) { Object.assign(this, { root, directory, provider, model, references, mode, skills, resume, sandbox, detached, recovery, onEvent }); this.promptEpoch = 0; this.closedPermissions = new Set(); this.closedQuestions = new Set(); this.pendingQuestions = new Map(); this.pending = new Map(); this.active = false; this.resumed = false; }
   async request(url, method = 'GET', body, signal) {
     const response = await fetch(`${this.url}${url}`, { method, headers: { authorization: this.auth, 'content-type': 'application/json', 'x-opencode-directory': encodeURIComponent(this.root) }, body: body === undefined ? undefined : JSON.stringify(body), signal: signal || AbortSignal.timeout(15000), redirect: 'error' });
-    if (!response.ok) throw new Error(`Agentmotoren afviste handlingen (HTTP ${response.status}).`);
+    if (!response.ok) throw Object.assign(new Error(`Agentmotoren afviste handlingen (HTTP ${response.status}).`), { status: response.status });
     if (response.status === 204) return null;
     return response.json();
   }
@@ -268,39 +270,51 @@ class OpenCodeEngine {
       await this.openSession();
       this.active = true;
       this.listen();
+      await this.eventStream.ready;
       return this.session.id;
     } catch (error) { await this.close(); throw error; }
   }
   async listen() {
-    this.eventsAbort = new AbortController();
-    try {
-      const response = await fetch(`${this.url}/event`, { headers: { authorization: this.auth, 'x-opencode-directory': encodeURIComponent(this.root) }, signal: this.eventsAbort.signal });
-      if (!response.ok) throw new Error();
-      const decoder = new TextDecoder(); let buffer = '';
-      for await (const chunk of response.body) {
-        buffer += decoder.decode(chunk, { stream: true });
-        const blocks = buffer.replace(/\r\n/g, '\n').split('\n\n'); buffer = blocks.pop();
-        for (const block of blocks) {
-          const data = block.split('\n').filter(line => line.startsWith('data:')).map(line => line.slice(5).trim()).join('\n');
-          if (!data) continue;
-          let event; try { event = JSON.parse(data); } catch { continue; }
-          this.handleEvent(event);
-        }
-      }
-      // En velordnet HTTP-slutning er stadig et tab af hændelser, hvis Aura ikke selv har lukket motoren.
-      if (!this.eventsAbort.signal.aborted && this.active) throw new Error('Hændelsesstrømmen sluttede.');
-    } catch {
-      if (!this.eventsAbort.signal.aborted && this.active) { this.handleEvent({ type: 'engine.error', message: 'Forbindelsen til agentens hændelser blev afbrudt. Opgaven stoppes.', failure: { kind: 'engine' } }); await this.abort().catch(() => {}); }
-    }
+    this.eventStream?.close();
+    this.eventStream = new EngineEvents(this, this.recovery);
+    this.eventsAbort = this.eventStream.controller;
+    return this.eventStream.run();
   }
   handleEvent(event) {
     const props = event.properties || {}, sessionID = props.sessionID || props.part?.sessionID || props.info?.sessionID;
     if (sessionID && sessionID !== this.session?.id) return;
+    if (!this.compaction && event.type === 'session.status' && props.status?.type === 'idle') return this.handleEvent({ type: 'session.idle', properties: props });
+    // A delayed snapshot/idle from the completed turn must not terminate the
+    // next ChatSession while it is preparing its new prompt. Only messages owned
+    // by this prompt can open/complete the turn, even in the same server session.
+    if (this.promptID && !this.compaction) {
+      const terminal = event.type === 'session.idle' || event.type === 'session.status' && props.status?.type === 'idle';
+      const turnEvent = terminal || event.type.startsWith('message.') || event.type.startsWith('permission.') || event.type.startsWith('question.');
+      if (turnEvent && this.completedPromptID === this.promptID) return;
+      if (event.type === 'message.updated') {
+        const info = props.info;
+        if (info?.id !== this.promptID && info?.parentID !== this.promptID) return;
+        this.currentMessageIDs ||= new Set(); this.currentMessageIDs.add(info.id);
+        if (info.role === 'assistant') this.currentReplySeen = true;
+      }
+      const messageID = props.part?.messageID || props.messageID;
+      if (event.type.startsWith('message.part.') && messageID && !this.currentMessageIDs?.has(messageID)) return;
+      if (terminal) {
+        if (!this.currentReplySeen) return;
+        this.completedPromptID = this.promptID;
+      }
+    }
     // OpenCode udsender både status-idle og session.idle. Status er også en autoritativ afslutning;
     // ChatSession deduplikerer dem med sin igangværende finalisering.
-    if (!this.compaction && event.type === 'session.status' && props.status?.type === 'idle') return this.handleEvent({ type: 'session.idle', properties: props });
-    if (event.type === 'permission.asked') this.pending.set(props.id, props);
-    if (event.type === 'permission.replied') this.pending.delete(props.requestID);
+    if (event.type === 'permission.asked') {
+      // Preserve the exact object bound to an in-flight approval. Reconnection
+      // must neither duplicate its dialog nor re-use an already answered request.
+      if (this.pending.has(props.id) || this.closedPermissions.has(props.id)) return;
+      this.pending.set(props.id, props);
+    }
+    if (event.type === 'question.asked') { if (this.pendingQuestions.has(props.id) || this.closedQuestions.has(props.id)) return; this.pendingQuestions.set(props.id, props); }
+    if (['question.replied', 'question.rejected'].includes(event.type)) { this.pendingQuestions.delete(props.requestID || props.id); this.closedQuestions.add(props.requestID || props.id); }
+    if (event.type === 'permission.replied') { this.pending.delete(props.requestID); this.closedPermissions.add(props.requestID); }
     const compaction = this.compaction;
     if (!compaction && event.type === 'message.updated' && props.info?.role === 'assistant') {
       if (props.info.time?.completed && props.info.finish && props.info.finish !== 'tool-calls') this.watchCompletion(props.info.id);
@@ -313,10 +327,35 @@ class OpenCodeEngine {
   }
   async send(text, system) {
     if (!this.active) throw new Error('Agenten er ikke startet.');
-    this.cancelCompletionCheck();
-    return this.request(`/session/${this.session.id}/prompt_async`, 'POST', { model: { providerID: 'harness', modelID: this.model.id }, agent: ['chat', 'plan'].includes(this.mode) ? 'plan' : 'build', system, parts: [{ type: 'text', text }] });
+    this.cancelCompletionCheck(); ++this.promptEpoch;
+    // OpenCode's IDs sort by their timestamp prefix. Supply an explicit ID so a
+    // lost HTTP acknowledgement can be checked without posting the prompt twice.
+    const time = ((BigInt(Date.now()) * 4096n) & ((1n << 48n) - 1n)).toString(16).padStart(12, '0');
+    const messageID = this.promptID = 'msg_' + time + randomBytes(7).toString('hex');
+    this.currentReplySeen = false; this.currentMessageIDs = new Set([messageID]);
+    const epoch = this.promptEpoch, signal = this.eventsAbort?.signal;
+    try {
+      return await this.request(`/session/${this.session.id}/prompt_async`, 'POST', { messageID, model: { providerID: 'harness', modelID: this.model.id }, agent: ['chat', 'plan'].includes(this.mode) ? 'plan' : 'build', system, parts: [{ type: 'text', text }] });
+    } catch (error) {
+      if (error.status && error.status < 500 || signal?.aborted) throw error;
+      for (const wait of this.recovery.delays || [500, 1500, 3000]) {
+        if (epoch !== this.promptEpoch || !this.active || signal?.aborted) throw error;
+        this.handleEvent({ type: 'engine.recovery', recovery: { phase: 'checking' } });
+        await delay(wait, undefined, { signal });
+        try {
+          const messages = await this.messages(), statuses = await this.request('/session/status');
+          if (epoch !== this.promptEpoch || signal?.aborted) throw error;
+          if (messages.some(m => m.info?.id === messageID && m.info.role === 'user') &&
+              (statuses?.[this.session.id]?.type === 'busy' || messages.some(m => m.info?.parentID === messageID && m.info?.time?.completed))) {
+            if (this.eventStream) { this.eventStream.snapshotMode = true; await this.eventStream.reconcile(); }
+            this.handleEvent({ type: 'engine.recovery', recovery: { phase: 'recovered' } }); return;
+          }
+        } catch { /* A failed read is not permission to repeat the POST. */ }
+      }
+      throw new Error('Det kunne ikke bekræftes, om agenten modtog beskeden. Aura sender den ikke igen automatisk, så handlinger ikke gentages.');
+    }
   }
-  async abort() { this.cancelCompletionCheck(); this.cancelCompaction(); if (this.session && this.url) await this.request(`/session/${this.session.id}/abort`, 'POST'); this.pending.clear(); }
+  async abort() { ++this.promptEpoch; this.eventStream?.close(); this.cancelCompletionCheck(); this.cancelCompaction(); if (this.session && this.url) await this.request(`/session/${this.session.id}/abort`, 'POST'); this.pending.clear(); this.pendingQuestions.clear(); }
   cancelCompletionCheck() { clearTimeout(this.completionTimer); this.completionTimer = null; this.completionCheck = null; }
   watchCompletion(message) {
     this.cancelCompletionCheck();
@@ -334,7 +373,7 @@ class OpenCodeEngine {
   }
   async verifyCompletion(check) {
     const statuses = await this.request('/session/status');
-    if (!this.active || this.compaction || this.completionCheck !== check || this.pending.size) return false;
+    if (!this.active || this.compaction || this.completionCheck !== check || this.pending.size || this.pendingQuestions.size) return false;
     if (!statuses || typeof statuses !== 'object' || Array.isArray(statuses)) throw new Error('Ugyldig sessionsstatus.');
     // OpenCode udelader idle-sessioner fra statusoversigten. Kontrollen starter kun efter en faktisk
     // afsluttet assistant-message med finish-kode, aldrig på baggrund af tekst som "Færdig".
@@ -343,7 +382,7 @@ class OpenCodeEngine {
     return false;
   }
   // En afvisning med en besked stopper ikke opgaven: AI'en får beskeden som rettelse og fortsætter.
-  async reply(id, allow, message) { if (!this.pending.has(id)) throw new Error('Godkendelsen findes ikke længere.'); await this.request(`/permission/${encodeURIComponent(id)}/reply`, 'POST', { reply: allow ? 'once' : 'reject', ...(!allow && message ? { message } : {}) }); this.pending.delete(id); }
+  async reply(id, allow, message) { if (!this.pending.has(id)) throw new Error('Godkendelsen findes ikke længere.'); await this.request(`/permission/${encodeURIComponent(id)}/reply`, 'POST', { reply: allow ? 'once' : 'reject', ...(!allow && message ? { message } : {}) }); this.pending.delete(id); this.closedPermissions.add(id); }
   async messages() { return this.request(`/session/${this.session.id}/message`); }
   // OpenCode sammenfatter samtalen med samme model og fortsætter fra sammenfatningen. Planen og filerne røres ikke.
   async summarize({ timeout = SUMMARIZE_TIMEOUT_MS } = {}) {
@@ -356,13 +395,19 @@ class OpenCodeEngine {
     try {
       // summarize er et modelkald, ikke en almindelig 15-sekunders kontrol. Begge kanaler skal være afsluttet,
       // før næste prompt starter; et sent idle fra sammenfatningen må ikke afslutte brugerens nye opgave.
-      const [result] = await Promise.all([this.request(`/session/${this.session.id}/summarize`, 'POST', { providerID: 'harness', modelID: this.model.id, auto: false }, controller.signal), idle]);
+      const request = this.request(`/session/${this.session.id}/summarize`, 'POST', { providerID: 'harness', modelID: this.model.id, auto: false }, controller.signal).then(async result => {
+        operation.httpCompleted = true;
+        if (this.eventStream?.snapshotMode) await this.eventStream.settle();
+        return result;
+      });
+      const [result] = await Promise.all([request, idle]);
       return result;
     } finally { clearTimeout(timer); controller.abort(); if (this.compaction === operation) this.compaction = null; }
   }
   cancelCompaction(error = new Error('Sammenfatningen blev stoppet.')) { if (this.compaction) { this.compaction.controller.abort(error); this.compaction.reject(error); } }
   async diff() { return this.request(`/session/${this.session.id}/diff`); }
   async close() {
+    ++this.promptEpoch; this.eventStream?.close(); this.pendingQuestions.clear();
     // Er vagtprocessen allerede væk, stoppes motorens gruppe direkte.
     if (this.child && this.child.exitCode !== null && this.enginePID) { try { process.kill(-this.enginePID, 'SIGKILL'); } catch { /* Gruppen er allerede væk. */ } }
     this.cancelCompletionCheck(); this.cancelCompaction(); this.active = false; this.eventsAbort?.abort(); this.pending.clear(); if (this.child && this.child.exitCode === null) { this.child.kill(); await new Promise(resolve => { const timer = setTimeout(() => { this.child.kill('SIGKILL'); resolve(); }, 3000); this.child.once('exit', () => { clearTimeout(timer); resolve(); }); }); } }
