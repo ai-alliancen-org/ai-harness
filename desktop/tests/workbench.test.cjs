@@ -443,3 +443,18 @@ test('Gør samtalen kortere sammenfatter samtalen, før beskeden sendes, og spri
  assert.deepEqual(calls, ['send']);
  await bench.close();
 });
+
+test('modelkatalogets indsatsniveauer kommer fra samme regel som afsendelsen', async t => {
+ const connection = { id: 'test', kind: 'compatible', name: 'Prøve', baseURL: 'http://127.0.0.1:1/v1' };
+ const connections = require('../core/connections.cjs');
+ const original = connections.listModels;
+ t.after(() => { connections.listModels = original; });
+ connections.listModels = async () => [{ id: 'reported', name: 'Rapporteret', capabilities: { effort: ['minimal', 'high', 'ultra', 'BAD!', 4] } }, { id: 'unknown', name: 'Ukendt' }];
+ const bench = new Workbench({ directory: await temp(t), profiles, emit: () => {}, safeStorage: {} });
+ t.after(() => bench.close()); bench.connection = async () => connection;
+ const models = await bench.models(connection.id);
+ assert.deepEqual(models[0].effortLevels, ['minimal', 'high', 'ultra']);
+ assert.deepEqual(models[1].effortLevels, []);
+ assert.deepEqual(models[0].effortLevels, connections.effortLevels(connection, models[0]));
+ assert.equal(bench.catalogs.get(connection.id)[0], models[0]);
+});
