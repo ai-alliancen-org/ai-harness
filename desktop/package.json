@@ -80,7 +80,7 @@
   "author": "AI Alliancen",
   "dependencies": {
     "@anthropic-ai/sandbox-runtime": "0.0.81",
-    "@opencode-ai/plugin": "1.18.33",
+    "@opencode-ai/plugin": "1.19.4",
     "electron-updater": "6.8.11",
     "pdfjs-dist": "6.4.299",
     "semver": "7.8.5"
