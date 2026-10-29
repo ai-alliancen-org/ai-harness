@@ -20,7 +20,8 @@ const PROMTE_SETUP = 'Promte udgiver kun apps, der er bygget til Promte. Projekt
 const SKIP_DIRS = new Set(['node_modules', 'bower_components', '.git', '.hg', '.svn', '.promte-source', '.cache', '.yarn', '.npm', '.pnpm-store', '.turbo', '.vite', '.parcel-cache', '.next', '.nuxt', '.output', 'dist', 'build', 'out', 'coverage', '__pycache__', '.pytest_cache', '.mypy_cache', '.venv', 'venv', '.ssh', '.aws', '.azure', '.gcloud', '.kube', '.docker', '__macosx', '.claude', '.agents', '.codex', '.cursor', '.idea', '.vscode']);
 const SKIP_FILE = /^(?:\.env(?:\..*)?|\.npmrc|\.pypirc|\.netrc|\.ds_store|\.yarnrc(?:\.yml)?|\.secrets?|credentials(?:\.[^.]+)?|secrets?\.(?:json|ya?ml|toml)|id_(?:rsa|dsa|ecdsa|ed25519)(?:\.pub)?|promte-app-upload\.config\.json|yarn\.lock|pnpm-lock\.yaml|vite\.config\.[cm]?[jt]s)$|\.(?:pem|key|p12|pfx|keystore|jks|zip|tar|tgz|gz|7z|rar|map|tsbuildinfo|log|pyc|o|so|dll|exe|class)$/i;
 const UNSUPPORTED_BUILD_FILE = /^(?:(?:postcss|tailwind|babel|webpack|rollup)\.config\..+|\.babelrc(?:\..*)?|\.postcssrc(?:\..*)?)$/i;
-const ignoredSource = file => file.split('/').some(p => SKIP_DIRS.has(p.toLowerCase())) || SKIP_FILE.test(path.posix.basename(file));
+const { isProtected } = require('./protected-paths.cjs');
+const ignoredSource = file => isProtected(file) || file.split('/').some(p => SKIP_DIRS.has(p.toLowerCase())) || SKIP_FILE.test(path.posix.basename(file));
 const runtimeDependencies = pkg => ({ ...pkg.dependencies, ...pkg.peerDependencies, ...pkg.optionalDependencies });
 function preparePromteArtifact(artifact) {
   let pkg;

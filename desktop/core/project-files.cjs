@@ -13,7 +13,7 @@ const IMAGES = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg
 
 // Samme regler som agentens læsetilladelser: også fx produktion.env og mappen secrets er beskyttet.
 function isProtected(file) {
-  return protectedPath(file) || /(^|\/)[^/]*\.env(\.[^/]*)?$/i.test(file) || /(^|\/)\.?secrets(\/|$)/i.test(file);
+  return protectedPath(file);
 }
 class FileError extends Error { constructor(message, code) { super(message); this.code = code; } }
 

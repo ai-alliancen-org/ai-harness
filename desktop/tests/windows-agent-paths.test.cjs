@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const vm = require('node:vm');
+const requireFromPolicy = require('node:module').createRequire(path.join(__dirname, '../core/approvals-policy.cjs'));
 
 // Rigtige Win32-strenge og Node path.win32, med et eksplicit modelleret filsystem.
 // Det er ikke en Windows-kørsel: reparse points, ACL og netværksdrev kræver den native prøve.
@@ -17,7 +18,7 @@ async function fixture({ caseSensitive = false } = {}) {
   const entry = async file => { const value = entries.get(key(file)); if (!value) throw Object.assign(new Error('Ikke fundet'), { code: 'ENOENT' }); return value; };
   const fileSystem = { lstat: entry, stat: entry, realpath: async file => (await entry(file)).real };
   const module = { exports: {} }, source = await fs.readFile(path.join(__dirname, '../core/approvals-policy.cjs'), 'utf8');
-  vm.runInNewContext(source, { module, exports: module.exports, require: name => name === 'node:path' ? paths : name === 'node:fs/promises' ? fileSystem : name === 'node:os' ? { homedir: () => 'C:\\Brugere\\Zoë', tmpdir: () => 'C:\\Temp' } : require(name) });
+  vm.runInNewContext(source, { module, exports: module.exports, require: name => name === 'node:path' ? paths : name === 'node:fs/promises' ? fileSystem : name === 'node:os' ? { homedir: () => 'C:\\Brugere\\Zoë', tmpdir: () => 'C:\\Temp' } : requireFromPolicy(name) });
   const data = { approvals: { version: 1, autoProjectFiles: true, autoCommands: false, rules: [] } };
   const store = { project: async () => data };
   const policy = new module.exports.ApprovalsPolicy(store), context = { projectRoot: root, workspaceRoot: root, mode: 'free', commandSandboxSupported: false };
