@@ -720,7 +720,7 @@ Nøgler, godkendelser og pakning:
 - **Nøgler og GitHub-token indtastes kun i et separat vindue.** Hovedvinduet får en engangskvittering. Udgivs felt flyttes med. Nøglen renses og kontrolleres, før den gemmes. Knappen hedder Indtast nøgle.
 - **En afvist nøgle gemmes ikke.** Afviser udbyderen nøglen, bliver vinduet åbent med nøglen maskeret og udbyderens svar bag Se detaljer. Kan serveren ikke nås, fx en lokal server, der ikke kører, kan man vælge Gem alligevel. Besluttet 26. oktober 2026.
 - **Godkend alt er et udtrykkeligt valg pr. samtale**, som også gælder over projektmappens grænse. Det får dansk navn og advarsel og bygges på den nye godkendelsesmodel, når kommandosandkassen er rettet. #45 flettes ikke i sin nuværende form.
-- **Pakning sker fra et committet kildetræ.** Pakken får et kildebevis med commit og kontrolsummer, som også dækker byggekonfiguration, entitlements og byggescripts. Signeringskvitteringen gemmes pr. bygning. `docs/udgivelse.md` får den nye rækkefølge.
+- **Pakning sker fra et committet kildetræ.** Pakken får et kildebevis med commit og kontrolsummer, som også dækker byggekonfiguration, entitlements og byggescripts. Signeringskvitteringen gemmes pr. bygning. `docs/udgivelse.md` får den nye rækkefølge. `desktop/runtime-lock.json` følger med i `app.asar` og sammenlignes byte for byte mod kilden, fordi appens samtalekode læser motorversionen fra den; en vagt i `desktop/tests/packaging.test.cjs` afviser et relativt krav til en fil, der ikke står i fillisten.
 - **PDF-udtræk** må bruge `pdfjs-dist` (Apache-2.0). `@napi-rs/canvas` kommer kun med, hvis udtrækket påviseligt ikke virker uden.
 - **Indflettede kopier** ryddes fortsat automatisk. #24 flettes ikke.
 

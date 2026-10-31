@@ -4,7 +4,7 @@ const profileResources = [{ from: '../LICENSE', to: 'LICENSE' }, { from: '../pro
 module.exports = {
   appId: 'org.ai-alliancen.harness', productName: 'Aura',
   directories: { output: 'release', buildResources: 'packaging' },
-  files: ['main.cjs', 'preload.cjs', 'core/**/*', 'ui/**/*', 'package.json'],
+  files: ['main.cjs', 'preload.cjs', 'core/**/*', 'ui/**/*', 'package.json', 'runtime-lock.json'],
   asar: true, asarUnpack: ['core/engine-guardian.cjs', 'core/dev-server-runner.cjs', 'core/command-sandbox-runner.mjs', 'core/pdf-text-worker.cjs', 'node_modules/pdfjs-dist/**/*', 'node_modules/@anthropic-ai/sandbox-runtime/**/*', 'node_modules/@pondwader/socks5-server/**/*', 'node_modules/commander/**/*', 'node_modules/node-forge/**/*', 'node_modules/zod/**/*'], npmRebuild: false,
   extraResources: profileResources,
   artifactName: 'Aura-${version}-${os}-${arch}.${ext}',

@@ -6,7 +6,7 @@ const os = require('node:os');
 const { randomBytes } = require('node:crypto');
 const { pathToFileURL } = require('node:url');
 const run = promisify(execFile);
-// Skal svare til runtime-lock.json, som ikke kommer med i den pakkede app. En unit-test holder de to ens.
+// Skal svare til opencode i runtime-lock.json. En unit-test holder de to ens, så motoren ikke afvises af sin egen version.
 const VERSION = '1.18.33';
 
 // Første opstart kan være langsom, fordi macOS eller et antivirusprogram kontrollerer motoren, før den må køre.

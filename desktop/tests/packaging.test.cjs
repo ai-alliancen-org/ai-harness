@@ -72,3 +72,25 @@ test('filer, der startes som egne processer, pakkes ud af app.asar',()=>{
  const unpack=require('../electron-builder.cjs').asarUnpack;
  for(const file of ['core/engine-guardian.cjs','core/dev-server-runner.cjs','core/command-sandbox-runner.mjs'])assert.ok(unpack.includes(file),file);
 });
+
+// Et relativt krav til en fil uden for fillisten virker i udvikling og får den pakkede app til at fejle ved
+// indlæsningen. verify-package-source sammenligner kun de filer, den selv lister, og ser derfor ikke et krav,
+// der peger ud af pakken. Vagten læser fillisten fra electron-builder.cjs og går appkodens krav igennem.
+// Afgrænsning: kun krav med en skrevet relativ sti. Et beregnet require fanges ikke.
+test('appkodens relative krav peger kun på filer, der pakkes', async () => {
+  const root = path.join(__dirname, '..');
+  const patterns = require('../electron-builder.cjs').files;
+  const packed = name => patterns.some(p => p.endsWith('/**/*') ? name.startsWith(p.slice(0, -4)) : p === name);
+  const listed = await require('../scripts/verify-package-source.cjs').files(path.join(root, 'core'), 'core/');
+  const code = ['main.cjs', 'preload.cjs', ...listed.filter(name => /\.(cjs|mjs)$/.test(name))];
+  const missing = [];
+  for (const file of code) {
+    const text = await fs.readFile(path.join(root, file), 'utf8');
+    for (const [, specifier] of text.matchAll(/require\(\s*['"](\.\.?\/[^'"]+)['"]\s*\)/g)) {
+      const target = path.posix.normalize(path.posix.join(path.posix.dirname(file), specifier));
+      await fs.access(path.join(root, target));
+      if (!packed(target)) missing.push(`${file} kræver ${specifier}, og ${target} pakkes ikke`);
+    }
+  }
+  assert.deepEqual(missing, [], 'Krav, der ikke følger med i den pakkede app:\n' + missing.join('\n'));
+});

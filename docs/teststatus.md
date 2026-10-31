@@ -4,6 +4,24 @@ Senest kontrolleret 29. oktober 2026. Afsnittene er daterede, så tidligere begr
 
 [Gennemgangen før offentlig beta](offentliggoerelse.md) samler historik- og logkontrol samt de lokale prøver af README, hjemmeside og udgivelseskontrol. Den offentliggør ikke appen og ændrer ikke installationsstatus nedenfor.
 
+## Pakningshul i forslag 39: låsefilen fulgte ikke med i app.asar · 29. oktober 2026
+
+Gennemgangen af de 27 overtagne bidrag fandt, at forslag #39's påstand om `runtime-lock.json` i `app.asar` ikke var indfriet. Hullet var alvorligere end meldt: det ville have stoppet den næste pakkede app ved indlæsningen.
+
+**Fejlen.** `desktop/core/chat-session.cjs:14` læser motorversionen med `require('../runtime-lock.json')`. Kravet kom ind med commit `67b4bc5`, overtagelsen af #21 den 27. oktober. Fillisten i `desktop/electron-builder.cjs` er en eksplicit liste, og `runtime-lock.json` stod ikke i den, så filen var ikke i `app.asar`. `desktop/core/workbench.cjs` indlæser `chat-session.cjs`, så fejlen ville ramme ved indlæsningen og ikke først ved brug.
+
+**Ingen udgivet pakke er ramt.** Pakkerne i `desktop/release` er bygget 26. oktober, og kravet kom 27. Kontrolleret i den signerede 0.6.0-beta.1: arkivets rodposter er `/node_modules /core /main.cjs /package.json /preload.cjs /ui`, altså uden låsefilen, men dens `chat-session.cjs` krævede den heller ikke endnu. v0.7.0-beta.1 ville have været den første ramte bygning.
+
+**Rettelsen.** `runtime-lock.json` står nu i fillisten og i navnelisten i `desktop/scripts/verify-package-source.cjs`, så pakkens kopi sammenlignes byte for byte mod arbejdsmappen og kontrolleres som committet fil. Kommentaren i `desktop/core/engine.cjs:9`, der påstod at filen ikke kommer med i den pakkede app, er rettet. Kildebeviset dækkede filen i forvejen.
+
+**Vagten, og at den fyrer.** `desktop/tests/packaging.test.cjs` har en ny prøve, der læser fillisten fra `electron-builder.cjs` og går alle skrevne relative `require` i `main.cjs`, `preload.cjs` og `core/` igennem. Prøven blev skrevet og kørt før rettelsen og fejlede med netop den rigtige linje: `core/chat-session.cjs kræver ../runtime-lock.json, og runtime-lock.json pakkes ikke`. Afgrænsning: kun krav med en skrevet relativ sti, ikke beregnede. `desktop/ui` er kontrolleret særskilt og importerer intet uden for `ui/`.
+
+**Enhedstestet:** 696 af 696 prøver består med Node 22.23.3, den nye vagt indbefattet.
+
+**Afprøvet på konkret materiale:** appkoden fra arbejdsmappen er lagt i to mapper med præcis den gamle og den nye filliste og indlæst med rigtig Node. Den gamle fejler med `MODULE_NOT_FOUND: Cannot find module '../runtime-lock.json'`, den nye indlæser `core/chat-session.cjs` uden fejl. At et bart filnavn i fillisten lander i arkivets rod, hvor `require('../runtime-lock.json')` fra `core/` søger, er bekræftet i den rigtige signerede 0.6.0-beta.1-pakke, hvor `main.cjs`, `preload.cjs` og `package.json` alle ligger der.
+
+**Ikke kørt:** ingen ny pakning med `electron-builder`. Pakning kræver et committet kildetræ, og ændringerne er ikke committet. Et arkiv med låsefilen i er derfor ikke bygget og set endnu. Det bør gøres, før v0.7.0-beta.1 udgives.
+
 ## Afhængigheder: Electron 44.9.1 og tre mindre opdateringer · 29. oktober 2026
 
 Dependabot #15 (sikkerhed) og #51 (mindre opdateringer) er overtaget i `desktop/package.json`. Ingen pakker er lagt til eller fjernet; låsefilen ændrede 68 linjer, alle versionsnumre.

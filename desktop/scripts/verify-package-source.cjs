@@ -28,7 +28,7 @@ async function verify(resources, target) {
   const updateConfig = require('js-yaml').load(await fs.readFile(path.join(resources, 'app-update.yml'), 'utf8'));
   assert.equal(updateConfig.provider, 'generic');
   assert.equal(updateConfig.url, 'https://ai-alliancen-org.github.io/ai-harness/updates/');
-  const names = ['main.cjs', 'preload.cjs', ...await files(path.join(root, 'core'), 'core/'), ...await files(path.join(root, 'ui'), 'ui/')];
+  const names = ['main.cjs', 'preload.cjs', 'runtime-lock.json', ...await files(path.join(root, 'core'), 'core/'), ...await files(path.join(root, 'ui'), 'ui/')];
   assert.deepEqual(await fs.readFile(path.join(resources, 'LICENSE')), await fs.readFile(path.join(root, '../LICENSE')), 'Pakken skal bevare bibliotekets licens');
   const profileRoot = path.join(root, '../profiles');
   const profiles = ['grundregler.md', 'gitignore.txt', 'catalog.json', ...await files(path.join(profileRoot, 'skills'), 'skills/')];
