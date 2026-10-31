@@ -77,6 +77,36 @@ test('den rigtige sessions politik bruger initiatoren også ved omdirigering og 
   assert.equal(csp.origin, 'https://unpkg.com'); assert.equal(csp.kind, 'scripts'); assert.doesNotMatch(JSON.stringify(csp), /secret|private/);
 });
 
+// Appen navigerer selv forhåndsvisningens ramme, fx når en lokal udviklingsserver tilkobles. Rammens URL er da
+// stadig det FORRIGE dokument, så kun målet kan afgøre konteksten. Men en kendt frame-origin skal stadig vinde:
+// ellers kan en omdirigering fra ét projekts server lægge et andet projekts lokale tjeneste i rammen, uden at
+// siden behøver forfalske noget. Og kun forælderens URL må afgøre det; en referrer kan siden selv sætte.
+test('appens egen navigation af forhåndsvisningen afgøres af målet, men en omdirigering skifter ikke projekt', () => {
+  const app = 'harness://app/index.html';
+  const session = () => { let before; const ses = { protocol: { handle() {} }, webRequest: { onBeforeRequest(fn) { before = fn; }, onHeadersReceived() {} } }; return { ses, check: () => details => { let value; before(details, answer => { value = !answer.cancel; }); return value; } }; };
+  const a = { key: 'projekt-a', root: '/a' }, b = { key: 'projekt-b', root: '/b' };
+  a.preview = staticPreview(a); b.preview = staticPreview(b);
+  // Som efter preview:attach: den statiske forhåndsvisning er ryddet, og en lokal server er tilsluttet.
+  const ekstern = { key: 'projekt-c', root: '/c', preview: null, externalPreview: 'http://127.0.0.1:53982/preview' };
+  const en = session();
+  installSession(en.ses, { contexts: () => [a, b, ekstern], onDiagnostic: () => {} });
+  const check = en.check();
+
+  // Virker: rammen viser endnu den afregistrerede aura-preview-side, og appen navigerer den til den tilsluttede server.
+  assert.equal(check({ url: ekstern.externalPreview, resourceType: 'subFrame', initiatorOrigin: 'harness://app', frame: { url: 'aura-preview://projekt-c/', parent: { url: app } } }), true, 'tilkoblingen skal kunne vises');
+  // Må IKKE virke: 302 fra projekt A til projekt B, mens rammen viser en registreret A-side.
+  assert.equal(check({ url: b.preview.url, resourceType: 'subFrame', initiatorOrigin: 'harness://app', frame: { url: a.preview.url, parent: { url: app } } }), false, 'en omdirigering må ikke skifte arbejdsområde');
+  // Må IKKE virke: en påstået app-referrer uden forælder.
+  assert.equal(check({ url: b.preview.url, resourceType: 'subFrame', initiatorOrigin: 'null', referrer: app, frame: { url: 'http://127.0.0.1:9999/' } }), false, 'kun forælderens URL må afgøre det');
+
+  // Vejen tilbage: #static-preview rydder externalPreview og genskaber den statiske side, før rammen navigerer.
+  const tilbage = { key: 'projekt-c', root: '/c', externalPreview: null };
+  tilbage.preview = staticPreview(tilbage);
+  const to = session();
+  installSession(to.ses, { contexts: () => [a, b, tilbage], onDiagnostic: () => {} });
+  assert.equal(to.check()({ url: tilbage.preview.url, resourceType: 'subFrame', initiatorOrigin: 'harness://app', frame: { url: 'http://127.0.0.1:53982/preview', parent: { url: app } } }), true, 'tilbage til den statiske forhåndsvisning');
+});
+
 test('eksisterende CDN-HTML giver en konkret reparationskladde og respekterer den præcise netliste', async t => {
   const root = await fixture(t, { 'public/index.html': `<script src="https://unpkg.com/react@18/umd/react.js"></script><script src='https://unpkg.com/react-dom.js'></script><link rel="stylesheet" href="https://cdn.example.com/style.css">` });
   const found = await inspect(root); assert.equal(found.diagnostics.length, 2); assert.equal(found.diagnostics[0].origin, 'https://unpkg.com'); assert.match(found.diagnostics[0].repair, /Bevar/);

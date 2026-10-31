@@ -155,7 +155,7 @@ Valg i implementeringen, som kan ændres:
 - **Briefen følger projektet** og bevares ved Ny samtale. Ønskerne fra Ønsker til løsningen kommer i briefen, når planlægning er slået til.
 
 Tredje milepæl, godkendelser og fejl, er implementeret 6. oktober 2026. Brugeren valgte:
-- **Kontrol af forhåndsvisningen:** efter en opgave genindlæser Aura siden og siger, om den blev vist, og om den skrev fejl i konsollen. Aura klikker ikke og tester ikke funktioner.
+- **Kontrol af forhåndsvisningen:** efter en opgave genindlæser Aura siden og siger, om den blev vist, og om den skrev fejl i konsollen. Aura klikker ikke og tester ikke funktioner. Resultatet står i Aktivitet sammen med værktøjernes afslutningskoder og output; resultatkortet kvitterer kun for ændringerne. Kontrollen køres én gang pr. opgave med filændringer. Den fandtes ikke i 0.6.0-beta.1: udløseren forsvandt i `5ffe905`, mens beslutningen, handleren og posten i Aktivitet blev stående, og den er genoprettet til 0.7.0-beta.1.
 - **Afvisning:** Afvis stopper opgaven som før; Afvis med en besked lader AI'en fortsætte med beskeden.
 
 Valg i implementeringen, som kan ændres:
@@ -705,7 +705,7 @@ Samtalen og Før du sender:
 - **Før du sender viser den præcise tekst ét sted** med almindelige navne. Kontrolsummer, revision og bytes ligger bag Se detaljer. Det viste er bundet til det sendte.
 - **Links i AI-svar kan klikkes** og viser adresse eller værtsnavn i selve teksten. Det erstatter det tidligere valg om ikke-klikbare links.
 - **Søgning i beskeder** har en knap i sidepanelet, også når det er foldet sammen, og findes i ⌘K.
-- **Kontekstmålingen** ligger i statuslinjens detaljer og regnes mod Auras grænse på 200.000 tokens. Første lag viser kun en advarsel nær grænsen.
+- **Kontekstmålingen** ligger i statuslinjens detaljer og regnes mod Auras grænse på 200.000 tokens. Første lag viser kun en advarsel nær grænsen. Nævneren må kun være et oplyst kontekstvindue. Oplyser hverken kataloget eller tabellen det, siger detaljerne "Grænsen er ikke oplyst for denne model" ved siden af det målte tal, og der kommer ingen procent og ingen advarsel. Det gælder blandt andet Ollama, selvhostede OpenAI-kompatible servere og Azure-udrulninger med eget navn, som før fik en procent af reservetallet på 32.768. Reservetallet bliver stående som grænse til motorens komprimering.
 - **Modelstøtte** vises kun med udbyderens egne oplysninger. Appens egne observationer vises ikke som prøver.
 
 Design og udseende:
@@ -713,11 +713,11 @@ Design og udseende:
 - **Retning for stilarter:** Flere stilskills, fx minimalistisk, shadcn/Radix, Apple-inspireret og Material, som brugeren vælger mellem med forhåndsvisninger. Højst tre til fire vises først, med et anbefalet udgangspunkt forrest og resten bag Vælg en anden. Stilarterne bruger kun materiale med afklarede rettigheder.
 - **Udbyderlogoer** må stå ved modellen under skrivefeltet og på modelkortene. Alle bruger det fælles logosæt `desktop/ui/provider-*.svg` med samme størrelse og farveholdning. Ved OpenRouter vises forbindelsens logo.
 - **Tema følger systemet** med et valg under Indstillinger. Lyst og mørkt bygger på ét sæt farvetokens, og de mørke værdier skrives ind i `desktop/DESIGN.md`.
-- **Arbejdsstatus** vises som lyskant om skrivefeltet og som et lille mærke på forhåndsvisningen i Byg. Statusteksten står og læses op ét sted.
+- **Arbejdsstatus** vises som lyskant om skrivefeltet og som et lille mærke på forhåndsvisningen i Byg. Statusteksten står og læses op ét sted. Kanten om skrivefeltet er metalkanten under `#chat-form[data-work-state]` og kommer kun derfra; en anden regel, der også tegner en kant om feltet, giver to rytmer og lader kanten blive stående, når opgaven venter på brugeren.
 - **Designbriefet** skrives af designskillen i `docs/design.md` i brugerens projekt og genbruges. I Planlæg står et kort resumé under Sådan skal det se ud. Besluttet 26. oktober 2026.
 
 Nøgler, godkendelser og pakning:
-- **Nøgler og GitHub-token indtastes kun i et separat vindue.** Hovedvinduet får en engangskvittering. Udgivs felt flyttes med. Nøglen renses og kontrolleres, før den gemmes. Knappen hedder Indtast nøgle.
+- **Nøgler og GitHub-token indtastes kun i et separat vindue.** Hovedvinduet får en engangskvittering. Udgivs felt flyttes med. Nøglen renses og kontrolleres, før den gemmes. Knappen hedder Indtast nøgle. Lukker brugeren dialogen, mens nøglevinduet står åbent, kasseres svaret: nøglen gemmes stadig, men der skrives ingen kvittering og hentes ingen ny status i et vindue, brugeren ikke kan se. Status vises ved næste åbning.
 - **En afvist nøgle gemmes ikke.** Afviser udbyderen nøglen, bliver vinduet åbent med nøglen maskeret og udbyderens svar bag Se detaljer. Kan serveren ikke nås, fx en lokal server, der ikke kører, kan man vælge Gem alligevel. Besluttet 26. oktober 2026.
 - **Godkend alt er et udtrykkeligt valg pr. samtale**, som også gælder over projektmappens grænse. Det får dansk navn og advarsel og bygges på den nye godkendelsesmodel, når kommandosandkassen er rettet. #45 flettes ikke i sin nuværende form.
 - **Pakning sker fra et committet kildetræ.** Pakken får et kildebevis med commit og kontrolsummer, som også dækker byggekonfiguration, entitlements og byggescripts. Signeringskvitteringen gemmes pr. bygning. `docs/udgivelse.md` får den nye rækkefølge. `desktop/runtime-lock.json` følger med i `app.asar` og sammenlignes byte for byte mod kilden, fordi appens samtalekode læser motorversionen fra den; en vagt i `desktop/tests/packaging.test.cjs` afviser et relativt krav til en fil, der ikke står i fillisten.

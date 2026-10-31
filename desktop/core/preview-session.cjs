@@ -39,9 +39,13 @@ function installSession(ses, { contexts, resolveFrame = () => null, sdk, onDiagn
     if (explicit) return explicit;
     if (details.initiatorOrigin && details.initiatorOrigin !== 'null' && originOf(details.initiatorOrigin) !== appOrigin) return find(details.initiatorOrigin);
     // Frame-URL er autoritativ for underressourcer. En referrer kan udelades eller
-    // ændres af siden og må aldrig åbne en anden samtales lokale tjeneste.
-    if (originOf(details.frame?.url) && originOf(details.frame.url) !== appOrigin) return find(details.frame.url);
-    if (details.resourceType === 'subFrame' && originOf(details.frame?.parent?.url || details.referrer) === appOrigin) return find(details.url);
+    // ændres af siden og må aldrig åbne en anden samtales lokale tjeneste. Er rammens origin kendt, vinder den:
+    // en omdirigering fra ét arbejdsområdes server til et andets må ikke kunne afgøres af måladressen.
+    if (originOf(details.frame?.url) && originOf(details.frame.url) !== appOrigin) { const byFrame = find(details.frame.url); if (byFrame) return byFrame; }
+    // Appens egen navigation af forhåndsvisningens ramme: rammens URL er endnu det forrige dokument, fx den
+    // statiske aura-preview-side, så kun målet kan afgøre konteksten. Kun forælderens URL må bestemme det;
+    // en referrer kan siden udelade eller ændre og må aldrig pege på appen.
+    if (details.resourceType === 'subFrame' && originOf(details.frame?.parent?.url) === appOrigin) return find(details.url);
     if (details.resourceType === 'mainFrame') return find(details.url);
     return null;
   };

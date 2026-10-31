@@ -102,16 +102,19 @@ const helpers = require('./ui-test-helpers.cjs');
     await idle();
     passed('Kommandokortet viser kommandoen, AI’ens begrundelse og et gæt i almindeligt dansk uden en fremhævet Tillad');
 
-    // Resultatet: faktiske kontroller. Kommandoen fejlede med kode 1, og forhåndsvisningen skrev en fejl i konsollen.
-    const review = page.locator('#run-review'); await review.locator('h3', { hasText: 'Prøv resultatet i forhåndsvisningen' }).waitFor();
-    const checksText = review.locator('.check-list');
-    await checksText.locator('li.check-failed', { hasText: 'Forhåndsvisning: siden blev vist, men skrev 1 fejl i konsollen.' }).waitFor({ timeout: 30000 });
-    await review.locator('li.check-failed summary', { hasText: 'Se fejlene' }).click();
-    assert.match(await review.locator('li.check-failed pre').first().textContent(), /Kunne ikke hente lokalerne/);
-    assert.match(await checksText.innerText(), /Kommando echo "1 test fejlede" && exit 1: Afsluttet med fejl \(kode 1\)\./);
-    await review.locator('summary', { hasText: 'Sidste linjer af output' }).click();
-    assert.match(await review.locator('.check-list pre').last().textContent(), /1 test fejlede/);
-    await page.click('#tab-activity'); await page.locator('.activity-entry.kind-check', { hasText: 'Siden blev vist · 1 fejl i siden: Kunne ikke hente lokalerne' }).waitFor(); await page.click('#tab-preview');
+    // Resultatkortet kvitterer kun for ændringerne; de faktiske kontroller står i Aktivitet (5ffe905).
+    const review = page.locator('#run-review');
+    assert.match(await review.locator('.result-receipt').textContent(), /fil ændret|filer ændret/);
+    await page.click('#tab-activity');
+    // Forhåndsvisningen: Aura genindlæser siden efter opgaven og siger, hvad den svarede. docs/decisions.md.
+    await page.locator('.activity-entry.kind-check', { hasText: 'Siden blev vist · 1 fejl i siden: Kunne ikke hente lokalerne' }).waitFor({ timeout: 30000 });
+    // Kommandoen: afslutningskoden og de sidste linjer af output.
+    const kommando = page.locator('.activity-entry.kind-tool').filter({ hasText: 'echo "1 test fejlede" && exit 1' }).first();
+    await kommando.waitFor({ timeout: 30000 });
+    assert.match(await kommando.locator('.activity-state').innerText(), /afslutningskode 1/);
+    await kommando.locator('summary', { hasText: 'Vis output' }).click();
+    assert.match(await kommando.locator('pre').first().textContent(), /1 test fejlede/);
+    await page.click('#tab-preview');
     await capture('resultat-kontroller.png');
     passed('Kontrollerne viser faktiske resultater: sidens konsolfejl fra forhåndsvisningen og kommandoens afslutningskode og output');
 
@@ -119,15 +122,25 @@ const helpers = require('./ui-test-helpers.cjs');
     await send('INSTALLER en pakke');
     const install = page.locator('#approvals .approval').first(); await install.waitFor({ timeout: 90000 });
     assert.match(await install.locator('.approval-hints').innerText(), /Installerer pakker fra internettet/);
-    await install.locator('button', { hasText: 'Afvis med en besked' }).click();
+    // Afvis med en besked ligger bag Flere valg (ui/approvals.js:143-176). Hjælperen folder ud, hvis knappen er skjult.
+    await helpers.approve(page, 'Afvis med en besked', { scope: install });
     assert.equal(await page.evaluate(() => document.activeElement.tagName), 'TEXTAREA');
     await install.locator('textarea').fill('Brug ikke en pakke. Skriv funktionen selv.');
     await install.locator('button', { hasText: 'Afvis og send beskeden' }).click();
     await page.locator('#messages .assistant', { hasText: 'Forstået. Jeg skriver funktionen selv uden en pakke.' }).waitFor({ timeout: 90000 });
     await idle();
     assert.ok(requests.some(body => JSON.stringify(body.messages).includes('with the following feedback: Brug ikke en pakke. Skriv funktionen selv.')));
-    assert.match(await page.locator('#messages .answer-record').last().textContent(), /Du afviste, at AI’en må køre en kommando: npm install leftpad-ukendt, og skrev: Brug ikke en pakke/);
-    assert.notEqual(await review.locator('h3').textContent(), 'Du afviste en handling, så AI’en stoppede');
+    // Kvitteringen i samtalen er kort. Hvilken handling der blev afvist, og hvad brugeren skrev, står i Aktivitet (5ffe905).
+    assert.match(await page.locator('#messages .answer-record').last().textContent(), /Du afviste 1 handling og skrev: Brug ikke en pakke/);
+    await page.click('#tab-activity');
+    const afvist = page.locator('.activity-entry.kind-approval').filter({ hasText: 'npm install leftpad-ukendt' }).last();
+    await afvist.waitFor({ timeout: 30000 });
+    assert.match(await afvist.locator('.activity-state').innerText(), /Du afviste den med en besked/);
+    assert.match(await afvist.locator('.activity-detail').innerText(), /Din besked: Brug ikke en pakke/);
+    await page.click('#tab-preview');
+    // Opgaven fortsatte, så kortet er kvitteringen uden overskrift, ikke afvisningskortet. textContent læser
+    // også et skjult kort, så påstanden ikke afhænger af, om kortet er fremme.
+    assert.doesNotMatch(await review.textContent(), /Du afviste en handling/);
     passed('Afvis med en besked giver AI’en beskeden som rettelse, og opgaven fortsætter');
 
     // Afvis uden besked: opgaven stopper, og kortet siger, hvad der blev afvist, med en vej videre.
@@ -152,7 +165,8 @@ const helpers = require('./ui-test-helpers.cjs');
     await review.locator('h3', { hasText: 'Du stoppede opgaven' }).waitFor();
     assert.match(await review.innerText(), /AI’en nåede at ændre 1 fil:\s*public\/stop\.html/);
     assert.equal(await page.inputValue('#prompt'), 'STOP undervejs');
-    await review.locator('button', { hasText: 'Fortryd det, den nåede' }).click();
+    // Fortryd hedder nu Fortryd opgaven og ligger bag Flere valg på resultatkortet (5ffe905).
+    await (await helpers.resultOption(page, 'Fortryd opgaven')).click();
     await page.waitForFunction(() => !document.querySelector('#restore-confirm').disabled); await page.click('#restore-confirm');
     await page.waitForSelector('#restore-dialog:not([open])', { state: 'attached' });
     await assert.rejects(fs.stat(path.join(project, 'public/stop.html')), 'filen fra den stoppede opgave er fortrudt');

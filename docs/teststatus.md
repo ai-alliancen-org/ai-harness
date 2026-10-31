@@ -1,8 +1,133 @@
 # Teststatus før invitation
 
-Senest kontrolleret 29. oktober 2026. Afsnittene er daterede, så tidligere begrænsninger kan læses i deres sammenhæng. Dette er status for den aktuelle arbejdsmappe, ikke en erklæring om, at alle installationsfiler eller modeller er klar. Særskilt godkendte Git-handlinger, udgivelser og GitHub-kørsler fremgår af de enkelte afsnit.
+Senest kontrolleret 31. oktober 2026. Afsnittene er daterede, så tidligere begrænsninger kan læses i deres sammenhæng. Dette er status for den aktuelle arbejdsmappe, ikke en erklæring om, at alle installationsfiler eller modeller er klar. Særskilt godkendte Git-handlinger, udgivelser og GitHub-kørsler fremgår af de enkelte afsnit.
 
 [Gennemgangen før offentlig beta](offentliggoerelse.md) samler historik- og logkontrol samt de lokale prøver af README, hjemmeside og udgivelseskontrol. Den offentliggør ikke appen og ændrer ikke installationsstatus nedenfor.
+
+## Forhåndsvisningskontrollen genoprettet, to fejl i opsætningen og en oprydning i godkendelsesprøven · 31. oktober 2026
+
+### Forhåndsvisningskontrollen var væk, mens beslutningen stod der
+
+`docs/decisions.md` har siden 6. oktober krævet: "efter en opgave genindlæser Aura siden og siger, om den blev vist, og om den skrev fejl i konsollen." Det holdt op med at ske den 23. oktober. `5ffe905` lagde resultatkortet om og slettede samtidig `runPreviewCheck` i `ui/app.js`. Alt det andet blev stående: handleren `preview:check` i `main.cjs:740`, som selv skriver posten i Aktivitet, kanalen i `preload.cjs:95`, visningen i `ui/workspace.js` og beslutningen i loggen. Kun udløseren manglede, så der aldrig kom en post at læse.
+
+**Rettelsen** er derfor lille: `checkPreview` er tilbage i `ui/app.js`, nu med én kontrol pr. opgave (`v.checkedTask`) i stedet for én pr. gentegning af kortet. Kontrollen hører fortsat til Aktivitet, som `5ffe905` besluttede; resultatkortet kvitterer kun for ændringerne.
+
+**Ny vagt mod klassen:** `desktop/tests/preload-channels.test.cjs` kræver, at hver af de 144 IPC-kanaler i `preload.cjs` har en kalder i `ui/`. Den måler brugen, ikke erklæringen. `tests/key-window.test.cjs:398` kontrollerer til sammenligning, at tre kanaler ER erklæret i både main og preload, og kunne derfor ikke fange det her. Vagten fyrer på HEAD og navngiver `previewCheck`. Den afslørede desuden en femte død kanal, `keyCancel` (`main.cjs:627`), som står på undtagelseslisten med en skreven begrundelse, så listen ikke kan vokse i stilhed.
+
+### verify-approvals var ikke en forældet påstand, men fire
+
+Prøven havde stået rød siden 23. oktober og var afskrevet som forældet, blandt andet af mig i afsnittet nedenfor. Fordi den fejlede på den allerførste påstand, kunne ingen se, at der lå tre mere bagved. Alle fire kom af samme `5ffe905`:
+
+| Påstand | Ændringen | Skrevet om til |
+|---|---|---|
+| `h3` "Prøv resultatet i forhåndsvisningen" og `.check-list` | Kontroller flyttet til Aktivitet | `.result-receipt` på kortet, kontrollerne i Aktivitet |
+| Direkte klik på "Afvis med en besked" | Lagt bag "Flere valg" | `helpers.approve` med `scope` |
+| "Du afviste, at AI'en må køre en kommando: …" | Kvitteringen forkortet | Kort kvittering **og** Aktivitet med kommando og besked |
+| "Fortryd det, den nåede" | Hedder "Fortryd opgaven", bag "Flere valg" | `helpers.resultOption` |
+
+De resterende ti tekstpåstande blev kontrolleret mod appens kilde frem for én kørsel ad gangen; ni fandtes stadig.
+
+### To fejl i opsætningen
+
+**Fortsæt-knappen døde af en fremmed samtales fejl.** Fejlgrenen i `ui/app.js` ryddede fire ting under ét, for enhver samtales fejl, uanset hvilken forbindelse der fejlede. De har hver sin rigtige betingelse og er nu delt op: `acceptedFingerprint` ubetinget, `pendingSend` efter den valgte forbindelse eller den åbne samtale, `verifiedConnection` kun når det er den kontrollerede, der fejlede, og `++setupGeneration` kun på trinnet "saved" for opsætningens egen forbindelse. Uden opdelingen knækker `stillGuided` i `connectionSaved`, og den guidede opsætning når aldrig til "saved": brugeren får "Nøglen er kontrolleret og gemt krypteret." og ingen Fortsæt-knap.
+
+**Kontrollér adgang svarede aldrig fra Opsætning.** `!setupActive` blev til `$('#connections-dialog').open`. Beskyttelsen var ægte: lukkes dialogen undervejs, flytter `#connection-feedback` med formularen ind i opsætningen, og kontrolbeskeden ville lande midt i dens eget forløb. Men den var for bred, fordi `#setup-manage` åbner dialogen uden at rydde `setupActive`. `git log -L` viser, at linjen kom ind i `e75a1b6` samtidig med, at svaret blev asynkront.
+
+**Vagt:** `desktop/tests/setup-error-scope.test.cjs`, 7 prøver, hvoraf **4 fejler på HEAD**. De tre, der består begge veje, er modværnene: at attrappen overhovedet kan nå trinnet "saved", at beskyttelsen stadig virker, når den kontrollerede forbindelse fejler, og at en igangværende kontrol ikke sættes grøn bagefter.
+
+### Forhåndsvisningen afgjorde sin kontekst ud fra det forrige dokument
+
+`npm run test:chat` havde stået rød siden 23. oktober. Årsagen er fundet og målt i den rigtige app, ikke læst: `core/preview-session.cjs` afgjorde en anmodnings kontekst ud fra iframens **forrige** dokument. Tilkobler man sin egen udviklingsserver, står `frame.url` stadig på den statiske `aura-preview`-side, som `preview:attach` netop har afregistreret. Opslaget gav `null`, anmodningen blev annulleret i `onBeforeRequest`, og grenen, der ville have virket, blev aldrig nået.
+
+Brugeren så en tom ramme, statusteksten "Tilsluttet lokal server" og ingen fejlbesked. Målt: `net::ERR_BLOCKED_BY_CLIENT` på `subFrame`, mens `preview.diagnostic` var tom. Fejlen kom med `5ffe905`; `git blame` giver det commit på hele `context()`.
+
+**Rettelsen er ikke den oplagte.** Det første forslag indsatte en ny gren før frame-URL-grenen. En skeptiker målte i rigtig Electron, at den åbner et hul: svarer den tilkoblede server `302` til en anden adresse, melder Electron `initiatorOrigin: harness://app` for omdirigeringens hop, og projekt A's server kunne dermed lægge et andet projekts lokale tjeneste i forhåndsvisningen med en almindelig `Location`-header. Det er præcis det, kommentaren i filen lover aldrig må ske. Den valgte form lader i stedet en kendt frame-origin vinde og fjerner `|| details.referrer`, så kun forælderens URL kan afgøre en rammenavigation. Den er fail-closed.
+
+**Vagt:** en ny prøve i `desktop/tests/project-runtime.test.cjs` med fire sager. Den fyrer både på HEAD ("tilkoblingen skal kunne vises") og på det forkastede forslag ("en omdirigering må ikke skifte arbejdsområde").
+
+**Ikke rettet, og værd at tage stilling til:** blokeringen er stadig tavs, når konteksten ikke findes, altså netop i denne fejlklasse, fordi `preview-session.cjs` kun diagnosticerer, når der ER en kontekst. `#preview-status` siger desuden "Tilsluttet lokal server", så snart `src` er sat, uden at nogen har set rammen indlæse. Og `installSession` tager allerede en `resolveFrame`-krog, som `main.cjs` aldrig sender; knyttes den på, behøver ingen gren at tro på måladressen.
+
+### Hvor det står
+
+**Enhedstestet:** 717 af 717 prøver består med Node 22.23.3. De nye er `preload-channels` (3), `setup-error-scope` (7) og en sag i `project-runtime`.
+
+**Afprøvet på konkret materiale:** **alle tre tidligere røde Electron-suiter består nu.** `npm run test:approvals` med alle otte checkpoints, heriblandt `Siden blev vist · 1 fejl i siden: Kunne ikke hente lokalerne` i Aktivitet, som er beviset for, at forhåndsvisningskontrollen kører igen i den rigtige app. `npm run test:planning` består uændret. `npm run test:chat` består efter rettelsen af kontekstopslaget.
+
+**Målt af agenter, ikke gentaget af mig:** `.open`-rettelsen til Kontrollér adgang er målt i den rigtige Electron-app af to uafhængige agenter, som også viste, at en ren sletning af `!setupActive` ville skrive kontrolbeskeden ind i `#setup-provider-body`. Jeg har ikke selv gentaget den måling; ingen Electron-suite rører `#connection-test`.
+
+**Ikke verificeret:** Fortsæt-rettelsen er ikke set i den rigtige app, kun i prøvens DOM. Ingen pakning er bygget, og de øvrige Electron-suiter er ikke kørt igen i denne omgang.
+
+**Forbehold om maskinen:** alle kørsler denne dag skete med belastningstal mellem 126 og 464 på 10 kerner, fra Xcode-kompileringer og andre processer uden for dette projekt. `test:approvals` bestod ved 464, så dens resultat er ikke et heldigt tidsvindue.
+
+### Rettelser til tidligere påstande i dette dokument
+
+- **Afsnittet 29. oktober skrev om de tre røde suiter:** "Alle tre fejl er tidsudløb … og alle tre venter på, at AI-agenten leverer noget." Det var forkert for mindst to af dem. `test:approvals` ventede på en `h3`, der var fjernet seks dage før; agenten havde leveret. `test:planning` består nu uændret. Playwright rapporterer en manglende vælger som et tidsudløb, og jeg læste det som et agentproblem.
+- **Samme afsnit kaldte `test:approvals` forældet.** Den var det kun delvist. Den fangede også, at forhåndsvisningskontrollen var forsvundet, og stod rød i otte dage med den besked.
+- **Omlægningen af resultatkortet var dokumenteret.** Afsnittet 27. oktober (`Prøvegrundlaget ryddet`) beskriver den som bevidst og nævner hjælperne `approve`, `awaitApproval` og `resultOption`. `verify-approvals.cjs` blev bare ikke taget med i den oprydning.
+
+## Tre fejl fra gennemgangen: lukningsvagt, dobbelt lyskant og gættet kontekstvindue · 29. oktober 2026
+
+Tre af de ni huller uden en beslutning bag sig er lukket. Hver diagnose blev efterprøvet af to skeptikere med hver sin linse, og begge fandt reelle fejl i de første forslag; rettelserne nedenfor er de korrigerede.
+
+### #33: et svar fra nøglevinduet skrev i en lukket dialog
+
+**Fejlen.** `desktop/ui/hosting.js` havde ingen lukningsvagt. Lukkede brugeren Sikkerhedskopi-dialogen, mens nøglevinduet stod åbent, blev kvitteringen "Konto kontrolleret og adgang gemt krypteret." og en frisk statushentning alligevel skrevet i et vindue, der ikke var synligt, og det låste felt blev genaktiveret. Tokenet gik ikke tabt; `main.cjs` gemmer det uafhængigt af dialogen.
+
+**Rettelsen.** Mønsteret fandtes i forvejen i søstermodulet `ui/deployment.js`, som kalder samme IPC-kanal: et tællenummer, der øges ved åbning og ved lukning, og et `assertCurrent`, der kasserer et svar fra en lukket dialog. `hosting.js` bruger nu præcis det, også i `poll`s fejlgren.
+
+**Adfærdsændring, du skal kende.** Lukkes dialogen i det korte øjeblik, før `cancelLogin` er afgjort, åbnes nøglevinduet slet ikke. Før åbnede det efter lukningen.
+
+**Enhedstestet:** ny `desktop/tests/hosting-dialog.test.cjs`, 3 prøver. Den kører den faktiske `ui/hosting.js` i en lille DOM og fastholder, at nøglevinduet FAKTISK blev kaldt, før dialogen lukkes. Uden den påstand bestod prøven, uden at det sene svar nogensinde opstod, altså af den forkerte grund; det var skeptikerens fund. Kørt mod HEAD fejler den med netop den rigtige tekst.
+
+**Afprøvet på konkret materiale:** `npm run test:key-window` og `npm run test:hosting` består. Det normale forløb med dialogen åben skriver stadig kvitteringen og viser "testbruger" i `#hosting-status`.
+
+**Ikke verificeret:** at en bruger i praksis kan nå at lukke dialogen. Nøglevinduet er `modal: true`, men oprettes med `show: false`, så hovedvinduet er aktivt i et kort interval. Intervallet er ikke målt. I prøvelaget er fejlen uafhængig af timing.
+
+### #18: to konkurrerende lyskanter om skrivefeltet
+
+**Fejlen.** `.composer.is-working` i `ui/styles.css` lagde en anden, pulserende kant om skrivefeltet ved siden af metalkanten, og `ui/app.js` tændte den på `running`. Metalkanten slukker i tilstanden `waiting`, som `DESIGN.md` foreskriver, men klassen blev stående, så feltet pulserede videre, netop mens godkendelseskortet skulle stå alene.
+
+**Rettelsen.** Reglen og togglen er væk. `@keyframes composer-working` bliver stående, fordi forhåndsvisningens mærke bruger den. Der er ikke tilføjet CSS for `waiting` eller `idle`: at de ingen kant har, er det besluttede.
+
+**Enhedstestet:** ny `desktop/tests/composer-edge.test.cjs`, 3 prøver. Den måler reglen og ikke navnet: enhver regel på selve skrivefeltet med en animation fanges. Mit første forslag låste fraværet af en bestemt selektor; skeptikeren viste, at det både gav falsk rød på en korrekt eksplicit `waiting`-regel og kunne omgås med en omdøbt dublet. Den nye vagt er afprøvet mod begge: den fejler på HEAD og på `#chat-form.is-arbejder`.
+
+**Afprøvet på konkret materiale:** målt i rigtig Electron med det rigtige stilark. Tilstanden sættes direkte, så det måler CSS'en og ikke en AI-opgave.
+
+| Tilstand | Ringens opacity | Animation på selve feltet, HEAD | Efter rettelsen |
+|---|---|---|---|
+| idle | 0 | none | none |
+| working | 1 (drejer) | none | none |
+| quiet | 0,55 (står stille) | none | none |
+| waiting | 0 | none | none |
+| waiting med den gamle klasse | 0 | **composer-working** | none |
+
+Sidste række er fejlen: ringen er væk, som beslutningen kræver, mens feltet selv pulserer videre.
+
+**Ikke verificeret:** kanten er ikke set under en rigtig AI-opgave. `npm run test:preview-edit` kan ikke nå dertil; den stopper tidligere på playwright 1.64's ændrede tastaturhåndtering.
+
+### #21: en procent regnet mod et gættet kontekstvindue
+
+**Fejlen.** Oplyste hverken kataloget eller tabellen modellens kontekstvindue, brugte `modelLimits` et reservetal på 32.768, og statuslinjen viste "28.000 af 32.768 tokens kontekst, altså 85,4 %" uden at sige, at nævneren var gættet. Advarslen "Gør den kortere" stod som synlig tekst i første lag. Det rammer Ollama altid, selvhostede OpenAI-kompatible servere næsten altid og Azure-udrulninger med eget navn, altså den almindelige vej for lokale modeller.
+
+Den ærlige tekst fandtes allerede: `context-usage.cjs` sætter `unknown-limit`, når grænsen mangler, og `context-display.js` har sætningen "Grænsen er ikke oplyst for denne model". Men `limit` var aldrig falsy, så den gren kunne ikke nås fra appen. Det var en vagt, der ikke kunne fyre.
+
+**Rettelsen.** `connections.cjs` har nu `documentedContext` som eneste kilde til, hvad "oplyst" betyder, og en `contextLimit`, der giver `null`, når vinduet ikke er oplyst. `chat-session.cjs` sender den i stedet for reservetallet. Reservetallet bliver stående til motorens komprimering, som `docs/decisions.md` besluttede.
+
+**Funktion, der bevidst forsvinder:** advarslen nær grænsen vises ikke længere for modeller uden oplyst vindue, fordi den var regnet af et gæt. Det er skrevet ind i beslutningsloggen.
+
+**Enhedstestet:** ny `desktop/tests/context-limit.test.cjs`, 4 prøver. Den dækker tallet, hele kæden frem til teksten og leddet i `chat-session`, som ingen anden prøve ser. Skeptikeren viste, at mit første forslag kun afprøvede hjælpefunktionen: rulles linjen i `chat-session` tilbage, mens funktionen bliver stående, fejlede intet. Den nye vagt er afprøvet mod netop den halve tilbagerulning og fejler på den.
+
+**Afprøvet på konkret materiale:** `npm run test:chat-feedback` består med den nye påstand. Prøvens model oplyser ikke sit vindue, så detaljerne i den rigtige brugerflade viser nu "Seneste modelkald brugte 20 tokens kontekst. Grænsen er ikke oplyst for denne model." med en rigtig måling. Advarslen nær grænsen afprøves fortsat med syntetiske tal mod 200.000.
+
+### Samlet
+
+**Enhedstestet:** 706 af 706 prøver består med Node 22.23.3. De ti nye er de tre vagter.
+
+**Afprøvet på konkret materiale:** `test:key-window`, `test:hosting` og `test:chat-feedback` består i Electron, og skrivefeltets kant er målt i den rigtige app.
+
+**Ikke kørt:** ingen pakning, og ingen af de tre røde suiter fra 29. oktober er forsøgt igen.
+
+**Nyt fund, ikke rettet:** den samme manglende lukningsvagt findes i `desktop/ui/app.js` omkring `keyConnection` og `connectionSaved`, altså den oftere brugte vej til nøglevinduet for AI-nøgler. Den stod ikke i gennemgangens fjorten huller og er ikke rørt.
 
 ## Pakningshul i forslag 39: låsefilen fulgte ikke med i app.asar · 29. oktober 2026
 

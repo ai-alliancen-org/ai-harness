@@ -615,7 +615,13 @@ $('#connection-use').onclick = () => action(async () => {
 });
 $('#connection-test').onclick = () => action(async () => {
   const id = editingConnection; $('#connection-test').disabled = true; $('#connection-feedback').textContent = 'Kontrollerer den gemte forbindelse …';
-  try { const result = await checkConnection(id); if (result && !setupActive && id === $('#connection-id').value) $('#connection-feedback').textContent = result.detail; }
+  // Svaret skrives kun i den åbne dialog. Lukkes den undervejs, flytter #connection-feedback med formularen ind
+  // i Opsætning (moveConnectionForm), og kontrolbeskeden ville lande midt i opsætningens eget forløb.
+  // .open er kun nok, fordi formularen altid er hjemme, når knappen kan klikkes: editConnection kalder
+  // moveConnectionForm(false), før den viser #connection-edit, og #connections-button kalder connectionView('list')
+  // før showModal(). Flyttes en af de to, skal vagten strammes. Resultatet ligger i connectionChecks og vises
+  // igen ved næste åbning. !setupActive var for bredt: dialogen kan også åbnes fra Opsætning med #setup-manage.
+  try { const result = await checkConnection(id); if (result && $('#connections-dialog').open && id === $('#connection-id').value) $('#connection-feedback').textContent = result.detail; }
   finally { $('#connection-test').disabled = false; }
 });
 async function removeSavedConnection(id) {
@@ -869,8 +875,8 @@ function applyRunning() {
   clearInterval(runTimer); runTimer = running ? setInterval(renderStatus, 1000) : null;
   // Den tomme forhåndsvisning ånder roligt, mens AI'en arbejder. Animationen slås fra ved reduceret bevægelse.
   $('#preview-empty').classList.toggle('is-working', busy);
-  // Arbejdsstatus om skrivefeltet. Mærket på en vist forhåndsvisning sættes i live-work.js sammen med statusteksten.
-  $('#chat-form').classList.toggle('is-working', running);
+  // Skrivefeltets arbejdskant sættes kun ét sted: renderStatus skriver data-work-state på #chat-form nedenfor.
+  // Mærket på en vist forhåndsvisning sættes i live-work.js sammen med statusteksten.
   if (!running) $('#preview-working').hidden = true;
   window.chatMaterials?.sync();
   // En samtale, der ikke arbejder, viser sin egen seneste status, fx Stoppet eller Fejl. Linjen over skrivefeltet siger, hvis en anden arbejder.
@@ -980,8 +986,22 @@ window.harness.onEvent(event => {
   if (['engine.error', 'session.error'].includes(event.type)) {
     if (active && !$('#prompt').value) $('#prompt').value = v.lastSentText;
     if (['key', 'access', 'rejected', 'notfound'].includes(event.failure?.kind)) {
-      invalidateConnection(v.runConnection, event.failure?.message || event.message || 'Udbyderen afviste opgaven. Kontrollér adgang og model.');
-      verifiedConnection = ''; ++setupGeneration; acceptedFingerprint = null; pendingSend = null; setupControls();
+      // De fire sideeffekter har hver sin rigtige betingelse. En fremmed samtales fejl må ikke rydde en kontrol
+      // eller en bekræftelse, der hører til en anden forbindelse.
+      const failed = v.runConnection;
+      invalidateConnection(failed, event.failure?.message || event.message || 'Udbyderen afviste opgaven. Kontrollér adgang og model.');
+      acceptedFingerprint = null;
+      // Samtykkelåsen hører til den forbindelse, afsendelsen går til. Med én gemt forbindelse er en
+      // baggrundssamtales fejl altid på netop den.
+      if (active || (failed && failed === $('#connection-select').value)) pendingSend = null;
+      // Kontrollen gælder én forbindelse. Fejler en anden, står den stadig kontrolleret.
+      if (failed && failed === verifiedConnection) verifiedConnection = '';
+      // Tælleren betyder kun, at et svar på vej til opsætningen er forældet. Dens eneste sårbare læser er en
+      // testSetupConnection i gang, og den kan kun startes fra trinnet "saved". Øges den uden for det trin,
+      // knækker den stillGuided i connectionSaved, så den guidede opsætning aldrig når til "saved" og Fortsæt
+      // aldrig vises, selv om nøglen er gemt og kontrolleret.
+      if (failed && setupActive && setupStep === 'saved' && failed === $('#setup-connection').value) ++setupGeneration;
+      setupControls();
     }
     if (v.running) setStatusDetail('Der opstod en fejl. AI’en stopper.', v);
   }
@@ -1876,6 +1896,28 @@ function resultActions(result, v = view) {
   if (undo) { const menu = node('details', undefined, 'result-options'); menu.append(node('summary', 'Flere valg'), undo); actions.append(menu); }
   return actions;
 }
+// Kontrol af forhåndsvisningen efter en opgave, jf. docs/decisions.md: Aura genindlæser siden én gang og siger,
+// om den blev vist, og om den skrev fejl i konsollen. Aura klikker ikke og afprøver ikke funktioner. Resultatet
+// skrives i Aktivitet af hovedprocessens preview:check, så her står kun selve kontrollen.
+async function checkPreview(result) {
+  const root = current?.workspaceRoot, chat = view.id;
+  // En opgave, der sluttede i en anden samtale, kontrolleres i sin egen forhåndsvisning, ikke i den åbne.
+  if (result.chat && result.chat !== chat) return;
+  const moved = () => current?.workspaceRoot !== root || view.id !== chat;
+  // Ved første udkast starter den statiske forhåndsvisning først, når filerne er læst. Aura spørger, før den giver op.
+  if (!current?.previewURL) { try { revision = await call('revision') || revision; } catch {} }
+  if (moved()) return;
+  const url = current?.previewURL;
+  if (!url) return;
+  const since = Date.now();
+  try { revision = await call('revision') || revision; } catch {}
+  if (moved()) return;
+  // Siden genindlæses én gang, og Aura venter lidt på fejl, der først kommer efter indlæsningen.
+  await new Promise(resolve => { const frame = $('#preview'); let timer; const finish = () => { clearTimeout(timer); frame.removeEventListener('load', finish); resolve(); }; frame.addEventListener('load', finish); timer = setTimeout(finish, 10000); frame.src = url; });
+  await new Promise(resolve => setTimeout(resolve, 1500));
+  if (moved()) return;
+  try { await call('previewCheck', { since }); } catch { /* Kontrollen er en oplysning, ikke en betingelse for resultatet. */ }
+}
 const targetLine = (box, v = view) => { if (v.lastTarget) box.append(node('p', `Mål: ${v.lastTarget}`, 'review-target')); };
 function renderRunReview(result, v = view) {
   const box = v.review; box.replaceChildren();
@@ -1955,6 +1997,8 @@ function renderRunReview(result, v = view) {
   box.classList.toggle('is-reviewed', v.reviewedTask === result.task);
   box.append(node('p', result.files.length ? `${result.files.length} ${result.files.length === 1 ? 'fil ændret' : 'filer ændret'}${saved ? ' · Gemt' : ''}` : 'Opgaven er afsluttet uden filændringer.', 'result-receipt'));
   if (result.skipped) box.append(node('p', 'Nogle filer er udeladt af oversigten på grund af filtype eller størrelse.', 'hint'));
+  // Én kontrol pr. opgave: kortet tegnes om ved hver hændelse, og siden må kun genindlæses én gang.
+  if (result.files.length && result.status !== 'error' && v.checkedTask !== result.task) { v.checkedTask = result.task; checkPreview(result); }
   const actions = resultActions(result, v);
   if (actions.children.length) box.append(actions);
 }
