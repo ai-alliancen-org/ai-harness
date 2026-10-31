@@ -4,6 +4,24 @@ Senest kontrolleret 31. oktober 2026. Afsnittene er daterede, så tidligere begr
 
 [Gennemgangen før offentlig beta](offentliggoerelse.md) samler historik- og logkontrol samt de lokale prøver af README, hjemmeside og udgivelseskontrol. Den offentliggør ikke appen og ændrer ikke installationsstatus nedenfor.
 
+## Offentlig desktopbeta 0.7.0-beta.1 · 31. oktober 2026
+
+**Udgivet og observeret.** [Aura 0.7.0-beta.1](https://github.com/ai-alliancen-org/ai-harness/releases/tag/v0.7.0-beta.1) og [downloadsiden](https://ai-alliancen-org.github.io/ai-harness/desktop.html) er offentligt tilgængelige uden GitHub-login. Letvægtstagget `v0.7.0-beta.1` peger på commit `fb6b0f0`, som kun ændrer udgivelsesnoter oven på `9091f2a`, pakkerne er bygget fra. Udgivelsen indeholder de fem programfiler, `release.json` og `SHA256SUMS.txt`.
+
+**Signering og notarisation.** Begge Mac-apps er signerede med Developer ID Application: mekbas IVS (2UX98897JW) med sikker tidsstempling og Hardened Runtime. Forløbet fulgte vejledningens fire trin, altså **seks indsendelser til Apple**, ikke fire: først de to første DMG'er, så stapling af billetten på hver `.app`, så ompakning med `--prepackaged`, og til sidst de fire endelige filer. Alle seks blev godkendt.
+
+Stablingen er det trin, der er let at springe over, og målingen viser hvorfor. Før: `spctl` svarede `rejected · source=Unnotarized Developer ID` på selve appen, selv om DMG'en var godkendt. Efter: `accepted · source=Notarized Developer ID`, og `syspolicy_check distribution` meldte "App passed all pre-distribution checks and is ready for distribution." Billetten blev kontrolleret igen i de ompakkede filer ved at udpakke ZIP'erne og køre `stapler validate` på appen indeni, ikke på diskbilledet.
+
+**Kontrolleret efter offentliggørelsen, uden login:**
+- Downloadsiden svarer HTTP 200 og viser 0.7.0-beta.1 med tre installationsfiler.
+- Alle tre links peger på adresser med det rigtige versionstag, ikke på GitHubs midlertidige `untagged-…`.
+- Alle tre installationsfiler er hentet og deres SHA-256 stemmer med `SHA256SUMS.txt`.
+- Opdateringsfeedet er live for alle tre platforme: `updates/beta/darwin-arm64/beta-mac.yml`, `updates/beta/darwin-x64/beta-mac.yml` og `updates/beta/win32-x64/beta.yml`, alle med version 0.7.0-beta.1.
+
+**Godkendte GitHub-kørsler.** Brugeren gav udtrykkelig tilladelse til de to konkrete kørsler. *Offentliggør gennemgået desktopbeta* (kørsel 41205068082) kontrollerede tag, version, offentlig adgang, kladdens indhold, størrelser, SHA-256, SHA-512 og Mac-kvitteringer og hentede de faktiske filer, før den offentliggjorde. *Udgiv downloadside* byggede og udgav siden med opdateringsfeeds.
+
+**Ikke gjort:** installation og opdatering er ikke afprøvet på en anden computer end byggemaskinen. `test:package` er kun kørt på arm64-pakken. Windows-installationsfilen er usigneret og indholdskontrolleret mod den byggede app.
+
 ## Forhåndsvisningskontrollen genoprettet, to fejl i opsætningen og en oprydning i godkendelsesprøven · 31. oktober 2026
 
 ### Forhåndsvisningskontrollen var væk, mens beslutningen stod der
