@@ -65,7 +65,11 @@ Alle tre peger på commit `bc7bc35` med 193 filer i kildebeviset, 142 appfiler b
 
 **Kun `darwin-arm64` havde sit runtimebevis på forhånd.** De to andre manifester manglede `payloads.schemaVersion`, og `electron-builder.cjs` stopper pakningen på netop det. De er forberedt igen med `runtime:prepare`, som kun rydder `.runtime/<mål>` og derfor ikke rørte den runtime, prøverne kører på.
 
-**Ikke gjort:** signering og notarisation, `test:package` på x64- og Windows-pakken, og `release-site.cjs`. Windows-pakken er bygget på Mac og er fortsat uprøvet på Windows. Installationsfilerne ligger under `desktop/release/`, som er ignoreret i Git.
+`node scripts/release-site.cjs` er kørt på de fem samlede filer og meldte "5 faktiske installationsfiler med kontrolsummer. Ingen upload." Alle fem står med `notarized: false`, hvilket er det rigtige svar for usignerede pakker: scriptet tæller kun en kvittering med status Accepted, et indsendelses-id, en kontroldato og samme SHA-256 som filen.
+
+`node scripts/verify-download.cjs` består på den lokale downloadside: Aura-logo, favicon og touch-ikon matcher originalen, alle installationslinks virker, alle tre installationsfiler er hentet gennem en browser, og filnavne, størrelser og SHA-256 stemmer med mappens `release.json`. Både desktop- og mobilvisningen er kontrolleret. Intet er publiceret.
+
+**Ikke gjort:** signering og notarisation, og derfor heller ikke den fornyede kildekontrol, de signerede pakker kræver. `test:package` er kun kørt på arm64. Windows-pakken er bygget på Mac og er fortsat uprøvet på Windows. Ingen GitHub Actions-kørsel er startet. Installationsfilerne ligger under `desktop/release/`, som er ignoreret i Git.
 
 ### Hvor det står
 
