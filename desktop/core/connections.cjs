@@ -345,9 +345,12 @@ function effortLevels(connection, model) {
   const levels = Array.isArray(model.capabilities?.effort) ? model.capabilities.effort : known(connection, model)?.effort || [];
   return levels.filter(level => typeof level === 'string' && /^[a-z]{2,10}$/.test(level));
 }
+// Det kontekstvindue, udbyderen eller tabellen faktisk oplyser, eller null. Én kilde til, hvad "oplyst" betyder,
+// så modelLimits' reservetal og contextLimit aldrig kan komme ud af takt.
+const documentedContext = (connection, model) => model.limits?.context || known(connection, model)?.context || null;
 function modelLimits(connection, model) {
   const k = known(connection, model);
-  const context = model.limits?.context || k?.context || 32768;
+  const context = documentedContext(connection, model) || 32768;
   // Ukendte modeller får et forsigtigt loft. En tænkende model har brug for plads til både tanker og svar, og en lokal
   // Ollama-model kan bruge op til halvdelen af sin kontekst.
   const fallback = connection.kind === 'ollama' ? Math.floor(context / 2) : reasons(connection, model) ? 32000 : 4096;
@@ -355,6 +358,14 @@ function modelLimits(connection, model) {
   const output = Math.min(model.limits?.output || k?.output || fallback, OUTPUT_CEILING, Math.floor(context / 2));
   // OpenCode komprimerer ved limit.input minus en reserve; uden den ved konteksten minus svarloftet.
   return context > WORKING_WINDOW ? { context, output, input: Math.min(WORKING_WINDOW, context - output) } : { context, output };
+}
+// Kun et oplyst kontekstvindue må være nævner i en procent, brugeren ser. Oplyser hverken kataloget eller tabellen
+// det, er modelLimits' context Auras forsigtige reservetal, og grænsen er ukendt. Reserven bliver stående til
+// motorens egen komprimering; den må blot ikke fremstilles som en målt grænse.
+function contextLimit(connection, model) {
+  if (!documentedContext(connection, model)) return null;
+  const limits = modelLimits(connection, model);
+  return limits.input ?? limits.context;
 }
 function engineProvider(connection, model, gatewayURL, token) {
   assertSupported(connection);
@@ -364,4 +375,4 @@ function engineProvider(connection, model, gatewayURL, token) {
     options: { baseURL: gatewayURL, apiKey: token },
     models: { [model.id]: { name: model.name, tool_call: true, limit: modelLimits(connection, model), ...(usesResponses(connection) ? { options: { store: false, include: ['reasoning.encrypted_content'] } } : {}) } } };
 }
-module.exports = { definitions, accountPages, assertSupported, endpoint, normalize, cleanKey, redact, cortiName, requestJSON, listModels, routes, disclosure, engineProvider, modelLimits, effortLevels, reasons, priceFor, usesResponses, OUTPUT_CEILING, WORKING_WINDOW };
+module.exports = { definitions, accountPages, assertSupported, endpoint, normalize, cleanKey, redact, cortiName, requestJSON, listModels, routes, disclosure, engineProvider, modelLimits, contextLimit, effortLevels, reasons, priceFor, usesResponses, OUTPUT_CEILING, WORKING_WINDOW };

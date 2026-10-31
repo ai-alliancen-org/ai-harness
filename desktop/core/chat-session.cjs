@@ -414,9 +414,9 @@ class ChatSession {
         if (!this.engine.resumed) this.emit({ type: 'session.new' });
         this.log(this.engine.resumed ? { kind: 'session', title: 'AI-sessionen fortsætter', detail: 'Samme AI og samme samtale som sidst.', status: 'completed', task: this.task.id } : { kind: 'session', title: 'Ny AI-session', detail: this.engineConversation ? 'Den tidligere samtale følger med som kontekst.' : 'Plan og afklaring følger med.', status: 'completed', task: this.task.id });
       }
-      // Grænsen er Auras egen grænse for et kalds input, som motoren også komprimerer efter.
-      const contextLimits = connections.modelLimits(prepared.connection, prepared.model);
-      this.contextUsage.bind({ connectionID: prepared.connection.id || '', modelID: prepared.model.id, routeID: prepared.route?.id || '', engineID: contextEngine, sessionID: this.engine.session?.id || '', limit: contextLimits.input ?? contextLimits.context });
+      // Grænsen er Auras egen grænse for et kalds input, som motoren også komprimerer efter. Er kontekstvinduet
+      // ikke oplyst, sendes ingen grænse: statuslinjen siger det i stedet for at vise en procent af et reservetal.
+      this.contextUsage.bind({ connectionID: prepared.connection.id || '', modelID: prepared.model.id, routeID: prepared.route?.id || '', engineID: contextEngine, sessionID: this.engine.session?.id || '', limit: connections.contextLimit(prepared.connection, prepared.model) });
       // Fragmenterne bygges af den samme funktion igen, nu med den tidligere samtale, motoren faktisk gav. Afviger
       // summen fra den gennemgåede, sendes beskeden ikke; så er det viste og det sendte altid det samme.
       const appContext = composeAppContext({ prepared, project: prepared.project || this.project, plan: this.plan, planConversation: this.planConversation, dismissed: this.data.planOffersDismissed, handoff: this.engineConversation, surface: bench.surface });

@@ -78,7 +78,9 @@ const helpers = require('./ui-test-helpers.cjs');
     assert.match(await page.locator('#usage-status').textContent(), /20.*10/);
     // Kontekstmålingen står i statuslinjens detaljer med det faktisk målte kald, aldrig samtalens samlede forbrug.
     const kontekst = await page.locator('#usage-status').getAttribute('title');
-    assert.match(kontekst, /Seneste modelkald brugte 20 af [\d.]+ tokens kontekst/);
+    // Prøvens model oplyser ikke sit kontekstvindue, så der vises ingen procent af Auras reservetal.
+    assert.match(kontekst, /Seneste modelkald brugte 20 tokens kontekst/);
+    assert.match(kontekst, /Grænsen er ikke oplyst for denne model/);
     assert.match(kontekst, /ikke samtalens samlede forbrug/);
     assert.equal(await page.isVisible('#context-warning'), false, 'langt fra grænsen står der ingen advarsel i første lag');
     // Advarslen nær grænsen vises i den rigtige brugerflade med syntetiske tal; prøven kan ikke nå 200.000 tokens.

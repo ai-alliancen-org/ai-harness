@@ -1,14 +1,23 @@
 (() => {
   const $ = selector => document.querySelector(selector);
-  let review = null, creation = null, login = null, timer = null, focus = null, selected = false;
+  let review = null, creation = null, login = null, timer = null, focus = null, selected = false, session = 0;
+  // Nøglevinduet og browserloginet kan svare, efter dialogen er lukket. Samme lukningsvagt som i deployment.js:
+  // et svar fra en lukket dialog kasseres, så intet skrives i et vindue, brugeren ikke kan se.
+  const assertCurrent = token => { if (token !== session) throw Object.assign(Error('Dialogen er lukket.'), { stale: true }); };
   const view = window.ShareView;
   function rows(id, values) { $(id).replaceChildren(...values.flatMap(([label, value]) => { const dt = document.createElement('dt'), dd = document.createElement('dd'); dt.textContent = label; dd.textContent = value || 'Ikke oplyst'; return [dt, dd]; })); }
-  async function api(method, value) { const result = await window.harness[method](value); if (!result.ok) throw new Error(result.error); return result.value; }
+  async function api(method, value) {
+    const token = session; let result;
+    try { result = await window.harness[method](value); } catch (error) { assertCurrent(token); throw error; }
+    assertCurrent(token);
+    if (!result.ok) throw new Error(result.error); return result.value;
+  }
   async function act(fn) {
+    const token = session;
     $('#hosting-body').disabled = true; $('#hosting-feedback').textContent = '';
     try { await fn(); }
-    catch (error) { invalidate(); $('#hosting-target-section').hidden = false; $('#hosting-feedback').textContent = error.message; }
-    finally { $('#hosting-body').disabled = false; if (focus) { focus.scrollIntoView({ block: 'start' }); focus.focus({ preventScroll: true }); focus = null; } }
+    catch (error) { if (error.stale || token !== session) return; invalidate(); $('#hosting-target-section').hidden = false; $('#hosting-feedback').textContent = error.message; }
+    finally { if (token === session) { $('#hosting-body').disabled = false; if (focus) { focus.scrollIntoView({ block: 'start' }); focus.focus({ preventScroll: true }); focus = null; } } }
   }
   function invalidate() { review = null; $('#hosting-review-result').hidden = true; $('#hosting-ack').checked = false; $('#hosting-push').disabled = true; $('#hosting-target-section').hidden = false; $('#hosting-publication').hidden = false; $('#hosting-project-title').hidden = false; $('#hosting-review').hidden = !selected; $('#hosting-open').hidden = !selected; }
   async function refresh() {
@@ -35,11 +44,11 @@
       const result = await api('hostingPoll', id); if (login !== id) return;
       if (result.waiting) timer = setTimeout(() => poll(id), Math.max(1000, result.retryAfter));
       else { login = null; $('#hosting-device').hidden = true; invalidate(); await refresh(); $('#hosting-feedback').textContent = 'GitHub-adgangen er gemt krypteret. Hent konti og repositories for at fortsætte.'; }
-    } catch (error) { if (login === id) { await cancelLogin().catch(() => {}); $('#hosting-feedback').textContent = error.message; } }
+    } catch (error) { if (error.stale) return; if (login === id) { await cancelLogin().catch(() => {}); $('#hosting-feedback').textContent = error.message; } }
   }
-  const open = () => { creation = null; $('#hosting-create-confirm').hidden = true; $('#hosting-technical').open = false; $('#hosting-account').open = false; $('#hosting-dialog').showModal(); invalidate(); act(refresh); };
+  const open = () => { ++session; creation = null; $('#hosting-create-confirm').hidden = true; $('#hosting-technical').open = false; $('#hosting-account').open = false; $('#hosting-dialog').showModal(); invalidate(); act(refresh); };
   $('#setup-hosting').onclick = open; $('#publish-button').onclick = open;
-  $('#hosting-dialog').addEventListener('close', () => { cancelLogin().catch(() => {}); });
+  $('#hosting-dialog').addEventListener('close', () => { ++session; cancelLogin().catch(() => {}); });
   $('#hosting-login').onclick = () => act(async () => { const value = await api('hostingLogin'); login = value.id; $('#hosting-code').textContent = value.code; $('#hosting-device').hidden = false; timer = setTimeout(() => poll(value.id), value.retryAfter); });
   $('#hosting-browser').onclick = () => act(() => api('hostingBrowser'));
   $('#hosting-cancel').onclick = () => act(cancelLogin);
