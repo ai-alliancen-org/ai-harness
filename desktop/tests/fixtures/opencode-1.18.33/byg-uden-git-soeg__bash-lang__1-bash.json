@@ -1,0 +1,116 @@
+{
+ "opencode": "1.18.33",
+ "aura": "d816a9e",
+ "scenario": "byg-uden-git-soeg",
+ "outcome": "idle",
+ "case": "bash-lang",
+ "askIndex": 1,
+ "asksInStep": 1,
+ "layout": {
+  "mode": "build",
+  "git": false,
+  "copy": false,
+  "model": "kontraktmodel",
+  "worktree": "/",
+  "directory": "${ROOT}"
+ },
+ "sequence": [
+  "del:pending",
+  "spørg:bash",
+  "del:running",
+  "svar:once",
+  "del:running",
+  "del:completed"
+ ],
+ "request": {
+  "id": "per_1789f4d8b001jiSYvQ3qWGgbT1",
+  "sessionID": "ses_e8761014fffe7C0Smxj9vvHr14",
+  "permission": "bash",
+  "patterns": [
+   "npm install --no-audit --no-fund --prefer-offline",
+   "npm run build --if-present",
+   "node -e \"console.log(require('./package.json').name)\"",
+   "echo \"Bygget uden fejl i mappen $(pwd) med node $(node --version) og npm $(npm --version)\"",
+   "pwd",
+   "node --version",
+   "npm --version",
+   "cat build.log"
+  ],
+  "metadata": {
+   "command": "npm install --no-audit --no-fund --prefer-offline && npm run build --if-present && node -e \"console.log(require('./package.json').name)\" && echo \"Bygget uden fejl i mappen $(pwd) med node $(node --version) og npm $(npm --version)\" > build.log && cat build.log"
+  },
+  "always": [
+   "npm install *",
+   "npm run build *",
+   "node *",
+   "echo *",
+   "pwd *",
+   "npm --version *",
+   "cat *"
+  ],
+  "tool": {
+   "messageID": "msg_1789f4b8500144AZnIlP4ac3T1",
+   "callID": "kald-12-0"
+  }
+ },
+ "toolPartAtAsk": {
+  "status": "pending",
+  "tool": "bash",
+  "input": {}
+ },
+ "policyInput": {
+  "id": "per_1789f4d8b001jiSYvQ3qWGgbT1",
+  "sessionID": "ses_e8761014fffe7C0Smxj9vvHr14",
+  "permission": "bash",
+  "patterns": [
+   "npm install --no-audit --no-fund --prefer-offline",
+   "npm run build --if-present",
+   "node -e \"console.log(require('./package.json').name)\"",
+   "echo \"Bygget uden fejl i mappen $(pwd) med node $(node --version) og npm $(npm --version)\"",
+   "pwd",
+   "node --version",
+   "npm --version",
+   "cat build.log"
+  ],
+  "metadata": {
+   "command": "npm install --no-audit --no-fund --prefer-offline && npm run build --if-present && node -e \"console.log(require('./package.json').name)\" && echo \"Bygget uden fejl i mappen $(pwd) med node $(node --version) og npm $(npm --version)\" > build.log && cat build.log"
+  },
+  "always": [
+   "npm install *",
+   "npm run build *",
+   "node *",
+   "echo *",
+   "pwd *",
+   "npm --version *",
+   "cat *"
+  ],
+  "tool": {
+   "messageID": "msg_1789f4b8500144AZnIlP4ac3T1",
+   "callID": "kald-12-0"
+  },
+  "toolInput": {
+   "tool": "bash",
+   "input": {}
+  }
+ },
+ "recordedAura": {
+  "allowed": false,
+  "source": null,
+  "label": "Kommando: npm install --no-audit --no-fund --prefer-offline && npm run build --if-present && node -e \"console.log(require('./package.json').name)\" && echo \"Bygget uden fejl i mappen $(pwd) med node $(node --version) og npm $(npm --version)\" > build.log && cat build.log",
+  "target": "npm install --no-audit --no-fund --prefer-offline && npm run build --if-present && node -e \"console.log(require('./package.json').name)\" && echo \"Bygget uden fejl i mappen $(pwd) med node $(node --version) og npm $(npm --version)\" > build.log && cat build.log",
+  "match": {
+   "kind": "bash",
+   "command": "npm install --no-audit --no-fund --prefer-offline && npm run build --if-present && node -e \"console.log(require('./package.json').name)\" && echo \"Bygget uden fejl i mappen $(pwd) med node $(node --version) og npm $(npm --version)\" > build.log && cat build.log",
+   "cwd": "${ROOT}",
+   "input": {}
+  },
+  "persistable": true,
+  "projectFile": false,
+  "scratch": false,
+  "folder": null,
+  "blockedMode": false
+ },
+ "toolResult": [
+  "npm ERR! code ENOENT\nnpm ERR! syscall open\nnpm ERR! path ${ROOT}/package.json\nnpm ERR! errno -2\nnpm ERR! enoent ENOENT: no such file or directory, open '<sti fra optagemaskinen>'\nnpm ERR! enoent This is related to npm not being able to find a file.\nnpm ERR! enoent \n\nnpm ERR! A complete log of this r"
+ ]
+}

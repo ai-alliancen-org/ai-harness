@@ -1,0 +1,105 @@
+{
+ "opencode": "1.18.33",
+ "aura": "d816a9e",
+ "kilde": "M1-kontraktdesignets direkte.cjs (Auras isolatedEnv og engineConfig med ændrede regler, skills eller mapper). Kørt uden writePluginRuntime, så OpenCode hentede @opencode-ai/plugin fra npm (kritik K3)",
+ "eksperiment": "regler-uden-git",
+ "outcome": "idle",
+ "path": {
+  "home": "${BASE}/appdata/runtime/home",
+  "state": "${BASE}/appdata/runtime/state/opencode",
+  "config": "${BASE}/appdata/runtime/config/opencode",
+  "worktree": "/",
+  "directory": "${BASE}/Dokumenter/projekt"
+ },
+ "project": {
+  "id": "global",
+  "worktree": "/",
+  "time": {
+   "created": 1793024153411,
+   "updated": 1793024153411
+  },
+  "sandboxes": []
+ },
+ "asked": [
+  {
+   "step": "write-public-relativ-regel",
+   "permission": "edit",
+   "patterns": [
+    "${BASE:rel/}/Dokumenter/projekt/public/a.html"
+   ],
+   "always": [
+    "*"
+   ],
+   "metadata": {
+    "filepath": "${BASE}/Dokumenter/projekt/public/a.html"
+   }
+  },
+  {
+   "step": "write-src-absolut-regel",
+   "permission": "edit",
+   "patterns": [
+    "${BASE:rel/}/Dokumenter/projekt/src/b.js"
+   ],
+   "always": [
+    "*"
+   ],
+   "metadata": {
+    "filepath": "${BASE}/Dokumenter/projekt/src/b.js"
+   }
+  }
+ ],
+ "results": [
+  {
+   "step": "write-public-relativ-regel",
+   "status": "completed",
+   "output": "Wrote file successfully."
+  },
+  {
+   "step": "write-src-absolut-regel",
+   "status": "completed",
+   "output": "Wrote file successfully."
+  },
+  {
+   "step": "write-lib-uden-skraastreg-regel",
+   "status": "completed",
+   "output": "Wrote file successfully."
+  },
+  {
+   "step": "write-mappe-stjerne-regel",
+   "status": "completed",
+   "output": "Wrote file successfully."
+  }
+ ],
+ "files": [
+  "${BASE}/appdata/runtime/cache/",
+  "${BASE}/appdata/runtime/cache/opencode/",
+  "${BASE}/appdata/runtime/cache/opencode/bin/",
+  "${BASE}/appdata/runtime/config/",
+  "${BASE}/appdata/runtime/config/.gitignore 63",
+  "${BASE}/appdata/runtime/config/opencode/",
+  "${BASE}/appdata/runtime/config/opencode/.gitignore 63",
+  "${BASE}/appdata/runtime/data/",
+  "${BASE}/appdata/runtime/data/opencode/",
+  "${BASE}/appdata/runtime/data/opencode/log/",
+  "${BASE}/appdata/runtime/data/opencode/log/opencode.log 12976",
+  "${BASE}/appdata/runtime/data/opencode/opencode.db 249856",
+  "${BASE}/appdata/runtime/data/opencode/opencode.db-shm 32768",
+  "${BASE}/appdata/runtime/data/opencode/opencode.db-wal 1709832",
+  "${BASE}/appdata/runtime/data/opencode/repos/",
+  "${BASE}/appdata/runtime/home/",
+  "${BASE}/appdata/runtime/home/.npm/",
+  "${BASE}/appdata/runtime/home/.npm/_cacache/",
+  "${BASE}/appdata/runtime/home/.npm/_cacache/tmp/",
+  "${BASE}/appdata/runtime/home/.npm/_cacache/tmp/8b1fbbf4-02bf-4e37-bd0c-bc8d8bc3542d 1286262",
+  "${BASE}/appdata/runtime/home/.npm/_cacache/tmp/d9bc1ed5-7ad1-492a-bbb7-4e3383e87d1a 1444415",
+  "${BASE}/appdata/runtime/state/",
+  "${BASE}/appdata/runtime/state/opencode/",
+  "${BASE}/appdata/runtime/state/opencode/locks/",
+  "${BASE}/appdata/runtime/state/opencode/locks/80b0ce778eab03fa551e78cf6334ca36f1d2f609.lock/",
+  "${BASE}/appdata/runtime/state/opencode/locks/80b0ce778eab03fa551e78cf6334ca36f1d2f609.lock/heartbeat 0",
+  "${BASE}/appdata/runtime/state/opencode/locks/80b0ce778eab03fa551e78cf6334ca36f1d2f609.lock/meta.json 139",
+  "${BASE}/appdata/runtime/state/opencode/locks/c3ddf53b1eda05274b9b8dcefff0bc8cf56f695b.lock/",
+  "${BASE}/appdata/runtime/state/opencode/locks/c3ddf53b1eda05274b9b8dcefff0bc8cf56f695b.lock/heartbeat 0",
+  "${BASE}/appdata/runtime/state/opencode/locks/c3ddf53b1eda05274b9b8dcefff0bc8cf56f695b.lock/meta.json 139"
+ ]
+}

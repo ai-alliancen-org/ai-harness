@@ -1,0 +1,161 @@
+{
+ "opencode": "1.18.33",
+ "aura": "d816a9e",
+ "kilde": "M1-politikdesignets optag-forespoergsler.cjs (OpenCodeEngine med HEADs kommandosandkasse)",
+ "variant": "sandkasse",
+ "pladsholdere": {
+  "BASE": "optagelsens mappe",
+  "ROOT": "BASE/Projekt (Git, 30 filer i gammel/)",
+  "OUTSIDE": "BASE/udenfor",
+  "APPDATA": "BASE/appdata (motoren i runtime/noegle, opgavens mappe i scratch/noegle/opgave)",
+  "DESKTOP": "appens desktop-mappe på optagemaskinen",
+  "PAYLOAD": "HEADs kodede oprindelige kommando og arbejdsmappe"
+ },
+ "experimental": null,
+ "status": "session.idle",
+ "steps": 5,
+ "modelCalls": 6,
+ "requests": [
+  {
+   "permission": "bash",
+   "patterns": [
+    "exec /usr/bin/env -i PATH='${DESKTOP}/.runtime/darwin-arm64/node/bin:/usr/bin:/bin:/usr/sbin:/sbin' HOME='${APPDATA}/scratch/noegle/opgave/home' TMPDIR='${APPDATA}/scratch/noegle/opgave/tmp' TMP='${APPDATA}/scratch/noegle/opgave/tmp' TEMP='${APPDATA}/scratch/noegle/opgave/tmp' LANG='en_US.UTF-8' npm_config_cache='${APPDATA}/scratch/noegle/opgave/home/.npm' PIP_CACHE_DIR='${APPDATA}/scratch/noegle/opgave/home/.cache/pip' '${DESKTOP}/.runtime/darwin-arm64/node/bin/node' '${DESKTOP}/core/command-sandbox-runner.mjs' '${APPDATA}/sandboxes/policy/policy.json' '${PAYLOAD}'"
+   ],
+   "always": [
+    "exec *"
+   ],
+   "metadata": {
+    "command": "exec /usr/bin/env -i PATH='${DESKTOP}/.runtime/darwin-arm64/node/bin:/usr/bin:/bin:/usr/sbin:/sbin' HOME='${APPDATA}/scratch/noegle/opgave/home' TMPDIR='${APPDATA}/scratch/noegle/opgave/tmp' TMP='${APPDATA}/scratch/noegle/opgave/tmp' TEMP='${APPDATA}/scratch/noegle/opgave/tmp' LANG='en_US.UTF-8' npm_config_cache='${APPDATA}/scratch/noegle/opgave/home/.npm' PIP_CACHE_DIR='${APPDATA}/scratch/noegle/opgave/home/.cache/pip' '${DESKTOP}/.runtime/darwin-arm64/node/bin/node' '${DESKTOP}/core/command-sandbox-runner.mjs' '${APPDATA}/sandboxes/policy/policy.json' '${PAYLOAD}'"
+   },
+   "tool": {
+    "messageID": "msg_178784295001t27iJkKQChhHY2",
+    "callID": "kald-0-0"
+   },
+   "partAtAsk": {
+    "tool": "bash",
+    "status": "running",
+    "input": {
+     "command": "ls -la",
+     "description": "Viser filer"
+    }
+   },
+   "sendt": "once",
+   "svar": "once"
+  },
+  {
+   "permission": "bash",
+   "patterns": [
+    "exec /usr/bin/env -i PATH='${DESKTOP}/.runtime/darwin-arm64/node/bin:/usr/bin:/bin:/usr/sbin:/sbin' HOME='${APPDATA}/scratch/noegle/opgave/home' TMPDIR='${APPDATA}/scratch/noegle/opgave/tmp' TMP='${APPDATA}/scratch/noegle/opgave/tmp' TEMP='${APPDATA}/scratch/noegle/opgave/tmp' LANG='en_US.UTF-8' npm_config_cache='${APPDATA}/scratch/noegle/opgave/home/.npm' PIP_CACHE_DIR='${APPDATA}/scratch/noegle/opgave/home/.cache/pip' '${DESKTOP}/.runtime/darwin-arm64/node/bin/node' '${DESKTOP}/core/command-sandbox-runner.mjs' '${APPDATA}/sandboxes/policy/policy.json' '${PAYLOAD}'"
+   ],
+   "always": [
+    "exec *"
+   ],
+   "metadata": {
+    "command": "exec /usr/bin/env -i PATH='${DESKTOP}/.runtime/darwin-arm64/node/bin:/usr/bin:/bin:/usr/sbin:/sbin' HOME='${APPDATA}/scratch/noegle/opgave/home' TMPDIR='${APPDATA}/scratch/noegle/opgave/tmp' TMP='${APPDATA}/scratch/noegle/opgave/tmp' TEMP='${APPDATA}/scratch/noegle/opgave/tmp' LANG='en_US.UTF-8' npm_config_cache='${APPDATA}/scratch/noegle/opgave/home/.npm' PIP_CACHE_DIR='${APPDATA}/scratch/noegle/opgave/home/.cache/pip' '${DESKTOP}/.runtime/darwin-arm64/node/bin/node' '${DESKTOP}/core/command-sandbox-runner.mjs' '${APPDATA}/sandboxes/policy/policy.json' '${PAYLOAD}'"
+   },
+   "tool": {
+    "messageID": "msg_178784f2d001mk4WWqwsagtmAJ",
+    "callID": "kald-1-0"
+   },
+   "partAtAsk": {
+    "tool": "bash",
+    "status": "running",
+    "input": {
+     "command": "git status && git diff --stat",
+     "description": "Ser ændringer"
+    }
+   },
+   "sendt": "once",
+   "svar": "once"
+  },
+  {
+   "permission": "bash",
+   "patterns": [
+    "exec /usr/bin/env -i PATH='${DESKTOP}/.runtime/darwin-arm64/node/bin:/usr/bin:/bin:/usr/sbin:/sbin' HOME='${APPDATA}/scratch/noegle/opgave/home' TMPDIR='${APPDATA}/scratch/noegle/opgave/tmp' TMP='${APPDATA}/scratch/noegle/opgave/tmp' TEMP='${APPDATA}/scratch/noegle/opgave/tmp' LANG='en_US.UTF-8' npm_config_cache='${APPDATA}/scratch/noegle/opgave/home/.npm' PIP_CACHE_DIR='${APPDATA}/scratch/noegle/opgave/home/.cache/pip' '${DESKTOP}/.runtime/darwin-arm64/node/bin/node' '${DESKTOP}/core/command-sandbox-runner.mjs' '${APPDATA}/sandboxes/policy/policy.json' '${PAYLOAD}'"
+   ],
+   "always": [
+    "exec *"
+   ],
+   "metadata": {
+    "command": "exec /usr/bin/env -i PATH='${DESKTOP}/.runtime/darwin-arm64/node/bin:/usr/bin:/bin:/usr/sbin:/sbin' HOME='${APPDATA}/scratch/noegle/opgave/home' TMPDIR='${APPDATA}/scratch/noegle/opgave/tmp' TMP='${APPDATA}/scratch/noegle/opgave/tmp' TEMP='${APPDATA}/scratch/noegle/opgave/tmp' LANG='en_US.UTF-8' npm_config_cache='${APPDATA}/scratch/noegle/opgave/home/.npm' PIP_CACHE_DIR='${APPDATA}/scratch/noegle/opgave/home/.cache/pip' '${DESKTOP}/.runtime/darwin-arm64/node/bin/node' '${DESKTOP}/core/command-sandbox-runner.mjs' '${APPDATA}/sandboxes/policy/policy.json' '${PAYLOAD}'"
+   },
+   "tool": {
+    "messageID": "msg_17878528a001B0bNr17M7UjIvT",
+    "callID": "kald-2-0"
+   },
+   "partAtAsk": {
+    "tool": "bash",
+    "status": "running",
+    "input": {
+     "command": "echo hej | tr a-z A-Z",
+     "description": "Pipeline"
+    }
+   },
+   "sendt": "once",
+   "svar": "once"
+  },
+  {
+   "permission": "bash",
+   "patterns": [
+    "exec /usr/bin/env -i PATH='${DESKTOP}/.runtime/darwin-arm64/node/bin:/usr/bin:/bin:/usr/sbin:/sbin' HOME='${APPDATA}/scratch/noegle/opgave/home' TMPDIR='${APPDATA}/scratch/noegle/opgave/tmp' TMP='${APPDATA}/scratch/noegle/opgave/tmp' TEMP='${APPDATA}/scratch/noegle/opgave/tmp' LANG='en_US.UTF-8' npm_config_cache='${APPDATA}/scratch/noegle/opgave/home/.npm' PIP_CACHE_DIR='${APPDATA}/scratch/noegle/opgave/home/.cache/pip' '${DESKTOP}/.runtime/darwin-arm64/node/bin/node' '${DESKTOP}/core/command-sandbox-runner.mjs' '${APPDATA}/sandboxes/policy/policy.json' '${PAYLOAD}'"
+   ],
+   "always": [
+    "exec *"
+   ],
+   "metadata": {
+    "command": "exec /usr/bin/env -i PATH='${DESKTOP}/.runtime/darwin-arm64/node/bin:/usr/bin:/bin:/usr/sbin:/sbin' HOME='${APPDATA}/scratch/noegle/opgave/home' TMPDIR='${APPDATA}/scratch/noegle/opgave/tmp' TMP='${APPDATA}/scratch/noegle/opgave/tmp' TEMP='${APPDATA}/scratch/noegle/opgave/tmp' LANG='en_US.UTF-8' npm_config_cache='${APPDATA}/scratch/noegle/opgave/home/.npm' PIP_CACHE_DIR='${APPDATA}/scratch/noegle/opgave/home/.cache/pip' '${DESKTOP}/.runtime/darwin-arm64/node/bin/node' '${DESKTOP}/core/command-sandbox-runner.mjs' '${APPDATA}/sandboxes/policy/policy.json' '${PAYLOAD}'"
+   },
+   "tool": {
+    "messageID": "msg_1787856440013YHLlflseAxnDJ",
+    "callID": "kald-3-0"
+   },
+   "partAtAsk": {
+    "tool": "bash",
+    "status": "running",
+    "input": {
+     "command": "cd .. && ls",
+     "description": "Går ud af projektet"
+    }
+   },
+   "sendt": "once",
+   "svar": "once"
+  }
+ ],
+ "results": [
+  {
+   "callID": "kald-0-0",
+   "tool": "bash",
+   "status": "completed",
+   "output": "total 8\ndrwxr-xr-x@  7 <bruger>  wheel   224 Oct 26 13:48 .\ndrwx------@  6 <bruger>  wheel   192 Oct 26 13:48 ..\n-rw-r--r--   1 <bruger>  wheel    3",
+   "inputCommand": "exec /usr/bin/env -i PATH='${DESKTOP}/.runtime/darwin-arm64/node/bin:/usr/bin:/bin:/usr/sbin:/sbin' HOME='<sti fra optagemaskinen>"
+  },
+  {
+   "callID": "kald-1-0",
+   "tool": "bash",
+   "status": "completed",
+   "output": "xcode-select: error: unable to read data link at '/var/select/developer_dir', expected symbolic link (Operation not permitted)\nxcode-select: error: No developer",
+   "inputCommand": "exec /usr/bin/env -i PATH='${DESKTOP}/.runtime/darwin-arm64/node/bin:/usr/bin:/bin:/usr/sbin:/sbin' HOME='<sti fra optagemaskinen>"
+  },
+  {
+   "callID": "kald-2-0",
+   "tool": "bash",
+   "status": "completed",
+   "output": "HEJ\n",
+   "inputCommand": "exec /usr/bin/env -i PATH='${DESKTOP}/.runtime/darwin-arm64/node/bin:/usr/bin:/bin:/usr/sbin:/sbin' HOME='<sti fra optagemaskinen>"
+  },
+  {
+   "callID": "kald-3-0",
+   "tool": "bash",
+   "status": "completed",
+   "output": "ls: .: Operation not permitted\n\nKommandoen fejlede under teknisk isolation. Adgang er afgrænset til projektet, opgavens midlertidige mappe og de aftalte pakkere",
+   "inputCommand": "exec /usr/bin/env -i PATH='${DESKTOP}/.runtime/darwin-arm64/node/bin:/usr/bin:/bin:/usr/sbin:/sbin' HOME='<sti fra optagemaskinen>"
+  },
+  {
+   "callID": "kald-4-0",
+   "tool": "bash",
+   "status": "error",
+   "error": "Kommandoens arbejdsmappe ligger uden for projektet og opgavens midlertidige mappe.",
+   "inputCommand": "ls"
+  }
+ ]
+}

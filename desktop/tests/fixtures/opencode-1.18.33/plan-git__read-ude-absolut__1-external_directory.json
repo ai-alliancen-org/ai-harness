@@ -1,0 +1,91 @@
+{
+ "opencode": "1.18.33",
+ "aura": "d816a9e",
+ "scenario": "plan-git",
+ "outcome": "error",
+ "case": "read-ude-absolut",
+ "askIndex": 1,
+ "asksInStep": 1,
+ "layout": {
+  "mode": "plan",
+  "git": true,
+  "copy": false,
+  "model": "kontraktmodel",
+  "worktree": "${ROOT}",
+  "directory": "${ROOT}"
+ },
+ "sequence": [
+  "del:pending",
+  "del:running",
+  "spørg:external_directory",
+  "svar:once",
+  "del:completed"
+ ],
+ "request": {
+  "id": "per_178943818001pRWVX2U7FOnVz5",
+  "sessionID": "ses_e876c009bffeGcuTQAqvCqTz2s",
+  "permission": "external_directory",
+  "patterns": [
+   "${OUTSIDE}/*"
+  ],
+  "metadata": {
+   "filepath": "${OUTSIDE}/fil.txt",
+   "parentDir": "${OUTSIDE}"
+  },
+  "always": [
+   "${OUTSIDE}/*"
+  ],
+  "tool": {
+   "messageID": "msg_1789437340029KCg1mv8fcUQAq",
+   "callID": "kald-1-0"
+  }
+ },
+ "toolPartAtAsk": {
+  "status": "running",
+  "tool": "read",
+  "input": {
+   "filePath": "${OUTSIDE}/fil.txt"
+  }
+ },
+ "policyInput": {
+  "id": "per_178943818001pRWVX2U7FOnVz5",
+  "sessionID": "ses_e876c009bffeGcuTQAqvCqTz2s",
+  "permission": "external_directory",
+  "patterns": [
+   "${OUTSIDE}/*"
+  ],
+  "metadata": {
+   "filepath": "${OUTSIDE}/fil.txt",
+   "parentDir": "${OUTSIDE}"
+  },
+  "always": [
+   "${OUTSIDE}/*"
+  ],
+  "tool": {
+   "messageID": "msg_1789437340029KCg1mv8fcUQAq",
+   "callID": "kald-1-0"
+  },
+  "toolInput": {
+   "filePath": "${OUTSIDE}/fil.txt",
+   "tool": "read",
+   "input": {
+    "filePath": "${OUTSIDE}/fil.txt"
+   }
+  }
+ },
+ "recordedAura": {
+  "allowed": false,
+  "source": null,
+  "label": "Denne handling",
+  "target": "",
+  "match": null,
+  "persistable": false,
+  "projectFile": false,
+  "scratch": false,
+  "folder": null,
+  "blockedMode": false
+ },
+ "toolResult": [
+  "<path>${OUTSIDE}/fil.txt</path>\n<type>file</type>\n<content>\n1: Ekstern fil\n\n(End of file - total 1 lines)\n</content>"
+ ]
+}

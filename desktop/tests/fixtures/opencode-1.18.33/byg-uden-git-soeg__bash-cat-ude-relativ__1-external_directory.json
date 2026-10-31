@@ -1,0 +1,115 @@
+{
+ "opencode": "1.18.33",
+ "aura": "d816a9e",
+ "scenario": "byg-uden-git-soeg",
+ "outcome": "idle",
+ "case": "bash-cat-ude-relativ",
+ "askIndex": 1,
+ "asksInStep": 2,
+ "layout": {
+  "mode": "build",
+  "git": false,
+  "copy": false,
+  "model": "kontraktmodel",
+  "worktree": "/",
+  "directory": "${ROOT}"
+ },
+ "sequence": [
+  "del:pending",
+  "del:running",
+  "spørg:external_directory",
+  "svar:once",
+  "spørg:bash",
+  "svar:once",
+  "del:running",
+  "del:completed"
+ ],
+ "request": {
+  "id": "per_1789f614a001Aw6agDiG1n2cq0",
+  "sessionID": "ses_e8761014fffe7C0Smxj9vvHr14",
+  "permission": "external_directory",
+  "patterns": [
+   "${OUTSIDE}/*"
+  ],
+  "metadata": {
+   "command": "cat ../ekstern/fil.txt",
+   "directories": [
+    "${OUTSIDE}"
+   ],
+   "patterns": [
+    "${OUTSIDE}/*"
+   ]
+  },
+  "always": [
+   "${OUTSIDE}/*"
+  ],
+  "tool": {
+   "messageID": "msg_1789f5db3001mWHPzmJmsG0iR8",
+   "callID": "kald-16-0"
+  }
+ },
+ "toolPartAtAsk": {
+  "status": "running",
+  "tool": "bash",
+  "input": {
+   "command": "cat ../ekstern/fil.txt",
+   "description": "Læser en ekstern fil relativt"
+  }
+ },
+ "policyInput": {
+  "id": "per_1789f614a001Aw6agDiG1n2cq0",
+  "sessionID": "ses_e8761014fffe7C0Smxj9vvHr14",
+  "permission": "external_directory",
+  "patterns": [
+   "${OUTSIDE}/*"
+  ],
+  "metadata": {
+   "command": "cat ../ekstern/fil.txt",
+   "directories": [
+    "${OUTSIDE}"
+   ],
+   "patterns": [
+    "${OUTSIDE}/*"
+   ]
+  },
+  "always": [
+   "${OUTSIDE}/*"
+  ],
+  "tool": {
+   "messageID": "msg_1789f5db3001mWHPzmJmsG0iR8",
+   "callID": "kald-16-0"
+  },
+  "toolInput": {
+   "command": "cat ../ekstern/fil.txt",
+   "description": "Læser en ekstern fil relativt",
+   "tool": "bash",
+   "input": {
+    "command": "cat ../ekstern/fil.txt",
+    "description": "Læser en ekstern fil relativt"
+   }
+  }
+ },
+ "recordedAura": {
+  "allowed": false,
+  "source": null,
+  "label": "Mappeadgang: ${OUTSIDE}/*",
+  "target": "${OUTSIDE}/*",
+  "match": {
+   "kind": "external_directory",
+   "targets": [
+    {
+     "path": "${OUTSIDE}",
+     "subtree": true
+    }
+   ]
+  },
+  "persistable": true,
+  "projectFile": false,
+  "scratch": false,
+  "folder": "${OUTSIDE}",
+  "blockedMode": false
+ },
+ "toolResult": [
+  "Ekstern fil\n"
+ ]
+}

@@ -1,0 +1,103 @@
+{
+ "opencode": "1.18.33",
+ "aura": "d816a9e",
+ "scenario": "byg-uden-git-soeg",
+ "outcome": "idle",
+ "case": "bash-cat-ude",
+ "askIndex": 2,
+ "asksInStep": 2,
+ "layout": {
+  "mode": "build",
+  "git": false,
+  "copy": false,
+  "model": "kontraktmodel",
+  "worktree": "/",
+  "directory": "${ROOT}"
+ },
+ "sequence": [
+  "del:pending",
+  "del:running",
+  "spørg:external_directory",
+  "svar:once",
+  "spørg:bash",
+  "svar:once",
+  "del:running",
+  "del:completed"
+ ],
+ "request": {
+  "id": "per_1789f5c870013941Zi1GIeJBK8",
+  "sessionID": "ses_e8761014fffe7C0Smxj9vvHr14",
+  "permission": "bash",
+  "patterns": [
+   "cat ${OUTSIDE}/fil.txt"
+  ],
+  "metadata": {
+   "command": "cat ${OUTSIDE}/fil.txt"
+  },
+  "always": [
+   "cat *"
+  ],
+  "tool": {
+   "messageID": "msg_1789f59de001w9vQW5SrCrAksU",
+   "callID": "kald-15-0"
+  }
+ },
+ "toolPartAtAsk": {
+  "status": "running",
+  "tool": "bash",
+  "input": {
+   "command": "cat ${OUTSIDE}/fil.txt",
+   "description": "Læser en ekstern fil"
+  }
+ },
+ "policyInput": {
+  "id": "per_1789f5c870013941Zi1GIeJBK8",
+  "sessionID": "ses_e8761014fffe7C0Smxj9vvHr14",
+  "permission": "bash",
+  "patterns": [
+   "cat ${OUTSIDE}/fil.txt"
+  ],
+  "metadata": {
+   "command": "cat ${OUTSIDE}/fil.txt"
+  },
+  "always": [
+   "cat *"
+  ],
+  "tool": {
+   "messageID": "msg_1789f59de001w9vQW5SrCrAksU",
+   "callID": "kald-15-0"
+  },
+  "toolInput": {
+   "command": "cat ${OUTSIDE}/fil.txt",
+   "description": "Læser en ekstern fil",
+   "tool": "bash",
+   "input": {
+    "command": "cat ${OUTSIDE}/fil.txt",
+    "description": "Læser en ekstern fil"
+   }
+  }
+ },
+ "recordedAura": {
+  "allowed": false,
+  "source": null,
+  "label": "Kommando: cat ${OUTSIDE}/fil.txt",
+  "target": "cat ${OUTSIDE}/fil.txt",
+  "match": {
+   "kind": "bash",
+   "command": "cat ${OUTSIDE}/fil.txt",
+   "cwd": "${ROOT}",
+   "input": {
+    "command": "cat ${OUTSIDE}/fil.txt",
+    "description": "Læser en ekstern fil"
+   }
+  },
+  "persistable": true,
+  "projectFile": false,
+  "scratch": false,
+  "folder": null,
+  "blockedMode": false
+ },
+ "toolResult": [
+  "Ekstern fil\n"
+ ]
+}

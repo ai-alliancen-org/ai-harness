@@ -1,0 +1,88 @@
+{
+ "opencode": "1.18.33",
+ "aura": "d816a9e",
+ "scenario": "git-foraelder",
+ "outcome": "idle",
+ "case": "write-uden-for-repo",
+ "askIndex": 1,
+ "asksInStep": 2,
+ "layout": {
+  "mode": "build",
+  "git": "parent",
+  "copy": false,
+  "model": "kontraktmodel",
+  "worktree": "${REPO}",
+  "directory": "${ROOT}"
+ },
+ "sequence": [
+  "del:pending",
+  "spørg:external_directory",
+  "del:running",
+  "svar:once",
+  "spørg:edit",
+  "svar:once",
+  "del:completed"
+ ],
+ "request": {
+  "id": "per_1789d8c28001QOhqye1BMFjnme",
+  "sessionID": "ses_e87628d34ffePmSWwdeOxHfQfy",
+  "permission": "external_directory",
+  "patterns": [
+   "${OUTSIDE}/*"
+  ],
+  "metadata": {
+   "filepath": "${OUTSIDE}/ny.txt",
+   "parentDir": "${OUTSIDE}"
+  },
+  "always": [
+   "${OUTSIDE}/*"
+  ],
+  "tool": {
+   "messageID": "msg_1789d8b95001xNv68xLJ2zutIw",
+   "callID": "kald-5-0"
+  }
+ },
+ "toolPartAtAsk": {
+  "status": "pending",
+  "tool": "write",
+  "input": {}
+ },
+ "policyInput": {
+  "id": "per_1789d8c28001QOhqye1BMFjnme",
+  "sessionID": "ses_e87628d34ffePmSWwdeOxHfQfy",
+  "permission": "external_directory",
+  "patterns": [
+   "${OUTSIDE}/*"
+  ],
+  "metadata": {
+   "filepath": "${OUTSIDE}/ny.txt",
+   "parentDir": "${OUTSIDE}"
+  },
+  "always": [
+   "${OUTSIDE}/*"
+  ],
+  "tool": {
+   "messageID": "msg_1789d8b95001xNv68xLJ2zutIw",
+   "callID": "kald-5-0"
+  },
+  "toolInput": {
+   "tool": "write",
+   "input": {}
+  }
+ },
+ "recordedAura": {
+  "allowed": false,
+  "source": null,
+  "label": "Denne handling",
+  "target": "",
+  "match": null,
+  "persistable": false,
+  "projectFile": false,
+  "scratch": false,
+  "folder": null,
+  "blockedMode": false
+ },
+ "toolResult": [
+  "Wrote file successfully."
+ ]
+}

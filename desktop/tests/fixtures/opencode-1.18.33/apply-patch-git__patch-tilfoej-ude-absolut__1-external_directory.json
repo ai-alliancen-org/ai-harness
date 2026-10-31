@@ -1,0 +1,88 @@
+{
+ "opencode": "1.18.33",
+ "aura": "d816a9e",
+ "scenario": "apply-patch-git",
+ "outcome": "idle",
+ "case": "patch-tilfoej-ude-absolut",
+ "askIndex": 1,
+ "asksInStep": 2,
+ "layout": {
+  "mode": "build",
+  "git": true,
+  "copy": false,
+  "model": "gpt-5-kontrakt",
+  "worktree": "${ROOT}",
+  "directory": "${ROOT}"
+ },
+ "sequence": [
+  "del:pending",
+  "spørg:external_directory",
+  "del:running",
+  "svar:once",
+  "spørg:edit",
+  "svar:once",
+  "del:completed"
+ ],
+ "request": {
+  "id": "per_1789818780014C8sZmaey23a9E",
+  "sessionID": "ses_e8768872fffeYoWSYKTrl2VS1t",
+  "permission": "external_directory",
+  "patterns": [
+   "${OUTSIDE}/*"
+  ],
+  "metadata": {
+   "filepath": "${OUTSIDE}/patch2.txt",
+   "parentDir": "${OUTSIDE}"
+  },
+  "always": [
+   "${OUTSIDE}/*"
+  ],
+  "tool": {
+   "messageID": "msg_1789814750013zuPYd2BpMS7sL",
+   "callID": "kald-2-0"
+  }
+ },
+ "toolPartAtAsk": {
+  "status": "pending",
+  "tool": "apply_patch",
+  "input": {}
+ },
+ "policyInput": {
+  "id": "per_1789818780014C8sZmaey23a9E",
+  "sessionID": "ses_e8768872fffeYoWSYKTrl2VS1t",
+  "permission": "external_directory",
+  "patterns": [
+   "${OUTSIDE}/*"
+  ],
+  "metadata": {
+   "filepath": "${OUTSIDE}/patch2.txt",
+   "parentDir": "${OUTSIDE}"
+  },
+  "always": [
+   "${OUTSIDE}/*"
+  ],
+  "tool": {
+   "messageID": "msg_1789814750013zuPYd2BpMS7sL",
+   "callID": "kald-2-0"
+  },
+  "toolInput": {
+   "tool": "apply_patch",
+   "input": {}
+  }
+ },
+ "recordedAura": {
+  "allowed": false,
+  "source": null,
+  "label": "Denne handling",
+  "target": "",
+  "match": null,
+  "persistable": false,
+  "projectFile": false,
+  "scratch": false,
+  "folder": null,
+  "blockedMode": false
+ },
+ "toolResult": [
+  "Success. Updated the following files:\nA ../ekstern/patch2.txt"
+ ]
+}

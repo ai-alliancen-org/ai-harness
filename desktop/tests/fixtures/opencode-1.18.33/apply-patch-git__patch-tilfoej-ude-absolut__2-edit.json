@@ -1,0 +1,113 @@
+{
+ "opencode": "1.18.33",
+ "aura": "d816a9e",
+ "scenario": "apply-patch-git",
+ "outcome": "idle",
+ "case": "patch-tilfoej-ude-absolut",
+ "askIndex": 2,
+ "asksInStep": 2,
+ "layout": {
+  "mode": "build",
+  "git": true,
+  "copy": false,
+  "model": "gpt-5-kontrakt",
+  "worktree": "${ROOT}",
+  "directory": "${ROOT}"
+ },
+ "sequence": [
+  "del:pending",
+  "spørg:external_directory",
+  "del:running",
+  "svar:once",
+  "spørg:edit",
+  "svar:once",
+  "del:completed"
+ ],
+ "request": {
+  "id": "per_17898196f002wEKIHn7Vwo4HMl",
+  "sessionID": "ses_e8768872fffeYoWSYKTrl2VS1t",
+  "permission": "edit",
+  "patterns": [
+   "../ekstern/patch2.txt"
+  ],
+  "metadata": {
+   "filepath": "../ekstern/patch2.txt",
+   "diff": "Index: ${OUTSIDE}/patch2.txt\n===================================================================\n--- ${OUTSIDE}/patch2.txt\n+++ ${OUTSIDE}/patch2.txt\n@@ -0,0 +1,1 @@\n+ekstern\n\n",
+   "files": [
+    {
+     "filePath": "${OUTSIDE}/patch2.txt",
+     "relativePath": "../ekstern/patch2.txt",
+     "type": "add",
+     "patch": "Index: ${OUTSIDE}/patch2.txt\n===================================================================\n--- ${OUTSIDE}/patch2.txt\n+++ ${OUTSIDE}/patch2.txt\n@@ -0,0 +1,1 @@\n+ekstern\n",
+     "additions": 1,
+     "deletions": 0
+    }
+   ]
+  },
+  "always": [
+   "*"
+  ],
+  "tool": {
+   "messageID": "msg_1789814750013zuPYd2BpMS7sL",
+   "callID": "kald-2-0"
+  }
+ },
+ "toolPartAtAsk": {
+  "status": "running",
+  "tool": "apply_patch",
+  "input": {
+   "patchText": "*** Begin Patch\n*** Add File: ${OUTSIDE}/patch2.txt\n+ekstern\n*** End Patch"
+  }
+ },
+ "policyInput": {
+  "id": "per_17898196f002wEKIHn7Vwo4HMl",
+  "sessionID": "ses_e8768872fffeYoWSYKTrl2VS1t",
+  "permission": "edit",
+  "patterns": [
+   "../ekstern/patch2.txt"
+  ],
+  "metadata": {
+   "filepath": "../ekstern/patch2.txt",
+   "diff": "Index: ${OUTSIDE}/patch2.txt\n===================================================================\n--- ${OUTSIDE}/patch2.txt\n+++ ${OUTSIDE}/patch2.txt\n@@ -0,0 +1,1 @@\n+ekstern\n\n",
+   "files": [
+    {
+     "filePath": "${OUTSIDE}/patch2.txt",
+     "relativePath": "../ekstern/patch2.txt",
+     "type": "add",
+     "patch": "Index: ${OUTSIDE}/patch2.txt\n===================================================================\n--- ${OUTSIDE}/patch2.txt\n+++ ${OUTSIDE}/patch2.txt\n@@ -0,0 +1,1 @@\n+ekstern\n",
+     "additions": 1,
+     "deletions": 0
+    }
+   ]
+  },
+  "always": [
+   "*"
+  ],
+  "tool": {
+   "messageID": "msg_1789814750013zuPYd2BpMS7sL",
+   "callID": "kald-2-0"
+  },
+  "toolInput": {
+   "patchText": "*** Begin Patch\n*** Add File: ${OUTSIDE}/patch2.txt\n+ekstern\n*** End Patch",
+   "tool": "apply_patch",
+   "input": {
+    "patchText": "*** Begin Patch\n*** Add File: ${OUTSIDE}/patch2.txt\n+ekstern\n*** End Patch"
+   }
+  }
+ },
+ "recordedAura": {
+  "allowed": false,
+  "source": null,
+  "label": "Denne handling",
+  "target": "",
+  "match": null,
+  "persistable": false,
+  "projectFile": false,
+  "scratch": false,
+  "folder": null,
+  "blockedMode": false
+ },
+ "toolResult": [
+  "Success. Updated the following files:\nA ../ekstern/patch2.txt"
+ ]
+}

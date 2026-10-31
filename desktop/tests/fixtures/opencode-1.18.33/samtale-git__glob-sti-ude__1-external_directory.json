@@ -1,0 +1,94 @@
+{
+ "opencode": "1.18.33",
+ "aura": "d816a9e",
+ "scenario": "samtale-git",
+ "outcome": "idle",
+ "case": "glob-sti-ude",
+ "askIndex": 1,
+ "asksInStep": 1,
+ "layout": {
+  "mode": "chat",
+  "git": true,
+  "copy": false,
+  "model": "kontraktmodel",
+  "worktree": "${ROOT}",
+  "directory": "${ROOT}"
+ },
+ "sequence": [
+  "del:pending",
+  "del:running",
+  "spørg:external_directory",
+  "svar:once",
+  "del:completed"
+ ],
+ "request": {
+  "id": "per_17894ddd0001OJhD7SdIVHonMJ",
+  "sessionID": "ses_e876b6529ffeq2F84QALU6p8ah",
+  "permission": "external_directory",
+  "patterns": [
+   "${OUTSIDE}/*"
+  ],
+  "metadata": {
+   "filepath": "${OUTSIDE}",
+   "parentDir": "${OUTSIDE}"
+  },
+  "always": [
+   "${OUTSIDE}/*"
+  ],
+  "tool": {
+   "messageID": "msg_17894d970002MDES49jB2uHP52",
+   "callID": "kald-6-0"
+  }
+ },
+ "toolPartAtAsk": {
+  "status": "running",
+  "tool": "glob",
+  "input": {
+   "pattern": "*",
+   "path": "${OUTSIDE}"
+  }
+ },
+ "policyInput": {
+  "id": "per_17894ddd0001OJhD7SdIVHonMJ",
+  "sessionID": "ses_e876b6529ffeq2F84QALU6p8ah",
+  "permission": "external_directory",
+  "patterns": [
+   "${OUTSIDE}/*"
+  ],
+  "metadata": {
+   "filepath": "${OUTSIDE}",
+   "parentDir": "${OUTSIDE}"
+  },
+  "always": [
+   "${OUTSIDE}/*"
+  ],
+  "tool": {
+   "messageID": "msg_17894d970002MDES49jB2uHP52",
+   "callID": "kald-6-0"
+  },
+  "toolInput": {
+   "pattern": "*",
+   "path": "${OUTSIDE}",
+   "tool": "glob",
+   "input": {
+    "pattern": "*",
+    "path": "${OUTSIDE}"
+   }
+  }
+ },
+ "recordedAura": {
+  "allowed": false,
+  "source": null,
+  "label": "Denne handling",
+  "target": "",
+  "match": null,
+  "persistable": false,
+  "projectFile": false,
+  "scratch": false,
+  "folder": null,
+  "blockedMode": false
+ },
+ "toolResult": [
+  "${OUTSIDE}/fil.txt\n${OUTSIDE}/fil2.txt"
+ ]
+}

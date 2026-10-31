@@ -1,0 +1,90 @@
+{
+ "opencode": "1.18.33",
+ "aura": "d816a9e",
+ "scenario": "byg-git-soeg",
+ "outcome": "idle",
+ "case": "bash-npm-build",
+ "askIndex": 1,
+ "asksInStep": 1,
+ "layout": {
+  "mode": "build",
+  "git": true,
+  "copy": false,
+  "model": "kontraktmodel",
+  "worktree": "${ROOT}",
+  "directory": "${ROOT}"
+ },
+ "sequence": [
+  "del:pending",
+  "spørg:bash",
+  "del:running",
+  "svar:once",
+  "del:running",
+  "del:completed"
+ ],
+ "request": {
+  "id": "per_1789ea542001aoEUeSomCh2dkA",
+  "sessionID": "ses_e876210c4ffeTRFtBEUBE7VBjt",
+  "permission": "bash",
+  "patterns": [
+   "npm run build --if-present"
+  ],
+  "metadata": {
+   "command": "npm run build --if-present"
+  },
+  "always": [
+   "npm run build *"
+  ],
+  "tool": {
+   "messageID": "msg_1789ea33c001UVspmRdsfzZ2vh",
+   "callID": "kald-18-0"
+  }
+ },
+ "toolPartAtAsk": {
+  "status": "pending",
+  "tool": "bash",
+  "input": {}
+ },
+ "policyInput": {
+  "id": "per_1789ea542001aoEUeSomCh2dkA",
+  "sessionID": "ses_e876210c4ffeTRFtBEUBE7VBjt",
+  "permission": "bash",
+  "patterns": [
+   "npm run build --if-present"
+  ],
+  "metadata": {
+   "command": "npm run build --if-present"
+  },
+  "always": [
+   "npm run build *"
+  ],
+  "tool": {
+   "messageID": "msg_1789ea33c001UVspmRdsfzZ2vh",
+   "callID": "kald-18-0"
+  },
+  "toolInput": {
+   "tool": "bash",
+   "input": {}
+  }
+ },
+ "recordedAura": {
+  "allowed": false,
+  "source": null,
+  "label": "Kommando: npm run build --if-present",
+  "target": "npm run build --if-present",
+  "match": {
+   "kind": "bash",
+   "command": "npm run build --if-present",
+   "cwd": "${ROOT}",
+   "input": {}
+  },
+  "persistable": true,
+  "projectFile": false,
+  "scratch": false,
+  "folder": null,
+  "blockedMode": false
+ },
+ "toolResult": [
+  "npm ERR! code ENOENT\nnpm ERR! syscall open\nnpm ERR! path ${ROOT}/package.json\nnpm ERR! errno -2\nnpm ERR! enoent Could not read package.json: Error: ENOENT: no such file or directory, open '<sti fra optagemaskinen>'\nnpm ERR! enoent This is related to npm not being able to find a file.\nnpm ERR! enoent"
+ ]
+}

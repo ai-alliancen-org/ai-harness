@@ -1,0 +1,88 @@
+{
+ "opencode": "1.18.33",
+ "aura": "d816a9e",
+ "scenario": "kopi-git",
+ "outcome": "idle",
+ "case": "write-original-projekt",
+ "askIndex": 1,
+ "asksInStep": 2,
+ "layout": {
+  "mode": "build",
+  "git": true,
+  "copy": true,
+  "model": "kontraktmodel",
+  "worktree": "/",
+  "directory": "${WORKSPACE}"
+ },
+ "sequence": [
+  "del:pending",
+  "spørg:external_directory",
+  "del:running",
+  "svar:once",
+  "spørg:edit",
+  "svar:once",
+  "del:completed"
+ ],
+ "request": {
+  "id": "per_1789d0e4c001rPKgw0AaUQnNRr",
+  "sessionID": "ses_e87633f44ffeiVi45CDjAnlAZg",
+  "permission": "external_directory",
+  "patterns": [
+   "${ROOT}/public/*"
+  ],
+  "metadata": {
+   "filepath": "${ROOT}/public/fra-kopi.html",
+   "parentDir": "${ROOT}/public"
+  },
+  "always": [
+   "${ROOT}/public/*"
+  ],
+  "tool": {
+   "messageID": "msg_1789d0c1c001NHiuwBCr3rssye",
+   "callID": "kald-6-0"
+  }
+ },
+ "toolPartAtAsk": {
+  "status": "pending",
+  "tool": "write",
+  "input": {}
+ },
+ "policyInput": {
+  "id": "per_1789d0e4c001rPKgw0AaUQnNRr",
+  "sessionID": "ses_e87633f44ffeiVi45CDjAnlAZg",
+  "permission": "external_directory",
+  "patterns": [
+   "${ROOT}/public/*"
+  ],
+  "metadata": {
+   "filepath": "${ROOT}/public/fra-kopi.html",
+   "parentDir": "${ROOT}/public"
+  },
+  "always": [
+   "${ROOT}/public/*"
+  ],
+  "tool": {
+   "messageID": "msg_1789d0c1c001NHiuwBCr3rssye",
+   "callID": "kald-6-0"
+  },
+  "toolInput": {
+   "tool": "write",
+   "input": {}
+  }
+ },
+ "recordedAura": {
+  "allowed": false,
+  "source": null,
+  "label": "Denne handling",
+  "target": "",
+  "match": null,
+  "persistable": false,
+  "projectFile": false,
+  "scratch": false,
+  "folder": null,
+  "blockedMode": false
+ },
+ "toolResult": [
+  "Wrote file successfully."
+ ]
+}

@@ -1,0 +1,107 @@
+{
+ "opencode": "1.18.33",
+ "aura": "d816a9e",
+ "scenario": "byg-git-soeg",
+ "outcome": "idle",
+ "case": "bash-workdir-ude",
+ "askIndex": 1,
+ "asksInStep": 2,
+ "layout": {
+  "mode": "build",
+  "git": true,
+  "copy": false,
+  "model": "kontraktmodel",
+  "worktree": "${ROOT}",
+  "directory": "${ROOT}"
+ },
+ "sequence": [
+  "del:pending",
+  "spørg:external_directory",
+  "del:running",
+  "svar:once",
+  "spørg:bash",
+  "svar:once",
+  "del:running",
+  "del:completed"
+ ],
+ "request": {
+  "id": "per_1789e96c8001uyTzHhqdOG3H6j",
+  "sessionID": "ses_e876210c4ffeTRFtBEUBE7VBjt",
+  "permission": "external_directory",
+  "patterns": [
+   "${OUTSIDE}/*"
+  ],
+  "metadata": {
+   "command": "ls",
+   "directories": [
+    "${OUTSIDE}"
+   ],
+   "patterns": [
+    "${OUTSIDE}/*"
+   ]
+  },
+  "always": [
+   "${OUTSIDE}/*"
+  ],
+  "tool": {
+   "messageID": "msg_1789e953a001EMfsOcK8cWHRA1",
+   "callID": "kald-14-0"
+  }
+ },
+ "toolPartAtAsk": {
+  "status": "pending",
+  "tool": "bash",
+  "input": {}
+ },
+ "policyInput": {
+  "id": "per_1789e96c8001uyTzHhqdOG3H6j",
+  "sessionID": "ses_e876210c4ffeTRFtBEUBE7VBjt",
+  "permission": "external_directory",
+  "patterns": [
+   "${OUTSIDE}/*"
+  ],
+  "metadata": {
+   "command": "ls",
+   "directories": [
+    "${OUTSIDE}"
+   ],
+   "patterns": [
+    "${OUTSIDE}/*"
+   ]
+  },
+  "always": [
+   "${OUTSIDE}/*"
+  ],
+  "tool": {
+   "messageID": "msg_1789e953a001EMfsOcK8cWHRA1",
+   "callID": "kald-14-0"
+  },
+  "toolInput": {
+   "tool": "bash",
+   "input": {}
+  }
+ },
+ "recordedAura": {
+  "allowed": false,
+  "source": null,
+  "label": "Mappeadgang: ${OUTSIDE}/*",
+  "target": "${OUTSIDE}/*",
+  "match": {
+   "kind": "external_directory",
+   "targets": [
+    {
+     "path": "${OUTSIDE}",
+     "subtree": true
+    }
+   ]
+  },
+  "persistable": true,
+  "projectFile": false,
+  "scratch": false,
+  "folder": "${OUTSIDE}",
+  "blockedMode": false
+ },
+ "toolResult": [
+  "fil.txt\nfil2.txt\n"
+ ]
+}

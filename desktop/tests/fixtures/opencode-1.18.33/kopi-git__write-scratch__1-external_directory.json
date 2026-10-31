@@ -1,0 +1,88 @@
+{
+ "opencode": "1.18.33",
+ "aura": "d816a9e",
+ "scenario": "kopi-git",
+ "outcome": "idle",
+ "case": "write-scratch",
+ "askIndex": 1,
+ "asksInStep": 2,
+ "layout": {
+  "mode": "build",
+  "git": true,
+  "copy": true,
+  "model": "kontraktmodel",
+  "worktree": "/",
+  "directory": "${WORKSPACE}"
+ },
+ "sequence": [
+  "del:pending",
+  "spørg:external_directory",
+  "del:running",
+  "svar:once",
+  "spørg:edit",
+  "svar:once",
+  "del:completed"
+ ],
+ "request": {
+  "id": "per_1789d244a001eOo1hNihOm3cBd",
+  "sessionID": "ses_e87633f44ffeiVi45CDjAnlAZg",
+  "permission": "external_directory",
+  "patterns": [
+   "${SCRATCH}/*"
+  ],
+  "metadata": {
+   "filepath": "${SCRATCH}/noter.md",
+   "parentDir": "${SCRATCH}"
+  },
+  "always": [
+   "${SCRATCH}/*"
+  ],
+  "tool": {
+   "messageID": "msg_1789d23be001ErdvH9oETqoqtc",
+   "callID": "kald-11-0"
+  }
+ },
+ "toolPartAtAsk": {
+  "status": "pending",
+  "tool": "write",
+  "input": {}
+ },
+ "policyInput": {
+  "id": "per_1789d244a001eOo1hNihOm3cBd",
+  "sessionID": "ses_e87633f44ffeiVi45CDjAnlAZg",
+  "permission": "external_directory",
+  "patterns": [
+   "${SCRATCH}/*"
+  ],
+  "metadata": {
+   "filepath": "${SCRATCH}/noter.md",
+   "parentDir": "${SCRATCH}"
+  },
+  "always": [
+   "${SCRATCH}/*"
+  ],
+  "tool": {
+   "messageID": "msg_1789d23be001ErdvH9oETqoqtc",
+   "callID": "kald-11-0"
+  },
+  "toolInput": {
+   "tool": "write",
+   "input": {}
+  }
+ },
+ "recordedAura": {
+  "allowed": false,
+  "source": null,
+  "label": "Denne handling",
+  "target": "",
+  "match": null,
+  "persistable": false,
+  "projectFile": false,
+  "scratch": false,
+  "folder": null,
+  "blockedMode": false
+ },
+ "toolResult": [
+  "Wrote file successfully."
+ ]
+}

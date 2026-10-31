@@ -1,0 +1,3909 @@
+{
+ "opencode": "1.18.33",
+ "tokens": {
+  "ROOT": "projektmappen (BASE/Dokumenter/projekt, i git-foraelder BASE/Dokumenter/repo/projekt)",
+  "WORKSPACE": "samtalens arbejdsmappe (ROOT eller kopien STORE/copies/COPYID/project)",
+  "OUTSIDE": "BASE/Dokumenter/ekstern",
+  "REPO": "Git-roden over projektet (kun git-foraelder)",
+  "STORE": "BASE/appdata/harness",
+  "SCRATCH": "STORE/scratch/PROJECTKEY/TASK",
+  "RUNTIME": "STORE/runtime/WORKSPACEKEY (motorens mappe; HOME er RUNTIME/home)",
+  "SYSTMP": "os.tmpdir() under optagelsen",
+  "TOOLOUTPUT": "RUNTIME/data/opencode/tool-output/<fil>",
+  ":rel/": "samme sti uden foranstillet skråstreg (OpenCodes path.relative(\"/\", sti) uden Git)"
+ },
+ "scenarios": {
+  "apply-patch-git": {
+   "kilde": "M1-kontraktdesignets optager (rec.cjs) med samme forløb som scripts/record-opencode-contract.cjs forloeb",
+   "aura": "d816a9e",
+   "mode": "build",
+   "git": true,
+   "copy": false,
+   "model": "gpt-5-kontrakt",
+   "outcome": "idle",
+   "error": null
+  },
+  "apply-patch-uden-git": {
+   "kilde": "M1-kontraktdesignets optager (rec.cjs) med samme forløb som scripts/record-opencode-contract.cjs forloeb",
+   "aura": "d816a9e",
+   "mode": "build",
+   "git": false,
+   "copy": false,
+   "model": "gpt-5-kontrakt",
+   "outcome": "idle",
+   "error": null
+  },
+  "byg-git-filer": {
+   "kilde": "M1-kontraktdesignets optager (rec.cjs) med samme forløb som scripts/record-opencode-contract.cjs forloeb",
+   "aura": "d816a9e",
+   "mode": "build",
+   "git": true,
+   "copy": false,
+   "model": "kontraktmodel",
+   "outcome": "idle",
+   "error": null
+  },
+  "byg-git-soeg": {
+   "kilde": "M1-kontraktdesignets optager (rec.cjs) med samme forløb som scripts/record-opencode-contract.cjs forloeb",
+   "aura": "d816a9e",
+   "mode": "build",
+   "git": true,
+   "copy": false,
+   "model": "kontraktmodel",
+   "outcome": "idle",
+   "error": null
+  },
+  "byg-uden-git-filer": {
+   "kilde": "M1-kontraktdesignets optager (rec.cjs) med samme forløb som scripts/record-opencode-contract.cjs forloeb",
+   "aura": "d816a9e",
+   "mode": "build",
+   "git": false,
+   "copy": false,
+   "model": "kontraktmodel",
+   "outcome": "idle",
+   "error": null
+  },
+  "byg-uden-git-soeg": {
+   "kilde": "M1-kontraktdesignets optager (rec.cjs) med samme forløb som scripts/record-opencode-contract.cjs forloeb",
+   "aura": "d816a9e",
+   "mode": "build",
+   "git": false,
+   "copy": false,
+   "model": "kontraktmodel",
+   "outcome": "idle",
+   "error": null
+  },
+  "free-git-filer": {
+   "kilde": "M1-kontraktdesignets optager (rec.cjs) med samme forløb som scripts/record-opencode-contract.cjs forloeb",
+   "aura": "d816a9e",
+   "mode": "free",
+   "git": true,
+   "copy": false,
+   "model": "kontraktmodel",
+   "outcome": "idle",
+   "error": null
+  },
+  "git-foraelder": {
+   "kilde": "M1-kontraktdesignets optager (rec.cjs) med samme forløb som scripts/record-opencode-contract.cjs forloeb",
+   "aura": "d816a9e",
+   "mode": "build",
+   "git": "parent",
+   "copy": false,
+   "model": "kontraktmodel",
+   "outcome": "idle",
+   "error": null
+  },
+  "kopi-git": {
+   "kilde": "M1-kontraktdesignets optager (rec.cjs) med samme forløb som scripts/record-opencode-contract.cjs forloeb",
+   "aura": "d816a9e",
+   "mode": "build",
+   "git": true,
+   "copy": true,
+   "model": "kontraktmodel",
+   "outcome": "idle",
+   "error": null
+  },
+  "plan-git": {
+   "kilde": "M1-kontraktdesignets optager (rec.cjs) med samme forløb som scripts/record-opencode-contract.cjs forloeb",
+   "aura": "d816a9e",
+   "mode": "plan",
+   "git": true,
+   "copy": false,
+   "model": "kontraktmodel",
+   "outcome": "error",
+   "error": "The user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules [{\"permission\":\"*\",\"action\":\"allow\",\"pattern\":\"*\"},{\"permission\":\"doom_loop\",\"action\":\"ask\",\"pattern\":\"*\"},{\"permission\":\"*\",\"action\":\"deny\",\"pattern\":\"*\"},{\"permission\":\"*\",\"action\":\"deny\",\"pattern\":\"*\"}]"
+  },
+  "samtale-git": {
+   "kilde": "M1-kontraktdesignets optager (rec.cjs) med samme forløb som scripts/record-opencode-contract.cjs forloeb",
+   "aura": "d816a9e",
+   "mode": "chat",
+   "git": true,
+   "copy": false,
+   "model": "kontraktmodel",
+   "outcome": "idle",
+   "error": null
+  }
+ },
+ "entries": [
+  {
+   "file": "apply-patch-git__patch-tilfoej-inde__1-edit.json",
+   "scenario": "apply-patch-git",
+   "case": "patch-tilfoej-inde",
+   "permission": "edit",
+   "patterns": [
+    "public/patch.html"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:edit",
+    "del:running",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": "apply-patch-git__patch-tilfoej-ude-relativ__1-external_directory.json",
+   "scenario": "apply-patch-git",
+   "case": "patch-tilfoej-ude-relativ",
+   "permission": "external_directory",
+   "patterns": [
+    "${OUTSIDE}/*"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:external_directory",
+    "del:running",
+    "svar:once",
+    "spørg:edit",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": "apply-patch-git__patch-tilfoej-ude-relativ__2-edit.json",
+   "scenario": "apply-patch-git",
+   "case": "patch-tilfoej-ude-relativ",
+   "permission": "edit",
+   "patterns": [
+    "../ekstern/patch.txt"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:external_directory",
+    "del:running",
+    "svar:once",
+    "spørg:edit",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": "apply-patch-git__patch-tilfoej-ude-absolut__1-external_directory.json",
+   "scenario": "apply-patch-git",
+   "case": "patch-tilfoej-ude-absolut",
+   "permission": "external_directory",
+   "patterns": [
+    "${OUTSIDE}/*"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:external_directory",
+    "del:running",
+    "svar:once",
+    "spørg:edit",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": "apply-patch-git__patch-tilfoej-ude-absolut__2-edit.json",
+   "scenario": "apply-patch-git",
+   "case": "patch-tilfoej-ude-absolut",
+   "permission": "edit",
+   "patterns": [
+    "../ekstern/patch2.txt"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:external_directory",
+    "del:running",
+    "svar:once",
+    "spørg:edit",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": "apply-patch-git__patch-opdater-inde__1-edit.json",
+   "scenario": "apply-patch-git",
+   "case": "patch-opdater-inde",
+   "permission": "edit",
+   "patterns": [
+    "notes.txt"
+   ],
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "spørg:edit",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Filændring: ${ROOT}/notes.txt",
+   "recordedAllowed": false
+  },
+  {
+   "file": "apply-patch-git__patch-to-filer__1-external_directory.json",
+   "scenario": "apply-patch-git",
+   "case": "patch-to-filer",
+   "permission": "external_directory",
+   "patterns": [
+    "${OUTSIDE}/*"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:external_directory",
+    "del:running",
+    "svar:once",
+    "spørg:edit",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": "apply-patch-git__patch-to-filer__2-edit.json",
+   "scenario": "apply-patch-git",
+   "case": "patch-to-filer",
+   "permission": "edit",
+   "patterns": [
+    "public/a.html",
+    "../ekstern/b.txt"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:external_directory",
+    "del:running",
+    "svar:once",
+    "spørg:edit",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": "apply-patch-uden-git__patch-tilfoej-inde__1-edit.json",
+   "scenario": "apply-patch-uden-git",
+   "case": "patch-tilfoej-inde",
+   "permission": "edit",
+   "patterns": [
+    "${ROOT:rel/}/public/patch.html"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:edit",
+    "del:running",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": "apply-patch-uden-git__patch-tilfoej-ude-relativ__1-external_directory.json",
+   "scenario": "apply-patch-uden-git",
+   "case": "patch-tilfoej-ude-relativ",
+   "permission": "external_directory",
+   "patterns": [
+    "${OUTSIDE}/*"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:external_directory",
+    "del:running",
+    "svar:once",
+    "spørg:edit",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": "apply-patch-uden-git__patch-tilfoej-ude-relativ__2-edit.json",
+   "scenario": "apply-patch-uden-git",
+   "case": "patch-tilfoej-ude-relativ",
+   "permission": "edit",
+   "patterns": [
+    "${OUTSIDE:rel/}/patch.txt"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:external_directory",
+    "del:running",
+    "svar:once",
+    "spørg:edit",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": "apply-patch-uden-git__patch-tilfoej-ude-absolut__1-external_directory.json",
+   "scenario": "apply-patch-uden-git",
+   "case": "patch-tilfoej-ude-absolut",
+   "permission": "external_directory",
+   "patterns": [
+    "${OUTSIDE}/*"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:external_directory",
+    "del:running",
+    "svar:once",
+    "spørg:edit",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": "apply-patch-uden-git__patch-tilfoej-ude-absolut__2-edit.json",
+   "scenario": "apply-patch-uden-git",
+   "case": "patch-tilfoej-ude-absolut",
+   "permission": "edit",
+   "patterns": [
+    "${OUTSIDE:rel/}/patch2.txt"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:external_directory",
+    "del:running",
+    "svar:once",
+    "spørg:edit",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Filændring: ${OUTSIDE}/patch2.txt",
+   "recordedAllowed": false
+  },
+  {
+   "file": "apply-patch-uden-git__patch-opdater-inde__1-edit.json",
+   "scenario": "apply-patch-uden-git",
+   "case": "patch-opdater-inde",
+   "permission": "edit",
+   "patterns": [
+    "${ROOT:rel/}/notes.txt"
+   ],
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "spørg:edit",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Filændring: ${ROOT}/notes.txt",
+   "recordedAllowed": false
+  },
+  {
+   "file": "apply-patch-uden-git__patch-to-filer__1-external_directory.json",
+   "scenario": "apply-patch-uden-git",
+   "case": "patch-to-filer",
+   "permission": "external_directory",
+   "patterns": [
+    "${OUTSIDE}/*"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:external_directory",
+    "del:running",
+    "svar:once",
+    "spørg:edit",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": "apply-patch-uden-git__patch-to-filer__2-edit.json",
+   "scenario": "apply-patch-uden-git",
+   "case": "patch-to-filer",
+   "permission": "edit",
+   "patterns": [
+    "${ROOT:rel/}/public/a.html",
+    "${OUTSIDE:rel/}/b.txt"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:external_directory",
+    "del:running",
+    "svar:once",
+    "spørg:edit",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Filændring: ${OUTSIDE}/b.txt\n${ROOT}/public/a.html",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-git-filer__read-ude-absolut__1-external_directory.json",
+   "scenario": "byg-git-filer",
+   "case": "read-ude-absolut",
+   "permission": "external_directory",
+   "patterns": [
+    "${OUTSIDE}/*"
+   ],
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "spørg:external_directory",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-git-filer__read-ude-relativ__1-external_directory.json",
+   "scenario": "byg-git-filer",
+   "case": "read-ude-relativ",
+   "permission": "external_directory",
+   "patterns": [
+    "${OUTSIDE}/*"
+   ],
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "spørg:external_directory",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-git-filer__read-ude-mappe__1-external_directory.json",
+   "scenario": "byg-git-filer",
+   "case": "read-ude-mappe",
+   "permission": "external_directory",
+   "patterns": [
+    "${OUTSIDE}/*"
+   ],
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "spørg:external_directory",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-git-filer__write-inde-absolut__1-edit.json",
+   "scenario": "byg-git-filer",
+   "case": "write-inde-absolut",
+   "permission": "edit",
+   "patterns": [
+    "public/ny.html"
+   ],
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "spørg:edit",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Filændring: ${ROOT}/public/ny.html",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-git-filer__write-inde-relativ__1-edit.json",
+   "scenario": "byg-git-filer",
+   "case": "write-inde-relativ",
+   "permission": "edit",
+   "patterns": [
+    "public/ny2.html"
+   ],
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "spørg:edit",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Filændring: ${ROOT}/public/ny2.html",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-git-filer__write-inde-ny-mappe__1-edit.json",
+   "scenario": "byg-git-filer",
+   "case": "write-inde-ny-mappe",
+   "permission": "edit",
+   "patterns": [
+    "src/dyb/ny/fil.js"
+   ],
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "spørg:edit",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Filændring: ${ROOT}/src/dyb/ny/fil.js",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-git-filer__write-ude-absolut__1-external_directory.json",
+   "scenario": "byg-git-filer",
+   "case": "write-ude-absolut",
+   "permission": "external_directory",
+   "patterns": [
+    "${OUTSIDE}/*"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:external_directory",
+    "del:running",
+    "svar:once",
+    "spørg:edit",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-git-filer__write-ude-absolut__2-edit.json",
+   "scenario": "byg-git-filer",
+   "case": "write-ude-absolut",
+   "permission": "edit",
+   "patterns": [
+    "../ekstern/ny.txt"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:external_directory",
+    "del:running",
+    "svar:once",
+    "spørg:edit",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-git-filer__write-ude-relativ__1-external_directory.json",
+   "scenario": "byg-git-filer",
+   "case": "write-ude-relativ",
+   "permission": "external_directory",
+   "patterns": [
+    "${OUTSIDE}/*"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:external_directory",
+    "del:running",
+    "svar:once",
+    "spørg:edit",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-git-filer__write-ude-relativ__2-edit.json",
+   "scenario": "byg-git-filer",
+   "case": "write-ude-relativ",
+   "permission": "edit",
+   "patterns": [
+    "../ekstern/ny2.txt"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:external_directory",
+    "del:running",
+    "svar:once",
+    "spørg:edit",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-git-filer__write-ude-ny-mappe__1-external_directory.json",
+   "scenario": "byg-git-filer",
+   "case": "write-ude-ny-mappe",
+   "permission": "external_directory",
+   "patterns": [
+    "${OUTSIDE}/ny-mappe/*"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:external_directory",
+    "del:running",
+    "svar:once",
+    "spørg:edit",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-git-filer__write-ude-ny-mappe__2-edit.json",
+   "scenario": "byg-git-filer",
+   "case": "write-ude-ny-mappe",
+   "permission": "edit",
+   "patterns": [
+    "../ekstern/ny-mappe/fil.txt"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:external_directory",
+    "del:running",
+    "svar:once",
+    "spørg:edit",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-git-filer__write-scratch__1-external_directory.json",
+   "scenario": "byg-git-filer",
+   "case": "write-scratch",
+   "permission": "external_directory",
+   "patterns": [
+    "${SCRATCH}/*"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:external_directory",
+    "del:running",
+    "svar:once",
+    "spørg:edit",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-git-filer__write-scratch__2-edit.json",
+   "scenario": "byg-git-filer",
+   "case": "write-scratch",
+   "permission": "edit",
+   "patterns": [
+    "../../appdata/harness/scratch/${PROJECTKEY}/${TASK}/noter.md"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:external_directory",
+    "del:running",
+    "svar:once",
+    "spørg:edit",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-git-filer__edit-inde-absolut__1-edit.json",
+   "scenario": "byg-git-filer",
+   "case": "edit-inde-absolut",
+   "permission": "edit",
+   "patterns": [
+    "notes.txt"
+   ],
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "spørg:edit",
+    "svar:once",
+    "del:running",
+    "del:completed"
+   ],
+   "recordedLabel": "Filændring: ${ROOT}/notes.txt",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-git-filer__edit-inde-relativ__1-edit.json",
+   "scenario": "byg-git-filer",
+   "case": "edit-inde-relativ",
+   "permission": "edit",
+   "patterns": [
+    "src/app.js"
+   ],
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "spørg:edit",
+    "svar:once",
+    "del:running",
+    "del:completed"
+   ],
+   "recordedLabel": "Filændring: ${ROOT}/src/app.js",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-git-filer__edit-ude-absolut__1-external_directory.json",
+   "scenario": "byg-git-filer",
+   "case": "edit-ude-absolut",
+   "permission": "external_directory",
+   "patterns": [
+    "${OUTSIDE}/*"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:external_directory",
+    "del:running",
+    "svar:once",
+    "spørg:edit",
+    "svar:once",
+    "del:running",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-git-filer__edit-ude-absolut__2-edit.json",
+   "scenario": "byg-git-filer",
+   "case": "edit-ude-absolut",
+   "permission": "edit",
+   "patterns": [
+    "../ekstern/fil.txt"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:external_directory",
+    "del:running",
+    "svar:once",
+    "spørg:edit",
+    "svar:once",
+    "del:running",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": null,
+   "scenario": "byg-git-filer",
+   "case": "read-inde-absolut",
+   "permission": null,
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "del:completed"
+   ],
+   "toolResult": [
+    "<path>${ROOT}/notes.txt</path> <type>file</type> <content> 1: Hej verden NEEDLE (End of file - total 1 lines) </content>"
+   ]
+  },
+  {
+   "file": null,
+   "scenario": "byg-git-filer",
+   "case": "read-inde-relativ",
+   "permission": null,
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "del:completed"
+   ],
+   "toolResult": [
+    "<path>${ROOT}/notes.txt</path> <type>file</type> <content> 1: Hej verden NEEDLE (End of file - total 1 lines) </content>"
+   ]
+  },
+  {
+   "file": null,
+   "scenario": "byg-git-filer",
+   "case": "read-app",
+   "permission": null,
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "del:completed"
+   ],
+   "toolResult": [
+    "<path>${ROOT}/src/app.js</path> <type>file</type> <content> 1: const [a] = useState(0); // NEEDLE (End of file - total 1 lines) </content>"
+   ]
+  },
+  {
+   "file": null,
+   "scenario": "byg-git-filer",
+   "case": "read-env",
+   "permission": null,
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "del:error"
+   ],
+   "toolResult": [
+    "Aura beskytter denne fil."
+   ]
+  },
+  {
+   "file": null,
+   "scenario": "byg-git-filer",
+   "case": "read-mappe-inde",
+   "permission": null,
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "del:completed"
+   ],
+   "toolResult": [
+    "<path>${ROOT}/public</path> <type>directory</type> <entries> index.html (1 entries) </entries>"
+   ]
+  },
+  {
+   "file": null,
+   "scenario": "byg-git-filer",
+   "case": "write-env",
+   "permission": null,
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "del:error"
+   ],
+   "toolResult": [
+    "The user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules [{\"permission\":\"*\",\"action\":\"allow\",\"pattern\":\"*\"},{\"permission\":\"*\",\"action\":\""
+   ]
+  },
+  {
+   "file": null,
+   "scenario": "byg-git-filer",
+   "case": "write-git-mappe",
+   "permission": null,
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "del:error"
+   ],
+   "toolResult": [
+    "The user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules [{\"permission\":\"*\",\"action\":\"allow\",\"pattern\":\"*\"},{\"permission\":\"*\",\"action\":\""
+   ]
+  },
+  {
+   "file": "byg-git-soeg__grep-uden-sti__1-grep.json",
+   "scenario": "byg-git-soeg",
+   "case": "grep-uden-sti",
+   "permission": "grep",
+   "patterns": [
+    "NEEDLE"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:grep",
+    "del:running",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-git-soeg__grep-sti-inde-absolut__1-grep.json",
+   "scenario": "byg-git-soeg",
+   "case": "grep-sti-inde-absolut",
+   "permission": "grep",
+   "patterns": [
+    "NEEDLE"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:grep",
+    "del:running",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Læsning: ${ROOT}/src",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-git-soeg__grep-sti-inde-relativ__1-grep.json",
+   "scenario": "byg-git-soeg",
+   "case": "grep-sti-inde-relativ",
+   "permission": "grep",
+   "patterns": [
+    "NEEDLE"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:grep",
+    "del:running",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-git-soeg__grep-include__1-grep.json",
+   "scenario": "byg-git-soeg",
+   "case": "grep-include",
+   "permission": "grep",
+   "patterns": [
+    "useState"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:grep",
+    "del:running",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-git-soeg__grep-hemmelighed__1-grep.json",
+   "scenario": "byg-git-soeg",
+   "case": "grep-hemmelighed",
+   "permission": "grep",
+   "patterns": [
+    "HEMMELIG"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:grep",
+    "del:running",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-git-soeg__grep-sti-ude__1-grep.json",
+   "scenario": "byg-git-soeg",
+   "case": "grep-sti-ude",
+   "permission": "grep",
+   "patterns": [
+    "Ekstern"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:grep",
+    "del:running",
+    "svar:once",
+    "spørg:external_directory",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Læsning: ${OUTSIDE}",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-git-soeg__grep-sti-ude__2-external_directory.json",
+   "scenario": "byg-git-soeg",
+   "case": "grep-sti-ude",
+   "permission": "external_directory",
+   "patterns": [
+    "${OUTSIDE}/*"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:grep",
+    "del:running",
+    "svar:once",
+    "spørg:external_directory",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-git-soeg__grep-sti-ude-relativ__1-grep.json",
+   "scenario": "byg-git-soeg",
+   "case": "grep-sti-ude-relativ",
+   "permission": "grep",
+   "patterns": [
+    "Ekstern"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:grep",
+    "del:running",
+    "svar:once",
+    "spørg:external_directory",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-git-soeg__grep-sti-ude-relativ__2-external_directory.json",
+   "scenario": "byg-git-soeg",
+   "case": "grep-sti-ude-relativ",
+   "permission": "external_directory",
+   "patterns": [
+    "${OUTSIDE}/*"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:grep",
+    "del:running",
+    "svar:once",
+    "spørg:external_directory",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-git-soeg__glob-sti-ude__1-external_directory.json",
+   "scenario": "byg-git-soeg",
+   "case": "glob-sti-ude",
+   "permission": "external_directory",
+   "patterns": [
+    "${OUTSIDE}/*"
+   ],
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "spørg:external_directory",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-git-soeg__bash-kort__1-bash.json",
+   "scenario": "byg-git-soeg",
+   "case": "bash-kort",
+   "permission": "bash",
+   "patterns": [
+    "ls public"
+   ],
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "spørg:bash",
+    "svar:once",
+    "del:running",
+    "del:completed"
+   ],
+   "recordedLabel": "Kommando: ls public",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-git-soeg__bash-lang__1-bash.json",
+   "scenario": "byg-git-soeg",
+   "case": "bash-lang",
+   "permission": "bash",
+   "patterns": [
+    "npm install --no-audit --no-fund --prefer-offline",
+    "npm run build --if-present",
+    "node -e \"console.log(require('./package.json').name)\"",
+    "echo \"Bygget uden fejl i mappen $(pwd) med node $(node --version) og npm $(npm --version)\"",
+    "pwd",
+    "node --version",
+    "npm --version",
+    "cat build.log"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:bash",
+    "del:running",
+    "svar:once",
+    "del:running",
+    "del:completed"
+   ],
+   "recordedLabel": "Kommando: npm install --no-audit --no-fund --prefer-offline && npm run build --if-present && node -e \"console.log(require('./package.json').name)\" && echo \"Bygget uden fejl i mappen $(pwd) med node $(node --version) og npm $(npm --version)\" > build.log && cat build.log",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-git-soeg__bash-workdir-inde__1-bash.json",
+   "scenario": "byg-git-soeg",
+   "case": "bash-workdir-inde",
+   "permission": "bash",
+   "patterns": [
+    "ls"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:bash",
+    "del:running",
+    "svar:once",
+    "del:running",
+    "del:completed"
+   ],
+   "recordedLabel": "Kommando: ls",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-git-soeg__bash-workdir-ude__1-external_directory.json",
+   "scenario": "byg-git-soeg",
+   "case": "bash-workdir-ude",
+   "permission": "external_directory",
+   "patterns": [
+    "${OUTSIDE}/*"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:external_directory",
+    "del:running",
+    "svar:once",
+    "spørg:bash",
+    "svar:once",
+    "del:running",
+    "del:completed"
+   ],
+   "recordedLabel": "Mappeadgang: ${OUTSIDE}/*",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-git-soeg__bash-workdir-ude__2-bash.json",
+   "scenario": "byg-git-soeg",
+   "case": "bash-workdir-ude",
+   "permission": "bash",
+   "patterns": [
+    "ls"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:external_directory",
+    "del:running",
+    "svar:once",
+    "spørg:bash",
+    "svar:once",
+    "del:running",
+    "del:completed"
+   ],
+   "recordedLabel": "Kommando: ls",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-git-soeg__bash-cat-ude__1-external_directory.json",
+   "scenario": "byg-git-soeg",
+   "case": "bash-cat-ude",
+   "permission": "external_directory",
+   "patterns": [
+    "${OUTSIDE}/*"
+   ],
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "spørg:external_directory",
+    "svar:once",
+    "spørg:bash",
+    "svar:once",
+    "del:running",
+    "del:completed"
+   ],
+   "recordedLabel": "Mappeadgang: ${OUTSIDE}/*",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-git-soeg__bash-cat-ude__2-bash.json",
+   "scenario": "byg-git-soeg",
+   "case": "bash-cat-ude",
+   "permission": "bash",
+   "patterns": [
+    "cat ${OUTSIDE}/fil.txt"
+   ],
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "spørg:external_directory",
+    "svar:once",
+    "spørg:bash",
+    "svar:once",
+    "del:running",
+    "del:completed"
+   ],
+   "recordedLabel": "Kommando: cat ${OUTSIDE}/fil.txt",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-git-soeg__bash-cat-ude-relativ__1-external_directory.json",
+   "scenario": "byg-git-soeg",
+   "case": "bash-cat-ude-relativ",
+   "permission": "external_directory",
+   "patterns": [
+    "${OUTSIDE}/*"
+   ],
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "spørg:external_directory",
+    "svar:once",
+    "spørg:bash",
+    "svar:once",
+    "del:running",
+    "del:completed"
+   ],
+   "recordedLabel": "Mappeadgang: ${OUTSIDE}/*",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-git-soeg__bash-cat-ude-relativ__2-bash.json",
+   "scenario": "byg-git-soeg",
+   "case": "bash-cat-ude-relativ",
+   "permission": "bash",
+   "patterns": [
+    "cat ../ekstern/fil.txt"
+   ],
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "spørg:external_directory",
+    "svar:once",
+    "spørg:bash",
+    "svar:once",
+    "del:running",
+    "del:completed"
+   ],
+   "recordedLabel": "Kommando: cat ../ekstern/fil.txt",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-git-soeg__bash-cd-ud__1-external_directory.json",
+   "scenario": "byg-git-soeg",
+   "case": "bash-cd-ud",
+   "permission": "external_directory",
+   "patterns": [
+    "${DOCUMENTS}/*"
+   ],
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "spørg:external_directory",
+    "svar:once",
+    "spørg:bash",
+    "svar:once",
+    "del:running",
+    "del:completed"
+   ],
+   "recordedLabel": "Mappeadgang: ${DOCUMENTS}/*",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-git-soeg__bash-cd-ud__2-bash.json",
+   "scenario": "byg-git-soeg",
+   "case": "bash-cd-ud",
+   "permission": "bash",
+   "patterns": [
+    "ls"
+   ],
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "spørg:external_directory",
+    "svar:once",
+    "spørg:bash",
+    "svar:once",
+    "del:running",
+    "del:completed"
+   ],
+   "recordedLabel": "Kommando: cd .. && ls",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-git-soeg__bash-npm-build__1-bash.json",
+   "scenario": "byg-git-soeg",
+   "case": "bash-npm-build",
+   "permission": "bash",
+   "patterns": [
+    "npm run build --if-present"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:bash",
+    "del:running",
+    "svar:once",
+    "del:running",
+    "del:completed"
+   ],
+   "recordedLabel": "Kommando: npm run build --if-present",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-git-soeg__bash-pipe__1-bash.json",
+   "scenario": "byg-git-soeg",
+   "case": "bash-pipe",
+   "permission": "bash",
+   "patterns": [
+    "git status --short",
+    "head -5"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:bash",
+    "del:running",
+    "svar:once",
+    "del:running",
+    "del:completed"
+   ],
+   "recordedLabel": "Kommando: git status --short | head -5",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-git-soeg__bash-redirect-tmp__1-bash.json",
+   "scenario": "byg-git-soeg",
+   "case": "bash-redirect-tmp",
+   "permission": "bash",
+   "patterns": [
+    "echo hej > ${SYSTMP}/aura-kontrakt-69798.txt"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:bash",
+    "del:running",
+    "svar:once",
+    "del:running",
+    "del:completed"
+   ],
+   "recordedLabel": "Kommando: echo hej > ${SYSTMP}/aura-kontrakt-69798.txt",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-git-soeg__bash-langt-output__1-bash.json",
+   "scenario": "byg-git-soeg",
+   "case": "bash-langt-output",
+   "permission": "bash",
+   "patterns": [
+    "seq 1 40000"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:bash",
+    "del:running",
+    "svar:once",
+    "del:running",
+    "del:completed"
+   ],
+   "recordedLabel": "Kommando: seq 1 40000",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-git-soeg__grep-tool-output__1-grep.json",
+   "scenario": "byg-git-soeg",
+   "case": "grep-tool-output",
+   "permission": "grep",
+   "patterns": [
+    "^39999$"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:grep",
+    "del:running",
+    "svar:once",
+    "spørg:external_directory",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Læsning: ${RUNTIME}/data/opencode/tool-output",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-git-soeg__grep-tool-output__2-external_directory.json",
+   "scenario": "byg-git-soeg",
+   "case": "grep-tool-output",
+   "permission": "external_directory",
+   "patterns": [
+    "${RUNTIME}/data/opencode/*"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:grep",
+    "del:running",
+    "svar:once",
+    "spørg:external_directory",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-git-soeg__webfetch__1-webfetch.json",
+   "scenario": "byg-git-soeg",
+   "case": "webfetch",
+   "permission": "webfetch",
+   "patterns": [
+    "http://127.0.0.1:64064/side"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:webfetch",
+    "del:running",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Hjemmeside: http://127.0.0.1:64064",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-git-soeg__webfetch-localhost-sti__1-webfetch.json",
+   "scenario": "byg-git-soeg",
+   "case": "webfetch-localhost-sti",
+   "permission": "webfetch",
+   "patterns": [
+    "http://localhost:64064/andet?q=1"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:webfetch",
+    "del:running",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Hjemmeside: http://localhost:64064",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-git-soeg__doom-loop__1-doom_loop.json",
+   "scenario": "byg-git-soeg",
+   "case": "doom-loop",
+   "permission": "doom_loop",
+   "patterns": [
+    "read"
+   ],
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "del:pending",
+    "del:running",
+    "del:pending",
+    "del:running",
+    "spørg:doom_loop",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": null,
+   "scenario": "byg-git-soeg",
+   "case": "glob-uden-sti",
+   "permission": null,
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "del:completed"
+   ],
+   "toolResult": [
+    "${ROOT}/public/index.html"
+   ]
+  },
+  {
+   "file": null,
+   "scenario": "byg-git-soeg",
+   "case": "glob-sti-inde",
+   "permission": null,
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "del:completed"
+   ],
+   "toolResult": [
+    "${ROOT}/src/app.js"
+   ]
+  },
+  {
+   "file": null,
+   "scenario": "byg-git-soeg",
+   "case": "list",
+   "permission": null,
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "del:completed"
+   ],
+   "toolResult": [
+    "The arguments provided to the tool are invalid: Model tried to call unavailable tool 'list'. Available tools: bash, edit, glob, grep, invalid, question, read, skill, todowrite, webfetch, write."
+   ]
+  },
+  {
+   "file": null,
+   "scenario": "byg-git-soeg",
+   "case": "read-tool-output",
+   "permission": null,
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "del:error"
+   ],
+   "toolResult": [
+    "ENOENT: no such file or directory, lstat '${RUNTIME}/data/opencode/tool-output/mangler'"
+   ]
+  },
+  {
+   "file": null,
+   "scenario": "byg-git-soeg",
+   "case": "skill-aktiv",
+   "permission": null,
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "del:completed"
+   ],
+   "toolResult": [
+    "<skill_content name=\"harness-ide-og-afgraensning\"> # Skill: harness-ide-og-afgraensning # Idé og afgrænsning Målet er en kort, aftalt beskrivelse af opgaven, som brugeren kan genkende, og som kan afpr"
+   ]
+  },
+  {
+   "file": null,
+   "scenario": "byg-git-soeg",
+   "case": "skill-indbygget",
+   "permission": null,
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "del:error"
+   ],
+   "toolResult": [
+    "The user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules [{\"permission\":\"*\",\"action\":\"allow\",\"pattern\":\"*\"},{\"permission\":\"*\",\"action\":\""
+   ]
+  },
+  {
+   "file": null,
+   "scenario": "byg-git-soeg",
+   "case": "todowrite",
+   "permission": null,
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "del:completed"
+   ],
+   "toolResult": [
+    "[ { \"content\": \"Trin 1\", \"status\": \"in_progress\", \"priority\": \"high\" }, { \"content\": \"Trin 2\", \"status\": \"pending\", \"priority\": \"low\" } ]"
+   ]
+  },
+  {
+   "file": null,
+   "scenario": "byg-git-soeg",
+   "case": "question",
+   "permission": null,
+   "sequence": [
+    "del:pending",
+    "question.asked",
+    "del:running",
+    "del:completed"
+   ],
+   "toolResult": [
+    "User has answered your questions: \"Hvilken farve skal knappen have?\"=\"Blå (anbefalet)\". You can now continue with the user's answers in mind."
+   ]
+  },
+  {
+   "file": "byg-uden-git-filer__read-ude-absolut__1-external_directory.json",
+   "scenario": "byg-uden-git-filer",
+   "case": "read-ude-absolut",
+   "permission": "external_directory",
+   "patterns": [
+    "${OUTSIDE}/*"
+   ],
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "spørg:external_directory",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-uden-git-filer__read-ude-relativ__1-external_directory.json",
+   "scenario": "byg-uden-git-filer",
+   "case": "read-ude-relativ",
+   "permission": "external_directory",
+   "patterns": [
+    "${OUTSIDE}/*"
+   ],
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "spørg:external_directory",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-uden-git-filer__read-ude-mappe__1-external_directory.json",
+   "scenario": "byg-uden-git-filer",
+   "case": "read-ude-mappe",
+   "permission": "external_directory",
+   "patterns": [
+    "${OUTSIDE}/*"
+   ],
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "spørg:external_directory",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-uden-git-filer__write-inde-absolut__1-edit.json",
+   "scenario": "byg-uden-git-filer",
+   "case": "write-inde-absolut",
+   "permission": "edit",
+   "patterns": [
+    "${ROOT:rel/}/public/ny.html"
+   ],
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "spørg:edit",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Filændring: ${ROOT}/public/ny.html",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-uden-git-filer__write-inde-relativ__1-edit.json",
+   "scenario": "byg-uden-git-filer",
+   "case": "write-inde-relativ",
+   "permission": "edit",
+   "patterns": [
+    "${ROOT:rel/}/public/ny2.html"
+   ],
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "spørg:edit",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Filændring: ${ROOT}/public/ny2.html",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-uden-git-filer__write-inde-ny-mappe__1-edit.json",
+   "scenario": "byg-uden-git-filer",
+   "case": "write-inde-ny-mappe",
+   "permission": "edit",
+   "patterns": [
+    "${ROOT:rel/}/src/dyb/ny/fil.js"
+   ],
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "spørg:edit",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Filændring: ${ROOT}/src/dyb/ny/fil.js",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-uden-git-filer__write-ude-absolut__1-external_directory.json",
+   "scenario": "byg-uden-git-filer",
+   "case": "write-ude-absolut",
+   "permission": "external_directory",
+   "patterns": [
+    "${OUTSIDE}/*"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:external_directory",
+    "del:running",
+    "svar:once",
+    "spørg:edit",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-uden-git-filer__write-ude-absolut__2-edit.json",
+   "scenario": "byg-uden-git-filer",
+   "case": "write-ude-absolut",
+   "permission": "edit",
+   "patterns": [
+    "${OUTSIDE:rel/}/ny.txt"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:external_directory",
+    "del:running",
+    "svar:once",
+    "spørg:edit",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Filændring: ${OUTSIDE}/ny.txt",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-uden-git-filer__write-ude-relativ__1-external_directory.json",
+   "scenario": "byg-uden-git-filer",
+   "case": "write-ude-relativ",
+   "permission": "external_directory",
+   "patterns": [
+    "${OUTSIDE}/*"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:external_directory",
+    "del:running",
+    "svar:once",
+    "spørg:edit",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-uden-git-filer__write-ude-relativ__2-edit.json",
+   "scenario": "byg-uden-git-filer",
+   "case": "write-ude-relativ",
+   "permission": "edit",
+   "patterns": [
+    "${OUTSIDE:rel/}/ny2.txt"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:external_directory",
+    "del:running",
+    "svar:once",
+    "spørg:edit",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-uden-git-filer__write-ude-ny-mappe__1-external_directory.json",
+   "scenario": "byg-uden-git-filer",
+   "case": "write-ude-ny-mappe",
+   "permission": "external_directory",
+   "patterns": [
+    "${OUTSIDE}/ny-mappe/*"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:external_directory",
+    "del:running",
+    "svar:once",
+    "spørg:edit",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-uden-git-filer__write-ude-ny-mappe__2-edit.json",
+   "scenario": "byg-uden-git-filer",
+   "case": "write-ude-ny-mappe",
+   "permission": "edit",
+   "patterns": [
+    "${OUTSIDE:rel/}/ny-mappe/fil.txt"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:external_directory",
+    "del:running",
+    "svar:once",
+    "spørg:edit",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Filændring: ${OUTSIDE}/ny-mappe/fil.txt",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-uden-git-filer__write-scratch__1-external_directory.json",
+   "scenario": "byg-uden-git-filer",
+   "case": "write-scratch",
+   "permission": "external_directory",
+   "patterns": [
+    "${SCRATCH}/*"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:external_directory",
+    "del:running",
+    "svar:once",
+    "spørg:edit",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-uden-git-filer__write-scratch__2-edit.json",
+   "scenario": "byg-uden-git-filer",
+   "case": "write-scratch",
+   "permission": "edit",
+   "patterns": [
+    "${SCRATCH:rel/}/noter.md"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:external_directory",
+    "del:running",
+    "svar:once",
+    "spørg:edit",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Filændring: ${SCRATCH}/noter.md",
+   "recordedAllowed": true
+  },
+  {
+   "file": "byg-uden-git-filer__edit-inde-absolut__1-edit.json",
+   "scenario": "byg-uden-git-filer",
+   "case": "edit-inde-absolut",
+   "permission": "edit",
+   "patterns": [
+    "${ROOT:rel/}/notes.txt"
+   ],
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "spørg:edit",
+    "svar:once",
+    "del:running",
+    "del:completed"
+   ],
+   "recordedLabel": "Filændring: ${ROOT}/notes.txt",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-uden-git-filer__edit-inde-relativ__1-edit.json",
+   "scenario": "byg-uden-git-filer",
+   "case": "edit-inde-relativ",
+   "permission": "edit",
+   "patterns": [
+    "${ROOT:rel/}/src/app.js"
+   ],
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "spørg:edit",
+    "svar:once",
+    "del:running",
+    "del:completed"
+   ],
+   "recordedLabel": "Filændring: ${ROOT}/src/app.js",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-uden-git-filer__edit-ude-absolut__1-external_directory.json",
+   "scenario": "byg-uden-git-filer",
+   "case": "edit-ude-absolut",
+   "permission": "external_directory",
+   "patterns": [
+    "${OUTSIDE}/*"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:external_directory",
+    "del:running",
+    "svar:once",
+    "spørg:edit",
+    "svar:once",
+    "del:running",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-uden-git-filer__edit-ude-absolut__2-edit.json",
+   "scenario": "byg-uden-git-filer",
+   "case": "edit-ude-absolut",
+   "permission": "edit",
+   "patterns": [
+    "${OUTSIDE:rel/}/fil.txt"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:external_directory",
+    "del:running",
+    "svar:once",
+    "spørg:edit",
+    "svar:once",
+    "del:running",
+    "del:completed"
+   ],
+   "recordedLabel": "Filændring: ${OUTSIDE}/fil.txt",
+   "recordedAllowed": false
+  },
+  {
+   "file": null,
+   "scenario": "byg-uden-git-filer",
+   "case": "read-inde-absolut",
+   "permission": null,
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "del:completed"
+   ],
+   "toolResult": [
+    "<path>${ROOT}/notes.txt</path> <type>file</type> <content> 1: Hej verden NEEDLE (End of file - total 1 lines) </content>"
+   ]
+  },
+  {
+   "file": null,
+   "scenario": "byg-uden-git-filer",
+   "case": "read-inde-relativ",
+   "permission": null,
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "del:completed"
+   ],
+   "toolResult": [
+    "<path>${ROOT}/notes.txt</path> <type>file</type> <content> 1: Hej verden NEEDLE (End of file - total 1 lines) </content>"
+   ]
+  },
+  {
+   "file": null,
+   "scenario": "byg-uden-git-filer",
+   "case": "read-app",
+   "permission": null,
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "del:completed"
+   ],
+   "toolResult": [
+    "<path>${ROOT}/src/app.js</path> <type>file</type> <content> 1: const [a] = useState(0); // NEEDLE (End of file - total 1 lines) </content>"
+   ]
+  },
+  {
+   "file": null,
+   "scenario": "byg-uden-git-filer",
+   "case": "read-env",
+   "permission": null,
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "del:error"
+   ],
+   "toolResult": [
+    "Aura beskytter denne fil."
+   ]
+  },
+  {
+   "file": null,
+   "scenario": "byg-uden-git-filer",
+   "case": "read-mappe-inde",
+   "permission": null,
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "del:completed"
+   ],
+   "toolResult": [
+    "<path>${ROOT}/public</path> <type>directory</type> <entries> index.html (1 entries) </entries>"
+   ]
+  },
+  {
+   "file": null,
+   "scenario": "byg-uden-git-filer",
+   "case": "write-env",
+   "permission": null,
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "del:error"
+   ],
+   "toolResult": [
+    "The user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules [{\"permission\":\"*\",\"action\":\"allow\",\"pattern\":\"*\"},{\"permission\":\"*\",\"action\":\""
+   ]
+  },
+  {
+   "file": null,
+   "scenario": "byg-uden-git-filer",
+   "case": "write-git-mappe",
+   "permission": null,
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "del:error"
+   ],
+   "toolResult": [
+    "The user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules [{\"permission\":\"*\",\"action\":\"allow\",\"pattern\":\"*\"},{\"permission\":\"*\",\"action\":\""
+   ]
+  },
+  {
+   "file": "byg-uden-git-soeg__grep-uden-sti__1-grep.json",
+   "scenario": "byg-uden-git-soeg",
+   "case": "grep-uden-sti",
+   "permission": "grep",
+   "patterns": [
+    "NEEDLE"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:grep",
+    "del:running",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-uden-git-soeg__grep-sti-inde-absolut__1-grep.json",
+   "scenario": "byg-uden-git-soeg",
+   "case": "grep-sti-inde-absolut",
+   "permission": "grep",
+   "patterns": [
+    "NEEDLE"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:grep",
+    "del:running",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Læsning: ${ROOT}/src",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-uden-git-soeg__grep-sti-inde-relativ__1-grep.json",
+   "scenario": "byg-uden-git-soeg",
+   "case": "grep-sti-inde-relativ",
+   "permission": "grep",
+   "patterns": [
+    "NEEDLE"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:grep",
+    "del:running",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-uden-git-soeg__grep-include__1-grep.json",
+   "scenario": "byg-uden-git-soeg",
+   "case": "grep-include",
+   "permission": "grep",
+   "patterns": [
+    "useState"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:grep",
+    "del:running",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-uden-git-soeg__grep-hemmelighed__1-grep.json",
+   "scenario": "byg-uden-git-soeg",
+   "case": "grep-hemmelighed",
+   "permission": "grep",
+   "patterns": [
+    "HEMMELIG"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:grep",
+    "del:running",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-uden-git-soeg__grep-sti-ude__1-grep.json",
+   "scenario": "byg-uden-git-soeg",
+   "case": "grep-sti-ude",
+   "permission": "grep",
+   "patterns": [
+    "Ekstern"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:grep",
+    "del:running",
+    "svar:once",
+    "spørg:external_directory",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Læsning: ${OUTSIDE}",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-uden-git-soeg__grep-sti-ude__2-external_directory.json",
+   "scenario": "byg-uden-git-soeg",
+   "case": "grep-sti-ude",
+   "permission": "external_directory",
+   "patterns": [
+    "${OUTSIDE}/*"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:grep",
+    "del:running",
+    "svar:once",
+    "spørg:external_directory",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-uden-git-soeg__grep-sti-ude-relativ__1-grep.json",
+   "scenario": "byg-uden-git-soeg",
+   "case": "grep-sti-ude-relativ",
+   "permission": "grep",
+   "patterns": [
+    "Ekstern"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:grep",
+    "del:running",
+    "svar:once",
+    "spørg:external_directory",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-uden-git-soeg__grep-sti-ude-relativ__2-external_directory.json",
+   "scenario": "byg-uden-git-soeg",
+   "case": "grep-sti-ude-relativ",
+   "permission": "external_directory",
+   "patterns": [
+    "${OUTSIDE}/*"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:grep",
+    "del:running",
+    "svar:once",
+    "spørg:external_directory",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-uden-git-soeg__glob-sti-ude__1-external_directory.json",
+   "scenario": "byg-uden-git-soeg",
+   "case": "glob-sti-ude",
+   "permission": "external_directory",
+   "patterns": [
+    "${OUTSIDE}/*"
+   ],
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "spørg:external_directory",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-uden-git-soeg__bash-kort__1-bash.json",
+   "scenario": "byg-uden-git-soeg",
+   "case": "bash-kort",
+   "permission": "bash",
+   "patterns": [
+    "ls public"
+   ],
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "spørg:bash",
+    "svar:once",
+    "del:running",
+    "del:completed"
+   ],
+   "recordedLabel": "Kommando: ls public",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-uden-git-soeg__bash-lang__1-bash.json",
+   "scenario": "byg-uden-git-soeg",
+   "case": "bash-lang",
+   "permission": "bash",
+   "patterns": [
+    "npm install --no-audit --no-fund --prefer-offline",
+    "npm run build --if-present",
+    "node -e \"console.log(require('./package.json').name)\"",
+    "echo \"Bygget uden fejl i mappen $(pwd) med node $(node --version) og npm $(npm --version)\"",
+    "pwd",
+    "node --version",
+    "npm --version",
+    "cat build.log"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:bash",
+    "del:running",
+    "svar:once",
+    "del:running",
+    "del:completed"
+   ],
+   "recordedLabel": "Kommando: npm install --no-audit --no-fund --prefer-offline && npm run build --if-present && node -e \"console.log(require('./package.json').name)\" && echo \"Bygget uden fejl i mappen $(pwd) med node $(node --version) og npm $(npm --version)\" > build.log && cat build.log",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-uden-git-soeg__bash-workdir-inde__1-bash.json",
+   "scenario": "byg-uden-git-soeg",
+   "case": "bash-workdir-inde",
+   "permission": "bash",
+   "patterns": [
+    "ls"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:bash",
+    "del:running",
+    "svar:once",
+    "del:running",
+    "del:completed"
+   ],
+   "recordedLabel": "Kommando: ls",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-uden-git-soeg__bash-workdir-ude__1-external_directory.json",
+   "scenario": "byg-uden-git-soeg",
+   "case": "bash-workdir-ude",
+   "permission": "external_directory",
+   "patterns": [
+    "${OUTSIDE}/*"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:external_directory",
+    "del:running",
+    "svar:once",
+    "spørg:bash",
+    "svar:once",
+    "del:running",
+    "del:completed"
+   ],
+   "recordedLabel": "Mappeadgang: ${OUTSIDE}/*",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-uden-git-soeg__bash-workdir-ude__2-bash.json",
+   "scenario": "byg-uden-git-soeg",
+   "case": "bash-workdir-ude",
+   "permission": "bash",
+   "patterns": [
+    "ls"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:external_directory",
+    "del:running",
+    "svar:once",
+    "spørg:bash",
+    "svar:once",
+    "del:running",
+    "del:completed"
+   ],
+   "recordedLabel": "Kommando: ls",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-uden-git-soeg__bash-cat-ude__1-external_directory.json",
+   "scenario": "byg-uden-git-soeg",
+   "case": "bash-cat-ude",
+   "permission": "external_directory",
+   "patterns": [
+    "${OUTSIDE}/*"
+   ],
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "spørg:external_directory",
+    "svar:once",
+    "spørg:bash",
+    "svar:once",
+    "del:running",
+    "del:completed"
+   ],
+   "recordedLabel": "Mappeadgang: ${OUTSIDE}/*",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-uden-git-soeg__bash-cat-ude__2-bash.json",
+   "scenario": "byg-uden-git-soeg",
+   "case": "bash-cat-ude",
+   "permission": "bash",
+   "patterns": [
+    "cat ${OUTSIDE}/fil.txt"
+   ],
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "spørg:external_directory",
+    "svar:once",
+    "spørg:bash",
+    "svar:once",
+    "del:running",
+    "del:completed"
+   ],
+   "recordedLabel": "Kommando: cat ${OUTSIDE}/fil.txt",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-uden-git-soeg__bash-cat-ude-relativ__1-external_directory.json",
+   "scenario": "byg-uden-git-soeg",
+   "case": "bash-cat-ude-relativ",
+   "permission": "external_directory",
+   "patterns": [
+    "${OUTSIDE}/*"
+   ],
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "spørg:external_directory",
+    "svar:once",
+    "spørg:bash",
+    "svar:once",
+    "del:running",
+    "del:completed"
+   ],
+   "recordedLabel": "Mappeadgang: ${OUTSIDE}/*",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-uden-git-soeg__bash-cat-ude-relativ__2-bash.json",
+   "scenario": "byg-uden-git-soeg",
+   "case": "bash-cat-ude-relativ",
+   "permission": "bash",
+   "patterns": [
+    "cat ../ekstern/fil.txt"
+   ],
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "spørg:external_directory",
+    "svar:once",
+    "spørg:bash",
+    "svar:once",
+    "del:running",
+    "del:completed"
+   ],
+   "recordedLabel": "Kommando: cat ../ekstern/fil.txt",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-uden-git-soeg__bash-cd-ud__1-external_directory.json",
+   "scenario": "byg-uden-git-soeg",
+   "case": "bash-cd-ud",
+   "permission": "external_directory",
+   "patterns": [
+    "${DOCUMENTS}/*"
+   ],
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "spørg:external_directory",
+    "svar:once",
+    "spørg:bash",
+    "svar:once",
+    "del:running",
+    "del:completed"
+   ],
+   "recordedLabel": "Mappeadgang: ${DOCUMENTS}/*",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-uden-git-soeg__bash-cd-ud__2-bash.json",
+   "scenario": "byg-uden-git-soeg",
+   "case": "bash-cd-ud",
+   "permission": "bash",
+   "patterns": [
+    "ls"
+   ],
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "spørg:external_directory",
+    "svar:once",
+    "spørg:bash",
+    "svar:once",
+    "del:running",
+    "del:completed"
+   ],
+   "recordedLabel": "Kommando: cd .. && ls",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-uden-git-soeg__bash-npm-build__1-bash.json",
+   "scenario": "byg-uden-git-soeg",
+   "case": "bash-npm-build",
+   "permission": "bash",
+   "patterns": [
+    "npm run build --if-present"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:bash",
+    "del:running",
+    "svar:once",
+    "del:running",
+    "del:completed"
+   ],
+   "recordedLabel": "Kommando: npm run build --if-present",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-uden-git-soeg__bash-pipe__1-bash.json",
+   "scenario": "byg-uden-git-soeg",
+   "case": "bash-pipe",
+   "permission": "bash",
+   "patterns": [
+    "git status --short",
+    "head -5"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:bash",
+    "del:running",
+    "svar:once",
+    "del:running",
+    "del:completed"
+   ],
+   "recordedLabel": "Kommando: git status --short | head -5",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-uden-git-soeg__bash-redirect-tmp__1-bash.json",
+   "scenario": "byg-uden-git-soeg",
+   "case": "bash-redirect-tmp",
+   "permission": "bash",
+   "patterns": [
+    "echo hej > ${SYSTMP}/aura-kontrakt-72465.txt"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:bash",
+    "del:running",
+    "svar:once",
+    "del:running",
+    "del:completed"
+   ],
+   "recordedLabel": "Kommando: echo hej > ${SYSTMP}/aura-kontrakt-72465.txt",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-uden-git-soeg__bash-langt-output__1-bash.json",
+   "scenario": "byg-uden-git-soeg",
+   "case": "bash-langt-output",
+   "permission": "bash",
+   "patterns": [
+    "seq 1 40000"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:bash",
+    "del:running",
+    "svar:once",
+    "del:running",
+    "del:completed"
+   ],
+   "recordedLabel": "Kommando: seq 1 40000",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-uden-git-soeg__grep-tool-output__1-grep.json",
+   "scenario": "byg-uden-git-soeg",
+   "case": "grep-tool-output",
+   "permission": "grep",
+   "patterns": [
+    "^39999$"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:grep",
+    "del:running",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Læsning: ${RUNTIME}/data/opencode/tool-output",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-uden-git-soeg__webfetch__1-webfetch.json",
+   "scenario": "byg-uden-git-soeg",
+   "case": "webfetch",
+   "permission": "webfetch",
+   "patterns": [
+    "http://127.0.0.1:64806/side"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:webfetch",
+    "del:running",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Hjemmeside: http://127.0.0.1:64806",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-uden-git-soeg__webfetch-localhost-sti__1-webfetch.json",
+   "scenario": "byg-uden-git-soeg",
+   "case": "webfetch-localhost-sti",
+   "permission": "webfetch",
+   "patterns": [
+    "http://localhost:64806/andet?q=1"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:webfetch",
+    "del:running",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Hjemmeside: http://localhost:64806",
+   "recordedAllowed": false
+  },
+  {
+   "file": "byg-uden-git-soeg__doom-loop__1-doom_loop.json",
+   "scenario": "byg-uden-git-soeg",
+   "case": "doom-loop",
+   "permission": "doom_loop",
+   "patterns": [
+    "read"
+   ],
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "del:pending",
+    "del:running",
+    "del:pending",
+    "del:running",
+    "spørg:doom_loop",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": null,
+   "scenario": "byg-uden-git-soeg",
+   "case": "glob-uden-sti",
+   "permission": null,
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "del:completed"
+   ],
+   "toolResult": [
+    "${ROOT}/public/index.html"
+   ]
+  },
+  {
+   "file": null,
+   "scenario": "byg-uden-git-soeg",
+   "case": "glob-sti-inde",
+   "permission": null,
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "del:completed"
+   ],
+   "toolResult": [
+    "${ROOT}/src/app.js"
+   ]
+  },
+  {
+   "file": null,
+   "scenario": "byg-uden-git-soeg",
+   "case": "list",
+   "permission": null,
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "del:completed"
+   ],
+   "toolResult": [
+    "The arguments provided to the tool are invalid: Model tried to call unavailable tool 'list'. Available tools: bash, edit, glob, grep, invalid, question, read, skill, todowrite, webfetch, write."
+   ]
+  },
+  {
+   "file": null,
+   "scenario": "byg-uden-git-soeg",
+   "case": "read-tool-output",
+   "permission": null,
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "del:completed"
+   ],
+   "toolResult": [
+    "<path>${RUNTIME}/data/opencode/tool-output/tool_1789f88a8001TK6tSn0WQ6gQao</path> <type>file</type> <content> 39990: 39990 39991: 39991 39992: 39992 39993: 39993 39994: 39994 (Showing lines 39990-3999"
+   ]
+  },
+  {
+   "file": null,
+   "scenario": "byg-uden-git-soeg",
+   "case": "skill-aktiv",
+   "permission": null,
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "del:completed"
+   ],
+   "toolResult": [
+    "<skill_content name=\"harness-ide-og-afgraensning\"> # Skill: harness-ide-og-afgraensning # Idé og afgrænsning Målet er en kort, aftalt beskrivelse af opgaven, som brugeren kan genkende, og som kan afpr"
+   ]
+  },
+  {
+   "file": null,
+   "scenario": "byg-uden-git-soeg",
+   "case": "skill-indbygget",
+   "permission": null,
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "del:error"
+   ],
+   "toolResult": [
+    "The user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules [{\"permission\":\"*\",\"action\":\"allow\",\"pattern\":\"*\"},{\"permission\":\"*\",\"action\":\""
+   ]
+  },
+  {
+   "file": null,
+   "scenario": "byg-uden-git-soeg",
+   "case": "todowrite",
+   "permission": null,
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "del:completed"
+   ],
+   "toolResult": [
+    "[ { \"content\": \"Trin 1\", \"status\": \"in_progress\", \"priority\": \"high\" }, { \"content\": \"Trin 2\", \"status\": \"pending\", \"priority\": \"low\" } ]"
+   ]
+  },
+  {
+   "file": null,
+   "scenario": "byg-uden-git-soeg",
+   "case": "question",
+   "permission": null,
+   "sequence": [
+    "del:pending",
+    "question.asked",
+    "del:running",
+    "del:completed"
+   ],
+   "toolResult": [
+    "User has answered your questions: \"Hvilken farve skal knappen have?\"=\"Blå (anbefalet)\". You can now continue with the user's answers in mind."
+   ]
+  },
+  {
+   "file": "free-git-filer__read-ude-absolut__1-external_directory.json",
+   "scenario": "free-git-filer",
+   "case": "read-ude-absolut",
+   "permission": "external_directory",
+   "patterns": [
+    "${OUTSIDE}/*"
+   ],
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "spørg:external_directory",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": "free-git-filer__read-ude-relativ__1-external_directory.json",
+   "scenario": "free-git-filer",
+   "case": "read-ude-relativ",
+   "permission": "external_directory",
+   "patterns": [
+    "${OUTSIDE}/*"
+   ],
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "spørg:external_directory",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": "free-git-filer__read-ude-mappe__1-external_directory.json",
+   "scenario": "free-git-filer",
+   "case": "read-ude-mappe",
+   "permission": "external_directory",
+   "patterns": [
+    "${OUTSIDE}/*"
+   ],
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "spørg:external_directory",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": "free-git-filer__write-inde-absolut__1-edit.json",
+   "scenario": "free-git-filer",
+   "case": "write-inde-absolut",
+   "permission": "edit",
+   "patterns": [
+    "public/ny.html"
+   ],
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "spørg:edit",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Filændring: ${ROOT}/public/ny.html",
+   "recordedAllowed": false
+  },
+  {
+   "file": "free-git-filer__write-inde-relativ__1-edit.json",
+   "scenario": "free-git-filer",
+   "case": "write-inde-relativ",
+   "permission": "edit",
+   "patterns": [
+    "public/ny2.html"
+   ],
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "spørg:edit",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Filændring: ${ROOT}/public/ny2.html",
+   "recordedAllowed": false
+  },
+  {
+   "file": "free-git-filer__write-inde-ny-mappe__1-edit.json",
+   "scenario": "free-git-filer",
+   "case": "write-inde-ny-mappe",
+   "permission": "edit",
+   "patterns": [
+    "src/dyb/ny/fil.js"
+   ],
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "spørg:edit",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Filændring: ${ROOT}/src/dyb/ny/fil.js",
+   "recordedAllowed": false
+  },
+  {
+   "file": "free-git-filer__write-ude-absolut__1-external_directory.json",
+   "scenario": "free-git-filer",
+   "case": "write-ude-absolut",
+   "permission": "external_directory",
+   "patterns": [
+    "${OUTSIDE}/*"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:external_directory",
+    "del:running",
+    "svar:once",
+    "spørg:edit",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": "free-git-filer__write-ude-absolut__2-edit.json",
+   "scenario": "free-git-filer",
+   "case": "write-ude-absolut",
+   "permission": "edit",
+   "patterns": [
+    "../ekstern/ny.txt"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:external_directory",
+    "del:running",
+    "svar:once",
+    "spørg:edit",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": "free-git-filer__write-ude-relativ__1-external_directory.json",
+   "scenario": "free-git-filer",
+   "case": "write-ude-relativ",
+   "permission": "external_directory",
+   "patterns": [
+    "${OUTSIDE}/*"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:external_directory",
+    "del:running",
+    "svar:once",
+    "spørg:edit",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": "free-git-filer__write-ude-relativ__2-edit.json",
+   "scenario": "free-git-filer",
+   "case": "write-ude-relativ",
+   "permission": "edit",
+   "patterns": [
+    "../ekstern/ny2.txt"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:external_directory",
+    "del:running",
+    "svar:once",
+    "spørg:edit",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": "free-git-filer__write-ude-ny-mappe__1-external_directory.json",
+   "scenario": "free-git-filer",
+   "case": "write-ude-ny-mappe",
+   "permission": "external_directory",
+   "patterns": [
+    "${OUTSIDE}/ny-mappe/*"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:external_directory",
+    "del:running",
+    "svar:once",
+    "spørg:edit",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": "free-git-filer__write-ude-ny-mappe__2-edit.json",
+   "scenario": "free-git-filer",
+   "case": "write-ude-ny-mappe",
+   "permission": "edit",
+   "patterns": [
+    "../ekstern/ny-mappe/fil.txt"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:external_directory",
+    "del:running",
+    "svar:once",
+    "spørg:edit",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": "free-git-filer__write-scratch__1-external_directory.json",
+   "scenario": "free-git-filer",
+   "case": "write-scratch",
+   "permission": "external_directory",
+   "patterns": [
+    "${SCRATCH}/*"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:external_directory",
+    "del:running",
+    "svar:once",
+    "spørg:edit",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": "free-git-filer__write-scratch__2-edit.json",
+   "scenario": "free-git-filer",
+   "case": "write-scratch",
+   "permission": "edit",
+   "patterns": [
+    "../../appdata/harness/scratch/${PROJECTKEY}/${TASK}/noter.md"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:external_directory",
+    "del:running",
+    "svar:once",
+    "spørg:edit",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": "free-git-filer__edit-inde-absolut__1-edit.json",
+   "scenario": "free-git-filer",
+   "case": "edit-inde-absolut",
+   "permission": "edit",
+   "patterns": [
+    "notes.txt"
+   ],
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "spørg:edit",
+    "svar:once",
+    "del:running",
+    "del:completed"
+   ],
+   "recordedLabel": "Filændring: ${ROOT}/notes.txt",
+   "recordedAllowed": false
+  },
+  {
+   "file": null,
+   "scenario": "free-git-filer",
+   "case": "read-inde-absolut",
+   "permission": null,
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "del:completed"
+   ],
+   "toolResult": [
+    "<path>${ROOT}/notes.txt</path> <type>file</type> <content> 1: Hej verden NEEDLE (End of file - total 1 lines) </content>"
+   ]
+  },
+  {
+   "file": null,
+   "scenario": "free-git-filer",
+   "case": "read-inde-relativ",
+   "permission": null,
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "del:completed"
+   ],
+   "toolResult": [
+    "<path>${ROOT}/notes.txt</path> <type>file</type> <content> 1: Hej verden NEEDLE (End of file - total 1 lines) </content>"
+   ]
+  },
+  {
+   "file": null,
+   "scenario": "free-git-filer",
+   "case": "read-app",
+   "permission": null,
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "del:completed"
+   ],
+   "toolResult": [
+    "<path>${ROOT}/src/app.js</path> <type>file</type> <content> 1: const [a] = useState(0); // NEEDLE (End of file - total 1 lines) </content>"
+   ]
+  },
+  {
+   "file": null,
+   "scenario": "free-git-filer",
+   "case": "read-env",
+   "permission": null,
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "del:error"
+   ],
+   "toolResult": [
+    "Aura beskytter denne fil."
+   ]
+  },
+  {
+   "file": null,
+   "scenario": "free-git-filer",
+   "case": "read-mappe-inde",
+   "permission": null,
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "del:completed"
+   ],
+   "toolResult": [
+    "<path>${ROOT}/public</path> <type>directory</type> <entries> index.html (1 entries) </entries>"
+   ]
+  },
+  {
+   "file": null,
+   "scenario": "free-git-filer",
+   "case": "write-env",
+   "permission": null,
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "del:error"
+   ],
+   "toolResult": [
+    "The user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules [{\"permission\":\"*\",\"action\":\"allow\",\"pattern\":\"*\"},{\"permission\":\"*\",\"action\":\""
+   ]
+  },
+  {
+   "file": null,
+   "scenario": "free-git-filer",
+   "case": "write-git-mappe",
+   "permission": null,
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "del:error"
+   ],
+   "toolResult": [
+    "The user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules [{\"permission\":\"*\",\"action\":\"allow\",\"pattern\":\"*\"},{\"permission\":\"*\",\"action\":\""
+   ]
+  },
+  {
+   "file": "git-foraelder__write-inde-absolut__1-edit.json",
+   "scenario": "git-foraelder",
+   "case": "write-inde-absolut",
+   "permission": "edit",
+   "patterns": [
+    "projekt/public/ny.html"
+   ],
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "spørg:edit",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Filændring: ${ROOT}/public/ny.html",
+   "recordedAllowed": false
+  },
+  {
+   "file": "git-foraelder__write-soeskende-i-repo__1-edit.json",
+   "scenario": "git-foraelder",
+   "case": "write-soeskende-i-repo",
+   "permission": "edit",
+   "patterns": [
+    "andet-projekt/fil.txt"
+   ],
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "spørg:edit",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Filændring: ${REPO}/andet-projekt/fil.txt",
+   "recordedAllowed": false
+  },
+  {
+   "file": "git-foraelder__grep-soeskende-i-repo__1-grep.json",
+   "scenario": "git-foraelder",
+   "case": "grep-soeskende-i-repo",
+   "permission": "grep",
+   "patterns": [
+    "x"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:grep",
+    "del:running",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Læsning: ${REPO}/andet-projekt",
+   "recordedAllowed": false
+  },
+  {
+   "file": "git-foraelder__bash-cat-soeskende__1-bash.json",
+   "scenario": "git-foraelder",
+   "case": "bash-cat-soeskende",
+   "permission": "bash",
+   "patterns": [
+    "cat ${REPO}/andet-projekt/eksisterende.txt"
+   ],
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "spørg:bash",
+    "svar:once",
+    "del:running",
+    "del:completed"
+   ],
+   "recordedLabel": "Kommando: cat ${REPO}/andet-projekt/eksisterende.txt",
+   "recordedAllowed": false
+  },
+  {
+   "file": "git-foraelder__write-uden-for-repo__1-external_directory.json",
+   "scenario": "git-foraelder",
+   "case": "write-uden-for-repo",
+   "permission": "external_directory",
+   "patterns": [
+    "${OUTSIDE}/*"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:external_directory",
+    "del:running",
+    "svar:once",
+    "spørg:edit",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": "git-foraelder__write-uden-for-repo__2-edit.json",
+   "scenario": "git-foraelder",
+   "case": "write-uden-for-repo",
+   "permission": "edit",
+   "patterns": [
+    "../ekstern/ny.txt"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:external_directory",
+    "del:running",
+    "svar:once",
+    "spørg:edit",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": null,
+   "scenario": "git-foraelder",
+   "case": "read-soeskende-i-repo",
+   "permission": null,
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "del:completed"
+   ],
+   "toolResult": [
+    "<path>${REPO}/andet-projekt/eksisterende.txt</path> <type>file</type> <content> 1: x i søskende (End of file - total 1 lines) </content>"
+   ]
+  },
+  {
+   "file": "kopi-git__write-kopi-absolut__1-edit.json",
+   "scenario": "kopi-git",
+   "case": "write-kopi-absolut",
+   "permission": "edit",
+   "patterns": [
+    "${WORKSPACE:rel/}/public/ny.html"
+   ],
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "spørg:edit",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Filændring: ${WORKSPACE}/public/ny.html",
+   "recordedAllowed": false
+  },
+  {
+   "file": "kopi-git__write-kopi-relativ__1-edit.json",
+   "scenario": "kopi-git",
+   "case": "write-kopi-relativ",
+   "permission": "edit",
+   "patterns": [
+    "${WORKSPACE:rel/}/public/ny2.html"
+   ],
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "spørg:edit",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Filændring: ${WORKSPACE}/public/ny2.html",
+   "recordedAllowed": false
+  },
+  {
+   "file": "kopi-git__edit-kopi-absolut__1-edit.json",
+   "scenario": "kopi-git",
+   "case": "edit-kopi-absolut",
+   "permission": "edit",
+   "patterns": [
+    "${WORKSPACE:rel/}/notes.txt"
+   ],
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "spørg:edit",
+    "svar:once",
+    "del:running",
+    "del:completed"
+   ],
+   "recordedLabel": "Filændring: ${WORKSPACE}/notes.txt",
+   "recordedAllowed": false
+  },
+  {
+   "file": "kopi-git__read-original-projekt__1-external_directory.json",
+   "scenario": "kopi-git",
+   "case": "read-original-projekt",
+   "permission": "external_directory",
+   "patterns": [
+    "${ROOT}/*"
+   ],
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "spørg:external_directory",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": "kopi-git__write-original-projekt__1-external_directory.json",
+   "scenario": "kopi-git",
+   "case": "write-original-projekt",
+   "permission": "external_directory",
+   "patterns": [
+    "${ROOT}/public/*"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:external_directory",
+    "del:running",
+    "svar:once",
+    "spørg:edit",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": "kopi-git__write-original-projekt__2-edit.json",
+   "scenario": "kopi-git",
+   "case": "write-original-projekt",
+   "permission": "edit",
+   "patterns": [
+    "${ROOT:rel/}/public/fra-kopi.html"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:external_directory",
+    "del:running",
+    "svar:once",
+    "spørg:edit",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Filændring: ${ROOT}/public/fra-kopi.html",
+   "recordedAllowed": false
+  },
+  {
+   "file": "kopi-git__grep-uden-sti__1-grep.json",
+   "scenario": "kopi-git",
+   "case": "grep-uden-sti",
+   "permission": "grep",
+   "patterns": [
+    "NEEDLE"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:grep",
+    "del:running",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": "kopi-git__bash-kort__1-bash.json",
+   "scenario": "kopi-git",
+   "case": "bash-kort",
+   "permission": "bash",
+   "patterns": [
+    "ls public"
+   ],
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "spørg:bash",
+    "svar:once",
+    "del:running",
+    "del:completed"
+   ],
+   "recordedLabel": "Kommando: ls public",
+   "recordedAllowed": false
+  },
+  {
+   "file": "kopi-git__bash-workdir-original__1-external_directory.json",
+   "scenario": "kopi-git",
+   "case": "bash-workdir-original",
+   "permission": "external_directory",
+   "patterns": [
+    "${ROOT}/*"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:external_directory",
+    "del:running",
+    "svar:once",
+    "spørg:bash",
+    "svar:once",
+    "del:running",
+    "del:completed"
+   ],
+   "recordedLabel": "Mappeadgang: ${ROOT}/*",
+   "recordedAllowed": false
+  },
+  {
+   "file": "kopi-git__bash-workdir-original__2-bash.json",
+   "scenario": "kopi-git",
+   "case": "bash-workdir-original",
+   "permission": "bash",
+   "patterns": [
+    "ls"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:external_directory",
+    "del:running",
+    "svar:once",
+    "spørg:bash",
+    "svar:once",
+    "del:running",
+    "del:completed"
+   ],
+   "recordedLabel": "Kommando: ls",
+   "recordedAllowed": false
+  },
+  {
+   "file": "kopi-git__write-scratch__1-external_directory.json",
+   "scenario": "kopi-git",
+   "case": "write-scratch",
+   "permission": "external_directory",
+   "patterns": [
+    "${SCRATCH}/*"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:external_directory",
+    "del:running",
+    "svar:once",
+    "spørg:edit",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": "kopi-git__write-scratch__2-edit.json",
+   "scenario": "kopi-git",
+   "case": "write-scratch",
+   "permission": "edit",
+   "patterns": [
+    "${SCRATCH:rel/}/noter.md"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:external_directory",
+    "del:running",
+    "svar:once",
+    "spørg:edit",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Filændring: ${SCRATCH}/noter.md",
+   "recordedAllowed": true
+  },
+  {
+   "file": null,
+   "scenario": "kopi-git",
+   "case": "read-kopi-absolut",
+   "permission": null,
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "del:completed"
+   ],
+   "toolResult": [
+    "<path>${WORKSPACE}/notes.txt</path> <type>file</type> <content> 1: Hej verden NEEDLE (End of file - total 1 lines) </content>"
+   ]
+  },
+  {
+   "file": null,
+   "scenario": "kopi-git",
+   "case": "read-kopi-relativ",
+   "permission": null,
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "del:completed"
+   ],
+   "toolResult": [
+    "<path>${WORKSPACE}/notes.txt</path> <type>file</type> <content> 1: Hej verden NEEDLE (End of file - total 1 lines) </content>"
+   ]
+  },
+  {
+   "file": null,
+   "scenario": "kopi-git",
+   "case": "glob-uden-sti",
+   "permission": null,
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "del:completed"
+   ],
+   "toolResult": [
+    "${WORKSPACE}/public/ny2.html ${WORKSPACE}/public/ny.html ${WORKSPACE}/public/index.html"
+   ]
+  },
+  {
+   "file": "plan-git__read-ude-absolut__1-external_directory.json",
+   "scenario": "plan-git",
+   "case": "read-ude-absolut",
+   "permission": "external_directory",
+   "patterns": [
+    "${OUTSIDE}/*"
+   ],
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "spørg:external_directory",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": "plan-git__grep-uden-sti__1-grep.json",
+   "scenario": "plan-git",
+   "case": "grep-uden-sti",
+   "permission": "grep",
+   "patterns": [
+    "NEEDLE"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:grep",
+    "del:running",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": "plan-git__grep-sti-ude__1-grep.json",
+   "scenario": "plan-git",
+   "case": "grep-sti-ude",
+   "permission": "grep",
+   "patterns": [
+    "Ekstern"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:grep",
+    "del:running",
+    "svar:once",
+    "spørg:external_directory",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Læsning: ${OUTSIDE}",
+   "recordedAllowed": false
+  },
+  {
+   "file": "plan-git__grep-sti-ude__2-external_directory.json",
+   "scenario": "plan-git",
+   "case": "grep-sti-ude",
+   "permission": "external_directory",
+   "patterns": [
+    "${OUTSIDE}/*"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:grep",
+    "del:running",
+    "svar:once",
+    "spørg:external_directory",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": "plan-git__glob-sti-ude__1-external_directory.json",
+   "scenario": "plan-git",
+   "case": "glob-sti-ude",
+   "permission": "external_directory",
+   "patterns": [
+    "${OUTSIDE}/*"
+   ],
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "spørg:external_directory",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": "plan-git__webfetch__1-webfetch.json",
+   "scenario": "plan-git",
+   "case": "webfetch",
+   "permission": "webfetch",
+   "patterns": [
+    "http://127.0.0.1:58974/side"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:webfetch",
+    "del:running",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Hjemmeside: http://127.0.0.1:58974",
+   "recordedAllowed": false
+  },
+  {
+   "file": null,
+   "scenario": "plan-git",
+   "case": "read-inde-absolut",
+   "permission": null,
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "del:completed"
+   ],
+   "toolResult": [
+    "<path>${ROOT}/notes.txt</path> <type>file</type> <content> 1: Hej verden NEEDLE (End of file - total 1 lines) </content>"
+   ]
+  },
+  {
+   "file": null,
+   "scenario": "plan-git",
+   "case": "write-inde-absolut",
+   "permission": null,
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "del:error"
+   ],
+   "toolResult": [
+    "Model tried to call unavailable tool 'invalid'. Available tools: glob, grep, question, read, skill, webfetch."
+   ]
+  },
+  {
+   "file": null,
+   "scenario": "plan-git",
+   "case": "write-ude-absolut",
+   "permission": null,
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "del:error"
+   ],
+   "toolResult": [
+    "Model tried to call unavailable tool 'invalid'. Available tools: glob, grep, question, read, skill, webfetch."
+   ]
+  },
+  {
+   "file": null,
+   "scenario": "plan-git",
+   "case": "bash-kort",
+   "permission": null,
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "del:error"
+   ],
+   "toolResult": [
+    "Model tried to call unavailable tool 'invalid'. Available tools: glob, grep, question, read, skill, webfetch."
+   ]
+  },
+  {
+   "file": null,
+   "scenario": "plan-git",
+   "case": "todowrite",
+   "permission": null,
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "del:error"
+   ],
+   "toolResult": [
+    "Model tried to call unavailable tool 'invalid'. Available tools: glob, grep, question, read, skill, webfetch."
+   ]
+  },
+  {
+   "file": null,
+   "scenario": "plan-git",
+   "case": "skill-aktiv",
+   "permission": null,
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "del:completed"
+   ],
+   "toolResult": [
+    "<skill_content name=\"harness-ide-og-afgraensning\"> # Skill: harness-ide-og-afgraensning # Idé og afgrænsning Målet er en kort, aftalt beskrivelse af opgaven, som brugeren kan genkende, og som kan afpr"
+   ]
+  },
+  {
+   "file": null,
+   "scenario": "plan-git",
+   "case": "question",
+   "permission": null,
+   "sequence": [
+    "del:pending",
+    "question.asked",
+    "del:running",
+    "del:completed"
+   ],
+   "toolResult": [
+    "User has answered your questions: \"Hvilken farve?\"=\"Blå\". You can now continue with the user's answers in mind."
+   ]
+  },
+  {
+   "file": null,
+   "scenario": "plan-git",
+   "case": "doom-loop",
+   "permission": null,
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "del:pending",
+    "del:running",
+    "del:pending",
+    "del:running"
+   ],
+   "toolResult": []
+  },
+  {
+   "file": "samtale-git__read-ude-absolut__1-external_directory.json",
+   "scenario": "samtale-git",
+   "case": "read-ude-absolut",
+   "permission": "external_directory",
+   "patterns": [
+    "${OUTSIDE}/*"
+   ],
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "spørg:external_directory",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": "samtale-git__grep-uden-sti__1-grep.json",
+   "scenario": "samtale-git",
+   "case": "grep-uden-sti",
+   "permission": "grep",
+   "patterns": [
+    "NEEDLE"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:grep",
+    "del:running",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": "samtale-git__grep-sti-ude__1-grep.json",
+   "scenario": "samtale-git",
+   "case": "grep-sti-ude",
+   "permission": "grep",
+   "patterns": [
+    "Ekstern"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:grep",
+    "del:running",
+    "svar:once",
+    "spørg:external_directory",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Læsning: ${OUTSIDE}",
+   "recordedAllowed": false
+  },
+  {
+   "file": "samtale-git__grep-sti-ude__2-external_directory.json",
+   "scenario": "samtale-git",
+   "case": "grep-sti-ude",
+   "permission": "external_directory",
+   "patterns": [
+    "${OUTSIDE}/*"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:grep",
+    "del:running",
+    "svar:once",
+    "spørg:external_directory",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": "samtale-git__glob-sti-ude__1-external_directory.json",
+   "scenario": "samtale-git",
+   "case": "glob-sti-ude",
+   "permission": "external_directory",
+   "patterns": [
+    "${OUTSIDE}/*"
+   ],
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "spørg:external_directory",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Denne handling",
+   "recordedAllowed": false
+  },
+  {
+   "file": "samtale-git__webfetch__1-webfetch.json",
+   "scenario": "samtale-git",
+   "case": "webfetch",
+   "permission": "webfetch",
+   "patterns": [
+    "http://127.0.0.1:59251/side"
+   ],
+   "sequence": [
+    "del:pending",
+    "spørg:webfetch",
+    "del:running",
+    "svar:once",
+    "del:completed"
+   ],
+   "recordedLabel": "Hjemmeside: http://127.0.0.1:59251",
+   "recordedAllowed": false
+  },
+  {
+   "file": null,
+   "scenario": "samtale-git",
+   "case": "read-inde-absolut",
+   "permission": null,
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "del:completed"
+   ],
+   "toolResult": [
+    "<path>${ROOT}/notes.txt</path> <type>file</type> <content> 1: Hej verden NEEDLE (End of file - total 1 lines) </content>"
+   ]
+  },
+  {
+   "file": null,
+   "scenario": "samtale-git",
+   "case": "write-inde-absolut",
+   "permission": null,
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "del:error"
+   ],
+   "toolResult": [
+    "Model tried to call unavailable tool 'invalid'. Available tools: glob, grep, question, read, skill, webfetch."
+   ]
+  },
+  {
+   "file": null,
+   "scenario": "samtale-git",
+   "case": "write-ude-absolut",
+   "permission": null,
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "del:error"
+   ],
+   "toolResult": [
+    "Model tried to call unavailable tool 'invalid'. Available tools: glob, grep, question, read, skill, webfetch."
+   ]
+  },
+  {
+   "file": null,
+   "scenario": "samtale-git",
+   "case": "bash-kort",
+   "permission": null,
+   "sequence": [
+    "del:pending",
+    "del:running",
+    "del:error"
+   ],
+   "toolResult": [
+    "Model tried to call unavailable tool 'invalid'. Available tools: glob, grep, question, read, skill, webfetch."
+   ]
+  }
+ ]
+}

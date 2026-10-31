@@ -1,0 +1,177 @@
+{
+ "opencode": "1.18.33",
+ "aura": "d816a9e",
+ "kilde": "M1-kritikkens bash-former.cjs config (K2): OpenCode med Auras isolerede miljø og en indpakningsskal i config.shell",
+ "variant": "config-shell",
+ "pladsholdere": {
+  "BASE": "optagelsens mappe (forælder til ROOT)",
+  "ROOT": "BASE/Projekt (uden Git)",
+  "OUTSIDE": "BASE/ekstern",
+  "RUNTIME": "BASE/appdata/runtime/n (motorens mappe; motorens HOME er RUNTIME/home)"
+ },
+ "outcome": "idle",
+ "effectiveShell": "${BASE}/appdata/betroet/bin/bash",
+ "requests": [
+  {
+   "permission": "external_directory",
+   "patterns": [
+    "${BASE}/*"
+   ],
+   "always": [
+    "${BASE}/*"
+   ],
+   "metadata": {
+    "command": "cd .. && pwd",
+    "directories": [
+     "${BASE}"
+    ],
+    "patterns": [
+     "${BASE}/*"
+    ]
+   },
+   "callID": "k0"
+  },
+  {
+   "permission": "bash",
+   "patterns": [
+    "pwd"
+   ],
+   "always": [
+    "pwd *"
+   ],
+   "metadata": {
+    "command": "cd .. && pwd"
+   },
+   "callID": "k0"
+  },
+  {
+   "permission": "bash",
+   "patterns": [
+    "echo x > ../uden-for-via-omdirigering.txt"
+   ],
+   "always": [
+    "echo *"
+   ],
+   "metadata": {
+    "command": "echo x > ../uden-for-via-omdirigering.txt"
+   },
+   "callID": "k1"
+  },
+  {
+   "permission": "external_directory",
+   "patterns": [
+    "${OUTSIDE}/*"
+   ],
+   "always": [
+    "${OUTSIDE}/*"
+   ],
+   "metadata": {
+    "command": "ls",
+    "directories": [
+     "${OUTSIDE}"
+    ],
+    "patterns": [
+     "${OUTSIDE}/*"
+    ]
+   },
+   "callID": "k2"
+  },
+  {
+   "permission": "bash",
+   "patterns": [
+    "ls"
+   ],
+   "always": [
+    "ls *"
+   ],
+   "metadata": {
+    "command": "ls"
+   },
+   "callID": "k2"
+  },
+  {
+   "permission": "bash",
+   "patterns": [
+    "npm run build 2>&1",
+    "tail -2"
+   ],
+   "always": [
+    "npm run build *",
+    "tail *"
+   ],
+   "metadata": {
+    "command": "npm run build 2>&1 | tail -2"
+   },
+   "callID": "k3"
+  },
+  {
+   "permission": "external_directory",
+   "patterns": [
+    "${RUNTIME}/home/.ssh/*"
+   ],
+   "always": [
+    "${RUNTIME}/home/.ssh/*"
+   ],
+   "metadata": {
+    "command": "cat ~/.ssh/id_rsa 2>/dev/null; true",
+    "directories": [
+     "${RUNTIME}/home/.ssh"
+    ],
+    "patterns": [
+     "${RUNTIME}/home/.ssh/*"
+    ]
+   },
+   "callID": "k4"
+  },
+  {
+   "permission": "bash",
+   "patterns": [
+    "cat ~/.ssh/id_rsa 2>/dev/null",
+    "true"
+   ],
+   "always": [
+    "cat *",
+    "true *"
+   ],
+   "metadata": {
+    "command": "cat ~/.ssh/id_rsa 2>/dev/null; true"
+   },
+   "callID": "k4"
+  }
+ ],
+ "tools": [
+  {
+   "callID": "k0",
+   "status": "completed",
+   "command": "cd .. && pwd",
+   "output": "${BASE}"
+  },
+  {
+   "callID": "k1",
+   "status": "completed",
+   "command": "echo x > ../uden-for-via-omdirigering.txt",
+   "output": "(no output)"
+  },
+  {
+   "callID": "k2",
+   "status": "completed",
+   "command": "ls",
+   "workdir": "${OUTSIDE}",
+   "output": "(no output)"
+  },
+  {
+   "callID": "k3",
+   "status": "completed",
+   "command": "npm run build 2>&1 | tail -2",
+   "output": "npm ERR! A complete log of this run can be found in: <sti fra optagemaskinen>"
+  },
+  {
+   "callID": "k4",
+   "status": "completed",
+   "command": "cat ~/.ssh/id_rsa 2>/dev/null; true",
+   "output": "(no output)"
+  }
+ ],
+ "wrapperLog": "ARGV: [-c] [cd .. && pwd]\nARGV: [-c] [echo x > ../uden-for-via-omdirigering.txt]\nARGV: [-c] [ls]\nARGV: [-c] [npm run build 2>&1 | tail -2]\nARGV: [-c] [cat ~/.ssh/id_rsa 2>/dev/null; true]\n",
+ "udenForFil": "x\n"
+}

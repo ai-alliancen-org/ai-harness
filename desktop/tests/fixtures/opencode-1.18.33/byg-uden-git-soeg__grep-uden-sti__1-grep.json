@@ -1,0 +1,84 @@
+{
+ "opencode": "1.18.33",
+ "aura": "d816a9e",
+ "scenario": "byg-uden-git-soeg",
+ "outcome": "idle",
+ "case": "grep-uden-sti",
+ "askIndex": 1,
+ "asksInStep": 1,
+ "layout": {
+  "mode": "build",
+  "git": false,
+  "copy": false,
+  "model": "kontraktmodel",
+  "worktree": "/",
+  "directory": "${ROOT}"
+ },
+ "sequence": [
+  "del:pending",
+  "spørg:grep",
+  "del:running",
+  "svar:once",
+  "del:completed"
+ ],
+ "request": {
+  "id": "per_1789f150e0019aHbkYN0RJrMbn",
+  "sessionID": "ses_e8761014fffe7C0Smxj9vvHr14",
+  "permission": "grep",
+  "patterns": [
+   "NEEDLE"
+  ],
+  "metadata": {
+   "pattern": "NEEDLE"
+  },
+  "always": [
+   "*"
+  ],
+  "tool": {
+   "messageID": "msg_1789f07d2001m13nrv3FOfDBu8",
+   "callID": "kald-0-0"
+  }
+ },
+ "toolPartAtAsk": {
+  "status": "pending",
+  "tool": "grep",
+  "input": {}
+ },
+ "policyInput": {
+  "id": "per_1789f150e0019aHbkYN0RJrMbn",
+  "sessionID": "ses_e8761014fffe7C0Smxj9vvHr14",
+  "permission": "grep",
+  "patterns": [
+   "NEEDLE"
+  ],
+  "metadata": {
+   "pattern": "NEEDLE"
+  },
+  "always": [
+   "*"
+  ],
+  "tool": {
+   "messageID": "msg_1789f07d2001m13nrv3FOfDBu8",
+   "callID": "kald-0-0"
+  },
+  "toolInput": {
+   "tool": "grep",
+   "input": {}
+  }
+ },
+ "recordedAura": {
+  "allowed": false,
+  "source": null,
+  "label": "Denne handling",
+  "target": "",
+  "match": null,
+  "persistable": false,
+  "projectFile": false,
+  "scratch": false,
+  "folder": null,
+  "blockedMode": false
+ },
+ "toolResult": [
+  "Found 3 matches\n${ROOT}/.env:\n  Line 1: HEMMELIG_NEEDLE=syntetisk-hemmelighed\n\n\n${ROOT}/src/app.js:\n  Line 1: const [a] = useState(0); // NEEDLE\n\n\n${ROOT}/notes.txt:\n  Line 1: Hej verden NEEDLE\n"
+ ]
+}

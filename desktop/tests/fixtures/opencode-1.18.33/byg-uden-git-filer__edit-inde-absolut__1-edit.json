@@ -1,0 +1,106 @@
+{
+ "opencode": "1.18.33",
+ "aura": "d816a9e",
+ "scenario": "byg-uden-git-filer",
+ "outcome": "idle",
+ "case": "edit-inde-absolut",
+ "askIndex": 1,
+ "asksInStep": 1,
+ "layout": {
+  "mode": "build",
+  "git": false,
+  "copy": false,
+  "model": "kontraktmodel",
+  "worktree": "/",
+  "directory": "${ROOT}"
+ },
+ "sequence": [
+  "del:pending",
+  "del:running",
+  "spørg:edit",
+  "svar:once",
+  "del:running",
+  "del:completed"
+ ],
+ "request": {
+  "id": "per_1787c68100019RNbPxAStrNF8H",
+  "sessionID": "ses_e878463bbffePGhIoyv5KTAImI",
+  "permission": "edit",
+  "patterns": [
+   "${ROOT:rel/}/notes.txt"
+  ],
+  "metadata": {
+   "filepath": "${ROOT}/notes.txt",
+   "diff": "Index: ${ROOT}/notes.txt\n===================================================================\n--- ${ROOT}/notes.txt\n+++ ${ROOT}/notes.txt\n@@ -1,1 +1,1 @@\n-Hej verden NEEDLE\n+Hej kommune NEEDLE\n"
+  },
+  "always": [
+   "*"
+  ],
+  "tool": {
+   "messageID": "msg_1787c63bf001yLHXn3i3PVMPuj",
+   "callID": "kald-17-0"
+  }
+ },
+ "toolPartAtAsk": {
+  "status": "running",
+  "tool": "edit",
+  "input": {
+   "filePath": "${ROOT}/notes.txt",
+   "oldString": "Hej verden",
+   "newString": "Hej kommune"
+  }
+ },
+ "policyInput": {
+  "id": "per_1787c68100019RNbPxAStrNF8H",
+  "sessionID": "ses_e878463bbffePGhIoyv5KTAImI",
+  "permission": "edit",
+  "patterns": [
+   "${ROOT:rel/}/notes.txt"
+  ],
+  "metadata": {
+   "filepath": "${ROOT}/notes.txt",
+   "diff": "Index: ${ROOT}/notes.txt\n===================================================================\n--- ${ROOT}/notes.txt\n+++ ${ROOT}/notes.txt\n@@ -1,1 +1,1 @@\n-Hej verden NEEDLE\n+Hej kommune NEEDLE\n"
+  },
+  "always": [
+   "*"
+  ],
+  "tool": {
+   "messageID": "msg_1787c63bf001yLHXn3i3PVMPuj",
+   "callID": "kald-17-0"
+  },
+  "toolInput": {
+   "filePath": "${ROOT}/notes.txt",
+   "oldString": "Hej verden",
+   "newString": "Hej kommune",
+   "tool": "edit",
+   "input": {
+    "filePath": "${ROOT}/notes.txt",
+    "oldString": "Hej verden",
+    "newString": "Hej kommune"
+   }
+  }
+ },
+ "recordedAura": {
+  "allowed": false,
+  "source": null,
+  "label": "Filændring: ${ROOT}/notes.txt",
+  "target": "${ROOT}/notes.txt",
+  "match": {
+   "kind": "edit",
+   "targets": [
+    {
+     "path": "${ROOT}/notes.txt",
+     "subtree": false
+    }
+   ]
+  },
+  "persistable": true,
+  "projectFile": true,
+  "scratch": false,
+  "folder": "${ROOT}",
+  "blockedMode": false
+ },
+ "toolResult": [
+  "Edit applied successfully."
+ ]
+}

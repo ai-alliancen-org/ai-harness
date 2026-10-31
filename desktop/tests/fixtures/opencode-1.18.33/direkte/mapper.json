@@ -1,0 +1,148 @@
+{
+ "opencode": "1.18.33",
+ "aura": "d816a9e",
+ "kilde": "M1-kontraktdesignets direkte.cjs (Auras isolatedEnv og engineConfig med ændrede regler, skills eller mapper). Kørt uden writePluginRuntime, så OpenCode hentede @opencode-ai/plugin fra npm (kritik K3)",
+ "eksperiment": "mapper",
+ "outcome": "idle",
+ "path": {
+  "home": "${BASE}/appdata/runtime/home",
+  "state": "${BASE}/appdata/runtime/state/opencode",
+  "config": "${BASE}/appdata/runtime/config/opencode",
+  "worktree": "${BASE}/Dokumenter/projekt",
+  "directory": "${BASE}/Dokumenter/projekt"
+ },
+ "project": {
+  "id": "global",
+  "worktree": "${BASE}/Dokumenter/projekt",
+  "vcs": "git",
+  "time": {
+   "created": 1793024230913,
+   "updated": 1793024230913
+  },
+  "sandboxes": []
+ },
+ "asked": [
+  {
+   "step": "bash-tmp",
+   "permission": "bash",
+   "patterns": [
+    "echo \"TMPDIR=$TMPDIR\"",
+    "node -e \"console.log(require('os').tmpdir())\"",
+    "echo \"HOME=$HOME\""
+   ],
+   "always": [
+    "echo *",
+    "node *"
+   ],
+   "metadata": {
+    "command": "echo \"TMPDIR=$TMPDIR\"; node -e \"console.log(require('os').tmpdir())\"; echo \"HOME=$HOME\""
+   }
+  },
+  {
+   "step": "bash-langt-output",
+   "permission": "bash",
+   "patterns": [
+    "seq 1 40000"
+   ],
+   "always": [
+    "seq *"
+   ],
+   "metadata": {
+    "command": "seq 1 40000"
+   }
+  },
+  {
+   "step": "grep-tool-output",
+   "permission": "grep",
+   "patterns": [
+    "^39999$"
+   ],
+   "always": [
+    "*"
+   ],
+   "metadata": {
+    "pattern": "^39999$",
+    "path": "${BASE}/appdata/runtime/data/opencode/tool-output"
+   }
+  },
+  {
+   "step": "write-aura-tmp",
+   "permission": "edit",
+   "patterns": [
+    ".aura/tmp/noter.md"
+   ],
+   "always": [
+    "*"
+   ],
+   "metadata": {
+    "filepath": "${BASE}/Dokumenter/projekt/.aura/tmp/noter.md"
+   }
+  }
+ ],
+ "results": [
+  {
+   "step": "bash-tmp",
+   "status": "completed",
+   "output": "TMPDIR=${BASE}/Dokumenter/projekt/.aura/tmp <sti fra optagemaskinen>"
+  },
+  {
+   "step": "bash-langt-output",
+   "status": "completed",
+   "output": "...output truncated... Full output saved to: ${BASE}/appdata/runtime/data/opencode/tool-output/tool_17892ee78001w710bqIdVtGcD0 38002 38003 38004 38005 38006 38007"
+  },
+  {
+   "step": "read-tool-output",
+   "status": "completed",
+   "output": "<path>${BASE}/appdata/runtime/data/opencode/tool-output/tool_17892ee78001w710bqIdVtGcD0</path> <type>file</type> <content> 39990: 39990 39991: 39991 39992: 39992 "
+  },
+  {
+   "step": "grep-tool-output",
+   "status": "completed",
+   "output": "Found 1 matches ${BASE}/appdata/runtime/data/opencode/tool-output/tool_17892ee78001w710bqIdVtGcD0: Line 39999: 39999 "
+  },
+  {
+   "step": "write-aura-tmp",
+   "status": "completed",
+   "output": "Wrote file successfully."
+  }
+ ],
+ "files": [
+  "${BASE}/appdata/runtime/cache/",
+  "${BASE}/appdata/runtime/cache/opencode/",
+  "${BASE}/appdata/runtime/cache/opencode/bin/",
+  "${BASE}/appdata/runtime/config/",
+  "${BASE}/appdata/runtime/config/.gitignore 63",
+  "${BASE}/appdata/runtime/config/opencode/",
+  "${BASE}/appdata/runtime/config/opencode/.gitignore 63",
+  "${BASE}/appdata/runtime/data/",
+  "${BASE}/appdata/runtime/data/opencode/",
+  "${BASE}/appdata/runtime/data/opencode/log/",
+  "${BASE}/appdata/runtime/data/opencode/log/opencode.log 11547",
+  "${BASE}/appdata/runtime/data/opencode/repos/",
+  "${BASE}/appdata/runtime/data/opencode/tool-output/",
+  "${BASE}/appdata/runtime/data/opencode/tool-output/tool_17892ee78001w710bqIdVtGcD0 228894",
+  "${BASE}/appdata/runtime/home/",
+  "${BASE}/appdata/runtime/home/.npm/",
+  "${BASE}/appdata/runtime/home/.npm/_cacache/",
+  "${BASE}/appdata/runtime/home/.npm/_cacache/tmp/",
+  "${BASE}/appdata/runtime/home/.npm/_cacache/tmp/c78ff51d-8fbd-48b4-a9b7-93e876bb5de6 5863912",
+  "${BASE}/appdata/runtime/home/.npm/_cacache/tmp/cc4ee722-e834-4259-a665-158af2bb86d0 5953529",
+  "${BASE}/appdata/runtime/state/",
+  "${BASE}/appdata/runtime/state/opencode/",
+  "${BASE}/appdata/runtime/state/opencode/locks/",
+  "${BASE}/appdata/runtime/state/opencode/locks/13fc008996176bceb4b2d138fd91c19c1c073f65.lock/",
+  "${BASE}/appdata/runtime/state/opencode/locks/13fc008996176bceb4b2d138fd91c19c1c073f65.lock/heartbeat 0",
+  "${BASE}/appdata/runtime/state/opencode/locks/13fc008996176bceb4b2d138fd91c19c1c073f65.lock/meta.json 139",
+  "${BASE}/appdata/runtime/state/opencode/locks/9bdcb94387fad697af3fea01d1867ff27c1412df.lock/",
+  "${BASE}/appdata/runtime/state/opencode/locks/9bdcb94387fad697af3fea01d1867ff27c1412df.lock/heartbeat 0",
+  "${BASE}/appdata/runtime/state/opencode/locks/9bdcb94387fad697af3fea01d1867ff27c1412df.lock/meta.json 139",
+  "${BASE}/Dokumenter/projekt/.aura/opencode/",
+  "${BASE}/Dokumenter/projekt/.aura/opencode/opencode.db 249856",
+  "${BASE}/Dokumenter/projekt/.aura/opencode/opencode.db-shm 32768",
+  "${BASE}/Dokumenter/projekt/.aura/opencode/opencode.db-wal 2266032",
+  "${BASE}/Dokumenter/projekt/.aura/tmp/",
+  "${BASE}/Dokumenter/projekt/.aura/tmp/.b9fe3aafe3ffdbf2-00000000.dylib 4822976",
+  "${BASE}/Dokumenter/projekt/.aura/tmp/noter.md 5",
+  "${BASE}/Dokumenter/projekt/.aura/tmp/opencode/"
+ ]
+}

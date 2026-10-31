@@ -1,0 +1,90 @@
+{
+ "opencode": "1.18.33",
+ "aura": "d816a9e",
+ "scenario": "byg-uden-git-soeg",
+ "outcome": "idle",
+ "case": "bash-workdir-inde",
+ "askIndex": 1,
+ "asksInStep": 1,
+ "layout": {
+  "mode": "build",
+  "git": false,
+  "copy": false,
+  "model": "kontraktmodel",
+  "worktree": "/",
+  "directory": "${ROOT}"
+ },
+ "sequence": [
+  "del:pending",
+  "spørg:bash",
+  "del:running",
+  "svar:once",
+  "del:running",
+  "del:completed"
+ ],
+ "request": {
+  "id": "per_1789f5511001DBzfarqkQ4v8zz",
+  "sessionID": "ses_e8761014fffe7C0Smxj9vvHr14",
+  "permission": "bash",
+  "patterns": [
+   "ls"
+  ],
+  "metadata": {
+   "command": "ls"
+  },
+  "always": [
+   "ls *"
+  ],
+  "tool": {
+   "messageID": "msg_1789f5381001Rx5kmamW0DcgNO",
+   "callID": "kald-13-0"
+  }
+ },
+ "toolPartAtAsk": {
+  "status": "pending",
+  "tool": "bash",
+  "input": {}
+ },
+ "policyInput": {
+  "id": "per_1789f5511001DBzfarqkQ4v8zz",
+  "sessionID": "ses_e8761014fffe7C0Smxj9vvHr14",
+  "permission": "bash",
+  "patterns": [
+   "ls"
+  ],
+  "metadata": {
+   "command": "ls"
+  },
+  "always": [
+   "ls *"
+  ],
+  "tool": {
+   "messageID": "msg_1789f5381001Rx5kmamW0DcgNO",
+   "callID": "kald-13-0"
+  },
+  "toolInput": {
+   "tool": "bash",
+   "input": {}
+  }
+ },
+ "recordedAura": {
+  "allowed": false,
+  "source": null,
+  "label": "Kommando: ls",
+  "target": "ls",
+  "match": {
+   "kind": "bash",
+   "command": "ls",
+   "cwd": "${ROOT}",
+   "input": {}
+  },
+  "persistable": true,
+  "projectFile": false,
+  "scratch": false,
+  "folder": null,
+  "blockedMode": false
+ },
+ "toolResult": [
+  "app.js\n"
+ ]
+}

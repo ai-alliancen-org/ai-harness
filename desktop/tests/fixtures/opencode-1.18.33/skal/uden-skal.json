@@ -1,0 +1,177 @@
+{
+ "opencode": "1.18.33",
+ "aura": "d816a9e",
+ "kilde": "scripts/record-opencode-contract.cjs skal (OpenCode med Auras isolerede miljø uden config.shell)",
+ "variant": "uden-skal",
+ "pladsholdere": {
+  "BASE": "optagelsens mappe (forælder til ROOT)",
+  "ROOT": "BASE/Projekt (uden Git)",
+  "OUTSIDE": "BASE/ekstern",
+  "RUNTIME": "BASE/appdata/runtime/n (motorens mappe; motorens HOME er RUNTIME/home)"
+ },
+ "outcome": "idle",
+ "effectiveShell": null,
+ "requests": [
+  {
+   "permission": "external_directory",
+   "patterns": [
+    "${BASE}/*"
+   ],
+   "always": [
+    "${BASE}/*"
+   ],
+   "metadata": {
+    "command": "cd .. && pwd",
+    "directories": [
+     "${BASE}"
+    ],
+    "patterns": [
+     "${BASE}/*"
+    ]
+   },
+   "callID": "kald-0-0"
+  },
+  {
+   "permission": "bash",
+   "patterns": [
+    "pwd"
+   ],
+   "always": [
+    "pwd *"
+   ],
+   "metadata": {
+    "command": "cd .. && pwd"
+   },
+   "callID": "kald-0-0"
+  },
+  {
+   "permission": "bash",
+   "patterns": [
+    "echo x > ../uden-for-via-omdirigering.txt"
+   ],
+   "always": [
+    "echo *"
+   ],
+   "metadata": {
+    "command": "echo x > ../uden-for-via-omdirigering.txt"
+   },
+   "callID": "kald-1-0"
+  },
+  {
+   "permission": "external_directory",
+   "patterns": [
+    "${OUTSIDE}/*"
+   ],
+   "always": [
+    "${OUTSIDE}/*"
+   ],
+   "metadata": {
+    "command": "ls",
+    "directories": [
+     "${OUTSIDE}"
+    ],
+    "patterns": [
+     "${OUTSIDE}/*"
+    ]
+   },
+   "callID": "kald-2-0"
+  },
+  {
+   "permission": "bash",
+   "patterns": [
+    "ls"
+   ],
+   "always": [
+    "ls *"
+   ],
+   "metadata": {
+    "command": "ls"
+   },
+   "callID": "kald-2-0"
+  },
+  {
+   "permission": "bash",
+   "patterns": [
+    "npm run build 2>&1",
+    "tail -2"
+   ],
+   "always": [
+    "npm run build *",
+    "tail *"
+   ],
+   "metadata": {
+    "command": "npm run build 2>&1 | tail -2"
+   },
+   "callID": "kald-3-0"
+  },
+  {
+   "permission": "external_directory",
+   "patterns": [
+    "${RUNTIME}/home/.ssh/*"
+   ],
+   "always": [
+    "${RUNTIME}/home/.ssh/*"
+   ],
+   "metadata": {
+    "command": "cat ~/.ssh/id_rsa 2>/dev/null; true",
+    "directories": [
+     "${RUNTIME}/home/.ssh"
+    ],
+    "patterns": [
+     "${RUNTIME}/home/.ssh/*"
+    ]
+   },
+   "callID": "kald-4-0"
+  },
+  {
+   "permission": "bash",
+   "patterns": [
+    "cat ~/.ssh/id_rsa 2>/dev/null",
+    "true"
+   ],
+   "always": [
+    "cat *",
+    "true *"
+   ],
+   "metadata": {
+    "command": "cat ~/.ssh/id_rsa 2>/dev/null; true"
+   },
+   "callID": "kald-4-0"
+  }
+ ],
+ "tools": [
+  {
+   "callID": "kald-0-0",
+   "status": "completed",
+   "command": "cd .. && pwd",
+   "output": "${BASE}"
+  },
+  {
+   "callID": "kald-1-0",
+   "status": "completed",
+   "command": "echo x > ../uden-for-via-omdirigering.txt",
+   "output": "(no output)"
+  },
+  {
+   "callID": "kald-2-0",
+   "status": "completed",
+   "command": "ls",
+   "workdir": "${OUTSIDE}",
+   "output": "(no output)"
+  },
+  {
+   "callID": "kald-3-0",
+   "status": "completed",
+   "command": "npm run build 2>&1 | tail -2",
+   "output": "npm ERR! A complete log of this run can be found in: <sti fra optagemaskinen>"
+  },
+  {
+   "callID": "kald-4-0",
+   "status": "completed",
+   "command": "cat ~/.ssh/id_rsa 2>/dev/null; true",
+   "output": "(no output)"
+  }
+ ],
+ "wrapperLog": null,
+ "udenForFil": "x\n"
+}

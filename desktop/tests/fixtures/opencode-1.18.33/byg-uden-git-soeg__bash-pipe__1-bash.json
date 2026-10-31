@@ -1,0 +1,94 @@
+{
+ "opencode": "1.18.33",
+ "aura": "d816a9e",
+ "scenario": "byg-uden-git-soeg",
+ "outcome": "idle",
+ "case": "bash-pipe",
+ "askIndex": 1,
+ "asksInStep": 1,
+ "layout": {
+  "mode": "build",
+  "git": false,
+  "copy": false,
+  "model": "kontraktmodel",
+  "worktree": "/",
+  "directory": "${ROOT}"
+ },
+ "sequence": [
+  "del:pending",
+  "spørg:bash",
+  "del:running",
+  "svar:once",
+  "del:running",
+  "del:completed"
+ ],
+ "request": {
+  "id": "per_1789f6d750010Ff5Kk23Ci5ukH",
+  "sessionID": "ses_e8761014fffe7C0Smxj9vvHr14",
+  "permission": "bash",
+  "patterns": [
+   "git status --short",
+   "head -5"
+  ],
+  "metadata": {
+   "command": "git status --short | head -5"
+  },
+  "always": [
+   "git status *",
+   "head *"
+  ],
+  "tool": {
+   "messageID": "msg_1789f6c81001AFcv6fEgzY3hxE",
+   "callID": "kald-19-0"
+  }
+ },
+ "toolPartAtAsk": {
+  "status": "pending",
+  "tool": "bash",
+  "input": {}
+ },
+ "policyInput": {
+  "id": "per_1789f6d750010Ff5Kk23Ci5ukH",
+  "sessionID": "ses_e8761014fffe7C0Smxj9vvHr14",
+  "permission": "bash",
+  "patterns": [
+   "git status --short",
+   "head -5"
+  ],
+  "metadata": {
+   "command": "git status --short | head -5"
+  },
+  "always": [
+   "git status *",
+   "head *"
+  ],
+  "tool": {
+   "messageID": "msg_1789f6c81001AFcv6fEgzY3hxE",
+   "callID": "kald-19-0"
+  },
+  "toolInput": {
+   "tool": "bash",
+   "input": {}
+  }
+ },
+ "recordedAura": {
+  "allowed": false,
+  "source": null,
+  "label": "Kommando: git status --short | head -5",
+  "target": "git status --short | head -5",
+  "match": {
+   "kind": "bash",
+   "command": "git status --short | head -5",
+   "cwd": "${ROOT}",
+   "input": {}
+  },
+  "persistable": true,
+  "projectFile": false,
+  "scratch": false,
+  "folder": null,
+  "blockedMode": false
+ },
+ "toolResult": [
+  "fatal: not a git repository (or any of the parent directories): .git\n"
+ ]
+}

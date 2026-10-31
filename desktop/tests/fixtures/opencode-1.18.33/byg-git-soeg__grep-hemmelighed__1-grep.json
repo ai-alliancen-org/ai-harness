@@ -1,0 +1,84 @@
+{
+ "opencode": "1.18.33",
+ "aura": "d816a9e",
+ "scenario": "byg-git-soeg",
+ "outcome": "idle",
+ "case": "grep-hemmelighed",
+ "askIndex": 1,
+ "asksInStep": 1,
+ "layout": {
+  "mode": "build",
+  "git": true,
+  "copy": false,
+  "model": "kontraktmodel",
+  "worktree": "${ROOT}",
+  "directory": "${ROOT}"
+ },
+ "sequence": [
+  "del:pending",
+  "spørg:grep",
+  "del:running",
+  "svar:once",
+  "del:completed"
+ ],
+ "request": {
+  "id": "per_1789e4d98001PJrW9A46J6NrW7",
+  "sessionID": "ses_e876210c4ffeTRFtBEUBE7VBjt",
+  "permission": "grep",
+  "patterns": [
+   "HEMMELIG"
+  ],
+  "metadata": {
+   "pattern": "HEMMELIG"
+  },
+  "always": [
+   "*"
+  ],
+  "tool": {
+   "messageID": "msg_1789e4bd3001ESROzNlKrOEnQp",
+   "callID": "kald-4-0"
+  }
+ },
+ "toolPartAtAsk": {
+  "status": "pending",
+  "tool": "grep",
+  "input": {}
+ },
+ "policyInput": {
+  "id": "per_1789e4d98001PJrW9A46J6NrW7",
+  "sessionID": "ses_e876210c4ffeTRFtBEUBE7VBjt",
+  "permission": "grep",
+  "patterns": [
+   "HEMMELIG"
+  ],
+  "metadata": {
+   "pattern": "HEMMELIG"
+  },
+  "always": [
+   "*"
+  ],
+  "tool": {
+   "messageID": "msg_1789e4bd3001ESROzNlKrOEnQp",
+   "callID": "kald-4-0"
+  },
+  "toolInput": {
+   "tool": "grep",
+   "input": {}
+  }
+ },
+ "recordedAura": {
+  "allowed": false,
+  "source": null,
+  "label": "Denne handling",
+  "target": "",
+  "match": null,
+  "persistable": false,
+  "projectFile": false,
+  "scratch": false,
+  "folder": null,
+  "blockedMode": false
+ },
+ "toolResult": [
+  "Found 1 matches\n${ROOT}/.env:\n  Line 1: HEMMELIG_NEEDLE=syntetisk-hemmelighed\n"
+ ]
+}

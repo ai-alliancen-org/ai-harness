@@ -1,0 +1,101 @@
+{
+ "opencode": "1.18.33",
+ "aura": "d816a9e",
+ "scenario": "git-foraelder",
+ "outcome": "idle",
+ "case": "bash-cat-soeskende",
+ "askIndex": 1,
+ "asksInStep": 1,
+ "layout": {
+  "mode": "build",
+  "git": "parent",
+  "copy": false,
+  "model": "kontraktmodel",
+  "worktree": "${REPO}",
+  "directory": "${ROOT}"
+ },
+ "sequence": [
+  "del:pending",
+  "del:running",
+  "spørg:bash",
+  "svar:once",
+  "del:running",
+  "del:completed"
+ ],
+ "request": {
+  "id": "per_1789d8b310015NGmbTni7ZBijz",
+  "sessionID": "ses_e87628d34ffePmSWwdeOxHfQfy",
+  "permission": "bash",
+  "patterns": [
+   "cat ${REPO}/andet-projekt/eksisterende.txt"
+  ],
+  "metadata": {
+   "command": "cat ${REPO}/andet-projekt/eksisterende.txt"
+  },
+  "always": [
+   "cat *"
+  ],
+  "tool": {
+   "messageID": "msg_1789d89f2001XLUizmRqeP7BJw",
+   "callID": "kald-4-0"
+  }
+ },
+ "toolPartAtAsk": {
+  "status": "running",
+  "tool": "bash",
+  "input": {
+   "command": "cat ${REPO}/andet-projekt/eksisterende.txt",
+   "description": "Læser"
+  }
+ },
+ "policyInput": {
+  "id": "per_1789d8b310015NGmbTni7ZBijz",
+  "sessionID": "ses_e87628d34ffePmSWwdeOxHfQfy",
+  "permission": "bash",
+  "patterns": [
+   "cat ${REPO}/andet-projekt/eksisterende.txt"
+  ],
+  "metadata": {
+   "command": "cat ${REPO}/andet-projekt/eksisterende.txt"
+  },
+  "always": [
+   "cat *"
+  ],
+  "tool": {
+   "messageID": "msg_1789d89f2001XLUizmRqeP7BJw",
+   "callID": "kald-4-0"
+  },
+  "toolInput": {
+   "command": "cat ${REPO}/andet-projekt/eksisterende.txt",
+   "description": "Læser",
+   "tool": "bash",
+   "input": {
+    "command": "cat ${REPO}/andet-projekt/eksisterende.txt",
+    "description": "Læser"
+   }
+  }
+ },
+ "recordedAura": {
+  "allowed": false,
+  "source": null,
+  "label": "Kommando: cat ${REPO}/andet-projekt/eksisterende.txt",
+  "target": "cat ${REPO}/andet-projekt/eksisterende.txt",
+  "match": {
+   "kind": "bash",
+   "command": "cat ${REPO}/andet-projekt/eksisterende.txt",
+   "cwd": "${ROOT}",
+   "input": {
+    "command": "cat ${REPO}/andet-projekt/eksisterende.txt",
+    "description": "Læser"
+   }
+  },
+  "persistable": true,
+  "projectFile": false,
+  "scratch": false,
+  "folder": null,
+  "blockedMode": false
+ },
+ "toolResult": [
+  "x i søskende\n"
+ ]
+}

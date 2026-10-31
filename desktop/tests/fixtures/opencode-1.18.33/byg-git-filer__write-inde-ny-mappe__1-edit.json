@@ -1,0 +1,102 @@
+{
+ "opencode": "1.18.33",
+ "aura": "d816a9e",
+ "scenario": "byg-git-filer",
+ "outcome": "idle",
+ "case": "write-inde-ny-mappe",
+ "askIndex": 1,
+ "asksInStep": 1,
+ "layout": {
+  "mode": "build",
+  "git": true,
+  "copy": false,
+  "model": "kontraktmodel",
+  "worktree": "${ROOT}",
+  "directory": "${ROOT}"
+ },
+ "sequence": [
+  "del:pending",
+  "del:running",
+  "spørg:edit",
+  "svar:once",
+  "del:completed"
+ ],
+ "request": {
+  "id": "per_17870a9bd001Yfgmz8O81Kl7lN",
+  "sessionID": "ses_e878f66e4ffewOBgWF9eIkSqq1",
+  "permission": "edit",
+  "patterns": [
+   "src/dyb/ny/fil.js"
+  ],
+  "metadata": {
+   "filepath": "${ROOT}/src/dyb/ny/fil.js",
+   "diff": "Index: ${ROOT}/src/dyb/ny/fil.js\n===================================================================\n--- ${ROOT}/src/dyb/ny/fil.js\n+++ ${ROOT}/src/dyb/ny/fil.js\n@@ -0,0 +1,1 @@\n+export const x = 1;\n"
+  },
+  "always": [
+   "*"
+  ],
+  "tool": {
+   "messageID": "msg_17870a95e001IF5BhZ0pPGX5iA",
+   "callID": "kald-10-0"
+  }
+ },
+ "toolPartAtAsk": {
+  "status": "running",
+  "tool": "write",
+  "input": {
+   "filePath": "${ROOT}/src/dyb/ny/fil.js",
+   "content": "export const x = 1;\n"
+  }
+ },
+ "policyInput": {
+  "id": "per_17870a9bd001Yfgmz8O81Kl7lN",
+  "sessionID": "ses_e878f66e4ffewOBgWF9eIkSqq1",
+  "permission": "edit",
+  "patterns": [
+   "src/dyb/ny/fil.js"
+  ],
+  "metadata": {
+   "filepath": "${ROOT}/src/dyb/ny/fil.js",
+   "diff": "Index: ${ROOT}/src/dyb/ny/fil.js\n===================================================================\n--- ${ROOT}/src/dyb/ny/fil.js\n+++ ${ROOT}/src/dyb/ny/fil.js\n@@ -0,0 +1,1 @@\n+export const x = 1;\n"
+  },
+  "always": [
+   "*"
+  ],
+  "tool": {
+   "messageID": "msg_17870a95e001IF5BhZ0pPGX5iA",
+   "callID": "kald-10-0"
+  },
+  "toolInput": {
+   "filePath": "${ROOT}/src/dyb/ny/fil.js",
+   "content": "export const x = 1;\n",
+   "tool": "write",
+   "input": {
+    "filePath": "${ROOT}/src/dyb/ny/fil.js",
+    "content": "export const x = 1;\n"
+   }
+  }
+ },
+ "recordedAura": {
+  "allowed": false,
+  "source": null,
+  "label": "Filændring: ${ROOT}/src/dyb/ny/fil.js",
+  "target": "${ROOT}/src/dyb/ny/fil.js",
+  "match": {
+   "kind": "edit",
+   "targets": [
+    {
+     "path": "${ROOT}/src/dyb/ny/fil.js",
+     "subtree": false
+    }
+   ]
+  },
+  "persistable": true,
+  "projectFile": true,
+  "scratch": false,
+  "folder": "${ROOT}/src/dyb/ny",
+  "blockedMode": false
+ },
+ "toolResult": [
+  "Wrote file successfully."
+ ]
+}

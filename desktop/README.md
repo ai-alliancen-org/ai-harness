@@ -317,6 +317,8 @@ Git-, publicerings- og chattestene opretter rigtige commits med syntetiske filer
 
 Desktop- og chattest kræver en grafisk session. Agent- og chattest kræver den låste OpenCode-version fra `npm run runtime:prepare`. Native dialogers svar simuleres med isolerede teststier; operativsystemets dialogbetjening skal afprøves manuelt. Integrationstestene bruger en kontrolleret lokal modelserver, rigtige filer og rigtige OpenCode-værktøjer. Testmapper/skærmbilleder bevares under systemets midlertidige mappe, og stierne udskrives.
 
+`tests/opencode-contract.test.cjs` holder Aura op mod rigtige tilladelsesforespørgsler fra den låste OpenCode i `tests/fixtures/opencode-<VERSION>/`. Testen fejler, når OpenCode-versionen skifter, indtil der er optaget forfra med `node scripts/record-opencode-contract.cjs`. Optageren køres kun manuelt og lokalt med en lokal testmodel; `README.md` i fixturemappen forklarer sættene og de målte fakta.
+
 Den valgfrie webkontrol bruger en lokal testmodel, men lader den rigtige agents webværktøj hente Gentofte-guidens offentlige forside og underside:
 
 ```bash

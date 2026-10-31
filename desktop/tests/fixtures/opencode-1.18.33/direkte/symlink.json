@@ -1,0 +1,92 @@
+{
+ "opencode": "1.18.33",
+ "aura": "d816a9e",
+ "kilde": "M1-kontraktdesignets direkte.cjs (Auras isolatedEnv og engineConfig med ændrede regler, skills eller mapper)",
+ "eksperiment": "symlink",
+ "outcome": "idle",
+ "path": {
+  "home": "${BASE}/appdata/runtime/home",
+  "state": "${BASE}/appdata/runtime/state/opencode",
+  "config": "${BASE}/appdata/runtime/config/opencode",
+  "worktree": "${BASE}/Dokumenter/projekt",
+  "directory": "${BASE}/Dokumenter/projekt"
+ },
+ "project": {
+  "id": "global",
+  "worktree": "${BASE}/Dokumenter/projekt",
+  "vcs": "git",
+  "time": {
+   "created": 1793024353881,
+   "updated": 1793024353881
+  },
+  "sandboxes": []
+ },
+ "asked": [
+  {
+   "step": "bash-cat-gennem-link",
+   "permission": "bash",
+   "patterns": [
+    "cat link/fil.txt"
+   ],
+   "always": [
+    "cat *"
+   ],
+   "metadata": {
+    "command": "cat link/fil.txt"
+   }
+  }
+ ],
+ "results": [
+  {
+   "step": "write-gennem-link",
+   "status": "completed",
+   "output": "Wrote file successfully."
+  },
+  {
+   "step": "read-gennem-link-uden-laesevagt",
+   "status": "completed",
+   "output": "<path>${BASE}/Dokumenter/projekt/link/fil.txt</path> <type>file</type> <content> 1: Ekstern (End of file - total 1 lines) </content>"
+  },
+  {
+   "step": "grep-gennem-link",
+   "status": "completed",
+   "output": "Found 1 matches ${BASE}/Dokumenter/projekt/link/fil.txt: Line 1: Ekstern "
+  },
+  {
+   "step": "glob-gennem-link",
+   "status": "completed",
+   "output": "${BASE}/Dokumenter/projekt/link/under/dyb.txt <sti fra optagemaskinen>"
+  },
+  {
+   "step": "bash-cat-gennem-link",
+   "status": "completed",
+   "output": "Ekstern "
+  }
+ ],
+ "files": [
+  "${BASE}/appdata/runtime/cache/",
+  "${BASE}/appdata/runtime/cache/opencode/",
+  "${BASE}/appdata/runtime/cache/opencode/bin/",
+  "${BASE}/appdata/runtime/config/",
+  "${BASE}/appdata/runtime/config/.gitignore 63",
+  "${BASE}/appdata/runtime/config/node_modules (link/mappe, ikke gennemgået)",
+  "${BASE}/appdata/runtime/config/opencode/",
+  "${BASE}/appdata/runtime/config/opencode/.gitignore 63",
+  "${BASE}/appdata/runtime/config/opencode/node_modules (link/mappe, ikke gennemgået)",
+  "${BASE}/appdata/runtime/config/opencode/package-lock.json 173",
+  "${BASE}/appdata/runtime/config/opencode/package.json 93",
+  "${BASE}/appdata/runtime/config/package-lock.json 173",
+  "${BASE}/appdata/runtime/config/package.json 93",
+  "${BASE}/appdata/runtime/data/",
+  "${BASE}/appdata/runtime/data/opencode/",
+  "${BASE}/appdata/runtime/data/opencode/log/",
+  "${BASE}/appdata/runtime/data/opencode/log/opencode.log 9559",
+  "${BASE}/appdata/runtime/data/opencode/opencode.db 249856",
+  "${BASE}/appdata/runtime/data/opencode/opencode.db-shm 32768",
+  "${BASE}/appdata/runtime/data/opencode/opencode.db-wal 2076512",
+  "${BASE}/appdata/runtime/data/opencode/repos/",
+  "${BASE}/appdata/runtime/home/",
+  "${BASE}/appdata/runtime/state/",
+  "${BASE}/appdata/runtime/state/opencode/"
+ ]
+}

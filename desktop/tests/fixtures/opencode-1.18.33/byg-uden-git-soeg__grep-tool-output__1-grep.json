@@ -1,0 +1,94 @@
+{
+ "opencode": "1.18.33",
+ "aura": "d816a9e",
+ "scenario": "byg-uden-git-soeg",
+ "outcome": "idle",
+ "case": "grep-tool-output",
+ "askIndex": 1,
+ "asksInStep": 1,
+ "layout": {
+  "mode": "build",
+  "git": false,
+  "copy": false,
+  "model": "kontraktmodel",
+  "worktree": "/",
+  "directory": "${ROOT}"
+ },
+ "sequence": [
+  "del:pending",
+  "spørg:grep",
+  "del:running",
+  "svar:once",
+  "del:completed"
+ ],
+ "request": {
+  "id": "per_1789f8fb5001DCcz7isYKi1KtX",
+  "sessionID": "ses_e8761014fffe7C0Smxj9vvHr14",
+  "permission": "grep",
+  "patterns": [
+   "^39999$"
+  ],
+  "metadata": {
+   "pattern": "^39999$",
+   "path": "${RUNTIME}/data/opencode/tool-output"
+  },
+  "always": [
+   "*"
+  ],
+  "tool": {
+   "messageID": "msg_1789f8e6c001ZS5IhX456T99g6",
+   "callID": "kald-23-0"
+  }
+ },
+ "toolPartAtAsk": {
+  "status": "pending",
+  "tool": "grep",
+  "input": {}
+ },
+ "policyInput": {
+  "id": "per_1789f8fb5001DCcz7isYKi1KtX",
+  "sessionID": "ses_e8761014fffe7C0Smxj9vvHr14",
+  "permission": "grep",
+  "patterns": [
+   "^39999$"
+  ],
+  "metadata": {
+   "pattern": "^39999$",
+   "path": "${RUNTIME}/data/opencode/tool-output"
+  },
+  "always": [
+   "*"
+  ],
+  "tool": {
+   "messageID": "msg_1789f8e6c001ZS5IhX456T99g6",
+   "callID": "kald-23-0"
+  },
+  "toolInput": {
+   "tool": "grep",
+   "input": {}
+  }
+ },
+ "recordedAura": {
+  "allowed": false,
+  "source": null,
+  "label": "Læsning: ${RUNTIME}/data/opencode/tool-output",
+  "target": "${RUNTIME}/data/opencode/tool-output",
+  "match": {
+   "kind": "grep",
+   "targets": [
+    {
+     "path": "${RUNTIME}/data/opencode/tool-output",
+     "subtree": false
+    }
+   ]
+  },
+  "persistable": true,
+  "projectFile": false,
+  "scratch": false,
+  "folder": null,
+  "blockedMode": false
+ },
+ "toolResult": [
+  "Found 1 matches\n${RUNTIME}/data/opencode/tool-output/tool_1789f88a8001TK6tSn0WQ6gQao:\n  Line 39999: 39999\n"
+ ]
+}

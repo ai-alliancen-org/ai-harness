@@ -1,0 +1,80 @@
+{
+ "opencode": "1.18.33",
+ "aura": "d816a9e",
+ "scenario": "byg-uden-git-soeg",
+ "outcome": "idle",
+ "case": "doom-loop",
+ "askIndex": 1,
+ "asksInStep": 1,
+ "layout": {
+  "mode": "build",
+  "git": false,
+  "copy": false,
+  "model": "kontraktmodel",
+  "worktree": "/",
+  "directory": "${ROOT}"
+ },
+ "sequence": [
+  "del:pending",
+  "del:running",
+  "del:pending",
+  "del:running",
+  "del:pending",
+  "del:running",
+  "spørg:doom_loop",
+  "svar:once",
+  "del:completed"
+ ],
+ "request": {
+  "id": "per_1789f9e44001FEQSpGobn29kth",
+  "sessionID": "ses_e8761014fffe7C0Smxj9vvHr14",
+  "permission": "doom_loop",
+  "patterns": [
+   "read"
+  ],
+  "metadata": {
+   "tool": "read",
+   "input": {
+    "filePath": "${ROOT}/notes.txt"
+   }
+  },
+  "always": [
+   "read"
+  ]
+ },
+ "toolPartAtAsk": null,
+ "policyInput": {
+  "id": "per_1789f9e44001FEQSpGobn29kth",
+  "sessionID": "ses_e8761014fffe7C0Smxj9vvHr14",
+  "permission": "doom_loop",
+  "patterns": [
+   "read"
+  ],
+  "metadata": {
+   "tool": "read",
+   "input": {
+    "filePath": "${ROOT}/notes.txt"
+   }
+  },
+  "always": [
+   "read"
+  ]
+ },
+ "recordedAura": {
+  "allowed": false,
+  "source": null,
+  "label": "Denne handling",
+  "target": "",
+  "match": null,
+  "persistable": false,
+  "projectFile": false,
+  "scratch": false,
+  "folder": null,
+  "blockedMode": false
+ },
+ "toolResult": [
+  "<path>${ROOT}/notes.txt</path>\n<type>file</type>\n<content>\n1: Hej verden NEEDLE\n\n(End of file - total 1 lines)\n</content>",
+  "<path>${ROOT}/notes.txt</path>\n<type>file</type>\n<content>\n1: Hej verden NEEDLE\n\n(End of file - total 1 lines)\n</content>",
+  "<path>${ROOT}/notes.txt</path>\n<type>file</type>\n<content>\n1: Hej verden NEEDLE\n\n(End of file - total 1 lines)\n</content>"
+ ]
+}

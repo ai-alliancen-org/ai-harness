@@ -1,0 +1,90 @@
+{
+ "opencode": "1.18.33",
+ "aura": "d816a9e",
+ "scenario": "byg-uden-git-soeg",
+ "outcome": "idle",
+ "case": "bash-redirect-tmp",
+ "askIndex": 1,
+ "asksInStep": 1,
+ "layout": {
+  "mode": "build",
+  "git": false,
+  "copy": false,
+  "model": "kontraktmodel",
+  "worktree": "/",
+  "directory": "${ROOT}"
+ },
+ "sequence": [
+  "del:pending",
+  "spørg:bash",
+  "del:running",
+  "svar:once",
+  "del:running",
+  "del:completed"
+ ],
+ "request": {
+  "id": "per_1789f83df001owSxK41maww7pl",
+  "sessionID": "ses_e8761014fffe7C0Smxj9vvHr14",
+  "permission": "bash",
+  "patterns": [
+   "echo hej > ${SYSTMP}/aura-kontrakt-72465.txt"
+  ],
+  "metadata": {
+   "command": "echo hej > ${SYSTMP}/aura-kontrakt-72465.txt"
+  },
+  "always": [
+   "echo *"
+  ],
+  "tool": {
+   "messageID": "msg_1789f8135001zMZnZu4GH9OZ3C",
+   "callID": "kald-20-0"
+  }
+ },
+ "toolPartAtAsk": {
+  "status": "pending",
+  "tool": "bash",
+  "input": {}
+ },
+ "policyInput": {
+  "id": "per_1789f83df001owSxK41maww7pl",
+  "sessionID": "ses_e8761014fffe7C0Smxj9vvHr14",
+  "permission": "bash",
+  "patterns": [
+   "echo hej > ${SYSTMP}/aura-kontrakt-72465.txt"
+  ],
+  "metadata": {
+   "command": "echo hej > ${SYSTMP}/aura-kontrakt-72465.txt"
+  },
+  "always": [
+   "echo *"
+  ],
+  "tool": {
+   "messageID": "msg_1789f8135001zMZnZu4GH9OZ3C",
+   "callID": "kald-20-0"
+  },
+  "toolInput": {
+   "tool": "bash",
+   "input": {}
+  }
+ },
+ "recordedAura": {
+  "allowed": false,
+  "source": null,
+  "label": "Kommando: echo hej > ${SYSTMP}/aura-kontrakt-72465.txt",
+  "target": "echo hej > ${SYSTMP}/aura-kontrakt-72465.txt",
+  "match": {
+   "kind": "bash",
+   "command": "echo hej > ${SYSTMP}/aura-kontrakt-72465.txt",
+   "cwd": "${ROOT}",
+   "input": {}
+  },
+  "persistable": true,
+  "projectFile": false,
+  "scratch": false,
+  "folder": null,
+  "blockedMode": false
+ },
+ "toolResult": [
+  "(no output)"
+ ]
+}

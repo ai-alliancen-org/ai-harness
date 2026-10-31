@@ -1,0 +1,90 @@
+{
+ "opencode": "1.18.33",
+ "aura": "d816a9e",
+ "scenario": "byg-uden-git-soeg",
+ "outcome": "idle",
+ "case": "bash-langt-output",
+ "askIndex": 1,
+ "asksInStep": 1,
+ "layout": {
+  "mode": "build",
+  "git": false,
+  "copy": false,
+  "model": "kontraktmodel",
+  "worktree": "/",
+  "directory": "${ROOT}"
+ },
+ "sequence": [
+  "del:pending",
+  "spørg:bash",
+  "del:running",
+  "svar:once",
+  "del:running",
+  "del:completed"
+ ],
+ "request": {
+  "id": "per_1789f8731001gTihpolD0vfS4X",
+  "sessionID": "ses_e8761014fffe7C0Smxj9vvHr14",
+  "permission": "bash",
+  "patterns": [
+   "seq 1 40000"
+  ],
+  "metadata": {
+   "command": "seq 1 40000"
+  },
+  "always": [
+   "seq *"
+  ],
+  "tool": {
+   "messageID": "msg_1789f85160016PWRhG2YBXzTe7",
+   "callID": "kald-21-0"
+  }
+ },
+ "toolPartAtAsk": {
+  "status": "pending",
+  "tool": "bash",
+  "input": {}
+ },
+ "policyInput": {
+  "id": "per_1789f8731001gTihpolD0vfS4X",
+  "sessionID": "ses_e8761014fffe7C0Smxj9vvHr14",
+  "permission": "bash",
+  "patterns": [
+   "seq 1 40000"
+  ],
+  "metadata": {
+   "command": "seq 1 40000"
+  },
+  "always": [
+   "seq *"
+  ],
+  "tool": {
+   "messageID": "msg_1789f85160016PWRhG2YBXzTe7",
+   "callID": "kald-21-0"
+  },
+  "toolInput": {
+   "tool": "bash",
+   "input": {}
+  }
+ },
+ "recordedAura": {
+  "allowed": false,
+  "source": null,
+  "label": "Kommando: seq 1 40000",
+  "target": "seq 1 40000",
+  "match": {
+   "kind": "bash",
+   "command": "seq 1 40000",
+   "cwd": "${ROOT}",
+   "input": {}
+  },
+  "persistable": true,
+  "projectFile": false,
+  "scratch": false,
+  "folder": null,
+  "blockedMode": false
+ },
+ "toolResult": [
+  "...output truncated...\n\nFull output saved to: ${RUNTIME}/data/opencode/tool-output/tool_1789f88a8001TK6tSn0WQ6gQao\n\n38002\n38003\n38004\n38005\n38006\n38007\n38008\n38009\n38010\n38011\n38012\n38013\n38014\n38015\n38016\n38017\n38018\n38019\n38020\n38021\n38022\n38023\n38024\n38025\n38026\n38027\n38028\n38029\n38030\n38031\n3803"
+ ]
+}

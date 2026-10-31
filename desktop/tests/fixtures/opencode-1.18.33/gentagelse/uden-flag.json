@@ -1,0 +1,44 @@
+{
+ "opencode": "1.18.33",
+ "aura": "5525acf",
+ "kilde": "scripts/record-opencode-contract.cjs gentagelse (OpenCode med Auras isolerede miljø uden experimental)",
+ "variant": "uden-flag",
+ "experimental": null,
+ "sendtExperimental": null,
+ "status": "session.idle",
+ "modelCalls": 2,
+ "requests": [
+  {
+   "permission": "doom_loop",
+   "patterns": [
+    "read"
+   ],
+   "sendt": "once",
+   "svar": "once"
+  },
+  {
+   "permission": "webfetch",
+   "patterns": [
+    "https://andet.invalid/"
+   ],
+   "sendt": "reject+besked",
+   "svar": "reject"
+  },
+  {
+   "permission": "bash",
+   "patterns": [
+    "echo a"
+   ],
+   "ventedeVedAfvisning": true,
+   "sendt": null,
+   "svar": "reject"
+  }
+ ],
+ "results": [
+  "read:completed",
+  "read:completed",
+  "read:completed",
+  "webfetch:error The user rejected permission to use this specific tool call with the following feedback: Aura: kun lokale adresser i prø",
+  "bash:error The user rejected permission to use this specific tool call."
+ ]
+}

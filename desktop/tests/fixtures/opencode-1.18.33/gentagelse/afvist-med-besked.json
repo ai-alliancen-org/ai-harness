@@ -1,0 +1,29 @@
+{
+ "opencode": "1.18.33",
+ "aura": "5525acf",
+ "kilde": "scripts/record-opencode-contract.cjs gentagelse (OpenCode med Auras isolerede miljø og experimental.continue_loop_on_deny)",
+ "variant": "afvist-med-besked",
+ "experimental": {
+  "continue_loop_on_deny": true
+ },
+ "sendtExperimental": {
+  "continue_loop_on_deny": true
+ },
+ "status": "session.error {\"name\":\"UnknownError\",\"data\":{\"message\":\"The user rejected permission to use this specific tool call with the following feedback: Du gentager samme kald; prøv en anden vej.\"}}",
+ "modelCalls": 1,
+ "requests": [
+  {
+   "permission": "doom_loop",
+   "patterns": [
+    "read"
+   ],
+   "sendt": "reject+besked",
+   "svar": "reject"
+  }
+ ],
+ "results": [
+  "read:error Tool execution aborted",
+  "read:error Tool execution aborted",
+  "read:error Tool execution aborted"
+ ]
+}

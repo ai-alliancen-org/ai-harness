@@ -1,0 +1,88 @@
+{
+ "opencode": "1.18.33",
+ "aura": "d816a9e",
+ "scenario": "byg-git-filer",
+ "outcome": "idle",
+ "case": "write-ude-ny-mappe",
+ "askIndex": 1,
+ "asksInStep": 2,
+ "layout": {
+  "mode": "build",
+  "git": true,
+  "copy": false,
+  "model": "kontraktmodel",
+  "worktree": "${ROOT}",
+  "directory": "${ROOT}"
+ },
+ "sequence": [
+  "del:pending",
+  "spørg:external_directory",
+  "del:running",
+  "svar:once",
+  "spørg:edit",
+  "svar:once",
+  "del:completed"
+ ],
+ "request": {
+  "id": "per_17870abb5001YoInDqlH89hGL3",
+  "sessionID": "ses_e878f66e4ffewOBgWF9eIkSqq1",
+  "permission": "external_directory",
+  "patterns": [
+   "${OUTSIDE}/ny-mappe/*"
+  ],
+  "metadata": {
+   "filepath": "${OUTSIDE}/ny-mappe/fil.txt",
+   "parentDir": "${OUTSIDE}/ny-mappe"
+  },
+  "always": [
+   "${OUTSIDE}/ny-mappe/*"
+  ],
+  "tool": {
+   "messageID": "msg_17870ab7c001raEqciIASzAmfE",
+   "callID": "kald-15-0"
+  }
+ },
+ "toolPartAtAsk": {
+  "status": "pending",
+  "tool": "write",
+  "input": {}
+ },
+ "policyInput": {
+  "id": "per_17870abb5001YoInDqlH89hGL3",
+  "sessionID": "ses_e878f66e4ffewOBgWF9eIkSqq1",
+  "permission": "external_directory",
+  "patterns": [
+   "${OUTSIDE}/ny-mappe/*"
+  ],
+  "metadata": {
+   "filepath": "${OUTSIDE}/ny-mappe/fil.txt",
+   "parentDir": "${OUTSIDE}/ny-mappe"
+  },
+  "always": [
+   "${OUTSIDE}/ny-mappe/*"
+  ],
+  "tool": {
+   "messageID": "msg_17870ab7c001raEqciIASzAmfE",
+   "callID": "kald-15-0"
+  },
+  "toolInput": {
+   "tool": "write",
+   "input": {}
+  }
+ },
+ "recordedAura": {
+  "allowed": false,
+  "source": null,
+  "label": "Denne handling",
+  "target": "",
+  "match": null,
+  "persistable": false,
+  "projectFile": false,
+  "scratch": false,
+  "folder": null,
+  "blockedMode": false
+ },
+ "toolResult": [
+  "Wrote file successfully."
+ ]
+}

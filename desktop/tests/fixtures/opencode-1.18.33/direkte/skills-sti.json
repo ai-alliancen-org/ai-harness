@@ -1,0 +1,118 @@
+{
+ "opencode": "1.18.33",
+ "aura": "d816a9e",
+ "kilde": "M1-kontraktdesignets direkte.cjs (Auras isolatedEnv og engineConfig med ændrede regler, skills eller mapper). Kørt uden writePluginRuntime, så OpenCode hentede @opencode-ai/plugin fra npm (kritik K3)",
+ "eksperiment": "skills-sti",
+ "outcome": "idle",
+ "path": {
+  "home": "${BASE}/appdata/runtime/home",
+  "state": "${BASE}/appdata/runtime/state/opencode",
+  "config": "${BASE}/appdata/runtime/config/opencode",
+  "worktree": "${BASE}/Dokumenter/projekt",
+  "directory": "${BASE}/Dokumenter/projekt"
+ },
+ "project": {
+  "id": "global",
+  "worktree": "${BASE}/Dokumenter/projekt",
+  "vcs": "git",
+  "time": {
+   "created": 1793024188287,
+   "updated": 1793024188287
+  },
+  "sandboxes": []
+ },
+ "asked": [
+  {
+   "step": "read-delt-skill-reference",
+   "permission": "external_directory",
+   "patterns": [
+    "${BASE}/delte-skills/aura-delt/references/*"
+   ],
+   "always": [
+    "${BASE}/delte-skills/aura-delt/references/*"
+   ],
+   "metadata": {
+    "filepath": "${BASE}/delte-skills/aura-delt/references/ref.md",
+    "parentDir": "${BASE}/delte-skills/aura-delt/references"
+   }
+  },
+  {
+   "step": "read-andet-uden-for",
+   "permission": "external_directory",
+   "patterns": [
+    "${BASE}/Dokumenter/ekstern/*"
+   ],
+   "always": [
+    "${BASE}/Dokumenter/ekstern/*"
+   ],
+   "metadata": {
+    "filepath": "${BASE}/Dokumenter/ekstern/fil.txt",
+    "parentDir": "${BASE}/Dokumenter/ekstern"
+   }
+  }
+ ],
+ "results": [
+  {
+   "step": "skill-i-projektet",
+   "status": "completed",
+   "output": "<skill_content name=\"aura-proeve\"> # Skill: aura-proeve # aura-proeve Læs references/ref.md. Base directory for this skill: ${BASE}/Dokumenter/projekt/.aura/s"
+  },
+  {
+   "step": "skill-delt-uden-for",
+   "status": "completed",
+   "output": "<skill_content name=\"aura-delt\"> # Skill: aura-delt # aura-delt Læs references/ref.md. Base directory for this skill: ${BASE}/delte-skills/aura-delt Relative "
+  },
+  {
+   "step": "read-delt-skill-reference",
+   "status": "error",
+   "output": "The user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules [{\"permission\":\"*\",\"action\":\"allow\",\"pattern\":\"*\"},{\"permission\":\"read\",\"pattern\":\"*\",\"action\":\"allow\"},{\"permission\":\"read\",\"pattern\":\"*.env\",\"action\":\"ask\"},{\"permission\":\"read\""
+  },
+  {
+   "step": "read-andet-uden-for",
+   "status": "completed",
+   "output": "<path>${BASE}/Dokumenter/ekstern/fil.txt</path> <type>file</type> <content> 1: Ekstern (End of file - total 1 lines) </content>"
+  },
+  {
+   "step": "skill-indbygget",
+   "status": "error",
+   "output": "The user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules [{\"permission\":\"*\",\"action\":\"allow\",\"pattern\":\"*\"},{\"permission\":\"*\",\"action\":\"ask\",\"pattern\":\"*\"},{\"permission\":\"skill\",\"pattern\":\"*\",\"action\":\"deny\"},{\"permission\":\"skill\",\"patt"
+  }
+ ],
+ "files": [
+  "${BASE}/appdata/runtime/cache/",
+  "${BASE}/appdata/runtime/cache/opencode/",
+  "${BASE}/appdata/runtime/cache/opencode/bin/",
+  "${BASE}/appdata/runtime/config/",
+  "${BASE}/appdata/runtime/config/.gitignore 63",
+  "${BASE}/appdata/runtime/config/opencode/",
+  "${BASE}/appdata/runtime/config/opencode/.gitignore 63",
+  "${BASE}/appdata/runtime/data/",
+  "${BASE}/appdata/runtime/data/opencode/",
+  "${BASE}/appdata/runtime/data/opencode/log/",
+  "${BASE}/appdata/runtime/data/opencode/log/opencode.log 11160",
+  "${BASE}/appdata/runtime/data/opencode/opencode.db 249856",
+  "${BASE}/appdata/runtime/data/opencode/opencode.db-shm 32768",
+  "${BASE}/appdata/runtime/data/opencode/opencode.db-wal 2031192",
+  "${BASE}/appdata/runtime/data/opencode/repos/",
+  "${BASE}/appdata/runtime/home/",
+  "${BASE}/appdata/runtime/home/.npm/",
+  "${BASE}/appdata/runtime/home/.npm/_cacache/",
+  "${BASE}/appdata/runtime/home/.npm/_cacache/tmp/",
+  "${BASE}/appdata/runtime/home/.npm/_cacache/tmp/63ce135b-579d-447f-a3b7-800f2892e5bc 2706499",
+  "${BASE}/appdata/runtime/home/.npm/_cacache/tmp/acc970c9-8781-43c3-8c6a-948b9710b8cf 2683188",
+  "${BASE}/appdata/runtime/state/",
+  "${BASE}/appdata/runtime/state/opencode/",
+  "${BASE}/appdata/runtime/state/opencode/locks/",
+  "${BASE}/appdata/runtime/state/opencode/locks/60550f6fb5911f1cf92db443e01b4e6f02c4a5e8.lock/",
+  "${BASE}/appdata/runtime/state/opencode/locks/60550f6fb5911f1cf92db443e01b4e6f02c4a5e8.lock/heartbeat 0",
+  "${BASE}/appdata/runtime/state/opencode/locks/60550f6fb5911f1cf92db443e01b4e6f02c4a5e8.lock/meta.json 139",
+  "${BASE}/appdata/runtime/state/opencode/locks/738f9336b1c5ab532fcd6e15509e03b09535d7bb.lock/",
+  "${BASE}/appdata/runtime/state/opencode/locks/738f9336b1c5ab532fcd6e15509e03b09535d7bb.lock/heartbeat 0",
+  "${BASE}/appdata/runtime/state/opencode/locks/738f9336b1c5ab532fcd6e15509e03b09535d7bb.lock/meta.json 139",
+  "${BASE}/Dokumenter/projekt/.aura/skills/",
+  "${BASE}/Dokumenter/projekt/.aura/skills/aura-proeve/",
+  "${BASE}/Dokumenter/projekt/.aura/skills/aura-proeve/SKILL.md 124",
+  "${BASE}/Dokumenter/projekt/.aura/skills/aura-proeve/references/",
+  "${BASE}/Dokumenter/projekt/.aura/skills/aura-proeve/references/ref.md 27"
+ ]
+}

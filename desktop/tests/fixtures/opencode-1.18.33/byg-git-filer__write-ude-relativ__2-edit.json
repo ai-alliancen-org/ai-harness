@@ -1,0 +1,96 @@
+{
+ "opencode": "1.18.33",
+ "aura": "d816a9e",
+ "scenario": "byg-git-filer",
+ "outcome": "idle",
+ "case": "write-ude-relativ",
+ "askIndex": 2,
+ "asksInStep": 2,
+ "layout": {
+  "mode": "build",
+  "git": true,
+  "copy": false,
+  "model": "kontraktmodel",
+  "worktree": "${ROOT}",
+  "directory": "${ROOT}"
+ },
+ "sequence": [
+  "del:pending",
+  "spørg:external_directory",
+  "del:running",
+  "svar:once",
+  "spørg:edit",
+  "svar:once",
+  "del:completed"
+ ],
+ "request": {
+  "id": "per_17870ab59001Axo6YkXBY34bO0",
+  "sessionID": "ses_e878f66e4ffewOBgWF9eIkSqq1",
+  "permission": "edit",
+  "patterns": [
+   "../ekstern/ny2.txt"
+  ],
+  "metadata": {
+   "filepath": "${OUTSIDE}/ny2.txt",
+   "diff": "Index: ${OUTSIDE}/ny2.txt\n===================================================================\n--- ${OUTSIDE}/ny2.txt\n+++ ${OUTSIDE}/ny2.txt\n@@ -0,0 +1,1 @@\n+ny ekstern 2\n"
+  },
+  "always": [
+   "*"
+  ],
+  "tool": {
+   "messageID": "msg_17870ab0c001dH42xW0CYZ1zZ2",
+   "callID": "kald-14-0"
+  }
+ },
+ "toolPartAtAsk": {
+  "status": "running",
+  "tool": "write",
+  "input": {
+   "filePath": "../ekstern/ny2.txt",
+   "content": "ny ekstern 2\n"
+  }
+ },
+ "policyInput": {
+  "id": "per_17870ab59001Axo6YkXBY34bO0",
+  "sessionID": "ses_e878f66e4ffewOBgWF9eIkSqq1",
+  "permission": "edit",
+  "patterns": [
+   "../ekstern/ny2.txt"
+  ],
+  "metadata": {
+   "filepath": "${OUTSIDE}/ny2.txt",
+   "diff": "Index: ${OUTSIDE}/ny2.txt\n===================================================================\n--- ${OUTSIDE}/ny2.txt\n+++ ${OUTSIDE}/ny2.txt\n@@ -0,0 +1,1 @@\n+ny ekstern 2\n"
+  },
+  "always": [
+   "*"
+  ],
+  "tool": {
+   "messageID": "msg_17870ab0c001dH42xW0CYZ1zZ2",
+   "callID": "kald-14-0"
+  },
+  "toolInput": {
+   "filePath": "../ekstern/ny2.txt",
+   "content": "ny ekstern 2\n",
+   "tool": "write",
+   "input": {
+    "filePath": "../ekstern/ny2.txt",
+    "content": "ny ekstern 2\n"
+   }
+  }
+ },
+ "recordedAura": {
+  "allowed": false,
+  "source": null,
+  "label": "Denne handling",
+  "target": "",
+  "match": null,
+  "persistable": false,
+  "projectFile": false,
+  "scratch": false,
+  "folder": null,
+  "blockedMode": false
+ },
+ "toolResult": [
+  "Wrote file successfully."
+ ]
+}

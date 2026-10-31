@@ -1,0 +1,96 @@
+{
+ "opencode": "1.18.33",
+ "aura": "d816a9e",
+ "scenario": "free-git-filer",
+ "outcome": "idle",
+ "case": "write-ude-ny-mappe",
+ "askIndex": 2,
+ "asksInStep": 2,
+ "layout": {
+  "mode": "free",
+  "git": true,
+  "copy": false,
+  "model": "kontraktmodel",
+  "worktree": "${ROOT}",
+  "directory": "${ROOT}"
+ },
+ "sequence": [
+  "del:pending",
+  "spørg:external_directory",
+  "del:running",
+  "svar:once",
+  "spørg:edit",
+  "svar:once",
+  "del:completed"
+ ],
+ "request": {
+  "id": "per_17893aecf001yBTQxfveML5UkN",
+  "sessionID": "ses_e876cc12fffelZUKDuYIyX367r",
+  "permission": "edit",
+  "patterns": [
+   "../ekstern/ny-mappe/fil.txt"
+  ],
+  "metadata": {
+   "filepath": "${OUTSIDE}/ny-mappe/fil.txt",
+   "diff": "Index: ${OUTSIDE}/ny-mappe/fil.txt\n===================================================================\n--- ${OUTSIDE}/ny-mappe/fil.txt\n+++ ${OUTSIDE}/ny-mappe/fil.txt\n@@ -0,0 +1,1 @@\n+ny mappe\n"
+  },
+  "always": [
+   "*"
+  ],
+  "tool": {
+   "messageID": "msg_17893ad6b0015MVnyn6swFCZFT",
+   "callID": "kald-15-0"
+  }
+ },
+ "toolPartAtAsk": {
+  "status": "running",
+  "tool": "write",
+  "input": {
+   "filePath": "${OUTSIDE}/ny-mappe/fil.txt",
+   "content": "ny mappe\n"
+  }
+ },
+ "policyInput": {
+  "id": "per_17893aecf001yBTQxfveML5UkN",
+  "sessionID": "ses_e876cc12fffelZUKDuYIyX367r",
+  "permission": "edit",
+  "patterns": [
+   "../ekstern/ny-mappe/fil.txt"
+  ],
+  "metadata": {
+   "filepath": "${OUTSIDE}/ny-mappe/fil.txt",
+   "diff": "Index: ${OUTSIDE}/ny-mappe/fil.txt\n===================================================================\n--- ${OUTSIDE}/ny-mappe/fil.txt\n+++ ${OUTSIDE}/ny-mappe/fil.txt\n@@ -0,0 +1,1 @@\n+ny mappe\n"
+  },
+  "always": [
+   "*"
+  ],
+  "tool": {
+   "messageID": "msg_17893ad6b0015MVnyn6swFCZFT",
+   "callID": "kald-15-0"
+  },
+  "toolInput": {
+   "filePath": "${OUTSIDE}/ny-mappe/fil.txt",
+   "content": "ny mappe\n",
+   "tool": "write",
+   "input": {
+    "filePath": "${OUTSIDE}/ny-mappe/fil.txt",
+    "content": "ny mappe\n"
+   }
+  }
+ },
+ "recordedAura": {
+  "allowed": false,
+  "source": null,
+  "label": "Denne handling",
+  "target": "",
+  "match": null,
+  "persistable": false,
+  "projectFile": false,
+  "scratch": false,
+  "folder": null,
+  "blockedMode": false
+ },
+ "toolResult": [
+  "Wrote file successfully."
+ ]
+}

@@ -1,0 +1,89 @@
+{
+ "opencode": "1.18.33",
+ "aura": "d816a9e",
+ "scenario": "byg-git-soeg",
+ "outcome": "idle",
+ "case": "webfetch",
+ "askIndex": 1,
+ "asksInStep": 1,
+ "layout": {
+  "mode": "build",
+  "git": true,
+  "copy": false,
+  "model": "kontraktmodel",
+  "worktree": "${ROOT}",
+  "directory": "${ROOT}"
+ },
+ "sequence": [
+  "del:pending",
+  "spørg:webfetch",
+  "del:running",
+  "svar:once",
+  "del:completed"
+ ],
+ "request": {
+  "id": "per_1789eb4d6001zha2SUEcV5R10t",
+  "sessionID": "ses_e876210c4ffeTRFtBEUBE7VBjt",
+  "permission": "webfetch",
+  "patterns": [
+   "http://127.0.0.1:64064/side"
+  ],
+  "metadata": {
+   "url": "http://127.0.0.1:64064/side",
+   "format": "text"
+  },
+  "always": [
+   "*"
+  ],
+  "tool": {
+   "messageID": "msg_1789eb47f0011VM1PVuAmrEZwK",
+   "callID": "kald-24-0"
+  }
+ },
+ "toolPartAtAsk": {
+  "status": "pending",
+  "tool": "webfetch",
+  "input": {}
+ },
+ "policyInput": {
+  "id": "per_1789eb4d6001zha2SUEcV5R10t",
+  "sessionID": "ses_e876210c4ffeTRFtBEUBE7VBjt",
+  "permission": "webfetch",
+  "patterns": [
+   "http://127.0.0.1:64064/side"
+  ],
+  "metadata": {
+   "url": "http://127.0.0.1:64064/side",
+   "format": "text"
+  },
+  "always": [
+   "*"
+  ],
+  "tool": {
+   "messageID": "msg_1789eb47f0011VM1PVuAmrEZwK",
+   "callID": "kald-24-0"
+  },
+  "toolInput": {
+   "tool": "webfetch",
+   "input": {}
+  }
+ },
+ "recordedAura": {
+  "allowed": false,
+  "source": null,
+  "label": "Hjemmeside: http://127.0.0.1:64064",
+  "target": "http://127.0.0.1:64064",
+  "match": {
+   "kind": "webfetch",
+   "origin": "http://127.0.0.1:64064"
+  },
+  "persistable": true,
+  "projectFile": false,
+  "scratch": false,
+  "folder": null,
+  "blockedMode": false
+ },
+ "toolResult": [
+  "Lokal side til webfetch-prøven.\n"
+ ]
+}

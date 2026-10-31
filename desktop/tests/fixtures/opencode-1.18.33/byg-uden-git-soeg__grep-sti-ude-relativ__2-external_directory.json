@@ -1,0 +1,96 @@
+{
+ "opencode": "1.18.33",
+ "aura": "d816a9e",
+ "scenario": "byg-uden-git-soeg",
+ "outcome": "idle",
+ "case": "grep-sti-ude-relativ",
+ "askIndex": 2,
+ "asksInStep": 2,
+ "layout": {
+  "mode": "build",
+  "git": false,
+  "copy": false,
+  "model": "kontraktmodel",
+  "worktree": "/",
+  "directory": "${ROOT}"
+ },
+ "sequence": [
+  "del:pending",
+  "spørg:grep",
+  "del:running",
+  "svar:once",
+  "spørg:external_directory",
+  "svar:once",
+  "del:completed"
+ ],
+ "request": {
+  "id": "per_1789f3805001xy7pHDsKS7H4F1",
+  "sessionID": "ses_e8761014fffe7C0Smxj9vvHr14",
+  "permission": "external_directory",
+  "patterns": [
+   "${OUTSIDE}/*"
+  ],
+  "metadata": {
+   "filepath": "${OUTSIDE}",
+   "parentDir": "${OUTSIDE}"
+  },
+  "always": [
+   "${OUTSIDE}/*"
+  ],
+  "tool": {
+   "messageID": "msg_1789f3433001vnHnpc2rWL3cmG",
+   "callID": "kald-6-0"
+  }
+ },
+ "toolPartAtAsk": {
+  "status": "running",
+  "tool": "grep",
+  "input": {
+   "pattern": "Ekstern",
+   "path": "../ekstern"
+  }
+ },
+ "policyInput": {
+  "id": "per_1789f3805001xy7pHDsKS7H4F1",
+  "sessionID": "ses_e8761014fffe7C0Smxj9vvHr14",
+  "permission": "external_directory",
+  "patterns": [
+   "${OUTSIDE}/*"
+  ],
+  "metadata": {
+   "filepath": "${OUTSIDE}",
+   "parentDir": "${OUTSIDE}"
+  },
+  "always": [
+   "${OUTSIDE}/*"
+  ],
+  "tool": {
+   "messageID": "msg_1789f3433001vnHnpc2rWL3cmG",
+   "callID": "kald-6-0"
+  },
+  "toolInput": {
+   "pattern": "Ekstern",
+   "path": "../ekstern",
+   "tool": "grep",
+   "input": {
+    "pattern": "Ekstern",
+    "path": "../ekstern"
+   }
+  }
+ },
+ "recordedAura": {
+  "allowed": false,
+  "source": null,
+  "label": "Denne handling",
+  "target": "",
+  "match": null,
+  "persistable": false,
+  "projectFile": false,
+  "scratch": false,
+  "folder": null,
+  "blockedMode": false
+ },
+ "toolResult": [
+  "Found 2 matches\n${OUTSIDE}/fil.txt:\n  Line 1: Ekstern fil\n\n\n${OUTSIDE}/fil2.txt:\n  Line 1: Ekstern fil 2\n"
+ ]
+}

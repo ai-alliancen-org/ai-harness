@@ -1,0 +1,101 @@
+{
+ "opencode": "1.18.33",
+ "aura": "d816a9e",
+ "scenario": "byg-uden-git-soeg",
+ "outcome": "idle",
+ "case": "bash-kort",
+ "askIndex": 1,
+ "asksInStep": 1,
+ "layout": {
+  "mode": "build",
+  "git": false,
+  "copy": false,
+  "model": "kontraktmodel",
+  "worktree": "/",
+  "directory": "${ROOT}"
+ },
+ "sequence": [
+  "del:pending",
+  "del:running",
+  "spørg:bash",
+  "svar:once",
+  "del:running",
+  "del:completed"
+ ],
+ "request": {
+  "id": "per_1789f4aab001UGbu4TYcOVAd9i",
+  "sessionID": "ses_e8761014fffe7C0Smxj9vvHr14",
+  "permission": "bash",
+  "patterns": [
+   "ls public"
+  ],
+  "metadata": {
+   "command": "ls public"
+  },
+  "always": [
+   "ls *"
+  ],
+  "tool": {
+   "messageID": "msg_1789f455f001NsNSixXmtcLZNZ",
+   "callID": "kald-11-0"
+  }
+ },
+ "toolPartAtAsk": {
+  "status": "running",
+  "tool": "bash",
+  "input": {
+   "command": "ls public",
+   "description": "Viser filerne i public"
+  }
+ },
+ "policyInput": {
+  "id": "per_1789f4aab001UGbu4TYcOVAd9i",
+  "sessionID": "ses_e8761014fffe7C0Smxj9vvHr14",
+  "permission": "bash",
+  "patterns": [
+   "ls public"
+  ],
+  "metadata": {
+   "command": "ls public"
+  },
+  "always": [
+   "ls *"
+  ],
+  "tool": {
+   "messageID": "msg_1789f455f001NsNSixXmtcLZNZ",
+   "callID": "kald-11-0"
+  },
+  "toolInput": {
+   "command": "ls public",
+   "description": "Viser filerne i public",
+   "tool": "bash",
+   "input": {
+    "command": "ls public",
+    "description": "Viser filerne i public"
+   }
+  }
+ },
+ "recordedAura": {
+  "allowed": false,
+  "source": null,
+  "label": "Kommando: ls public",
+  "target": "ls public",
+  "match": {
+   "kind": "bash",
+   "command": "ls public",
+   "cwd": "${ROOT}",
+   "input": {
+    "command": "ls public",
+    "description": "Viser filerne i public"
+   }
+  },
+  "persistable": true,
+  "projectFile": false,
+  "scratch": false,
+  "folder": null,
+  "blockedMode": false
+ },
+ "toolResult": [
+  "index.html\n"
+ ]
+}

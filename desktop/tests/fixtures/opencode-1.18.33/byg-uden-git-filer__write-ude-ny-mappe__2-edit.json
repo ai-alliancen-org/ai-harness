@@ -1,0 +1,104 @@
+{
+ "opencode": "1.18.33",
+ "aura": "d816a9e",
+ "scenario": "byg-uden-git-filer",
+ "outcome": "idle",
+ "case": "write-ude-ny-mappe",
+ "askIndex": 2,
+ "asksInStep": 2,
+ "layout": {
+  "mode": "build",
+  "git": false,
+  "copy": false,
+  "model": "kontraktmodel",
+  "worktree": "/",
+  "directory": "${ROOT}"
+ },
+ "sequence": [
+  "del:pending",
+  "spørg:external_directory",
+  "del:running",
+  "svar:once",
+  "spørg:edit",
+  "svar:once",
+  "del:completed"
+ ],
+ "request": {
+  "id": "per_1787c540f001zX5sjYsCcgmjob",
+  "sessionID": "ses_e878463bbffePGhIoyv5KTAImI",
+  "permission": "edit",
+  "patterns": [
+   "${OUTSIDE:rel/}/ny-mappe/fil.txt"
+  ],
+  "metadata": {
+   "filepath": "${OUTSIDE}/ny-mappe/fil.txt",
+   "diff": "Index: ${OUTSIDE}/ny-mappe/fil.txt\n===================================================================\n--- ${OUTSIDE}/ny-mappe/fil.txt\n+++ ${OUTSIDE}/ny-mappe/fil.txt\n@@ -0,0 +1,1 @@\n+ny mappe\n"
+  },
+  "always": [
+   "*"
+  ],
+  "tool": {
+   "messageID": "msg_1787c4d3e001qBe1VGPl2pUFaj",
+   "callID": "kald-15-0"
+  }
+ },
+ "toolPartAtAsk": {
+  "status": "running",
+  "tool": "write",
+  "input": {
+   "filePath": "${OUTSIDE}/ny-mappe/fil.txt",
+   "content": "ny mappe\n"
+  }
+ },
+ "policyInput": {
+  "id": "per_1787c540f001zX5sjYsCcgmjob",
+  "sessionID": "ses_e878463bbffePGhIoyv5KTAImI",
+  "permission": "edit",
+  "patterns": [
+   "${OUTSIDE:rel/}/ny-mappe/fil.txt"
+  ],
+  "metadata": {
+   "filepath": "${OUTSIDE}/ny-mappe/fil.txt",
+   "diff": "Index: ${OUTSIDE}/ny-mappe/fil.txt\n===================================================================\n--- ${OUTSIDE}/ny-mappe/fil.txt\n+++ ${OUTSIDE}/ny-mappe/fil.txt\n@@ -0,0 +1,1 @@\n+ny mappe\n"
+  },
+  "always": [
+   "*"
+  ],
+  "tool": {
+   "messageID": "msg_1787c4d3e001qBe1VGPl2pUFaj",
+   "callID": "kald-15-0"
+  },
+  "toolInput": {
+   "filePath": "${OUTSIDE}/ny-mappe/fil.txt",
+   "content": "ny mappe\n",
+   "tool": "write",
+   "input": {
+    "filePath": "${OUTSIDE}/ny-mappe/fil.txt",
+    "content": "ny mappe\n"
+   }
+  }
+ },
+ "recordedAura": {
+  "allowed": false,
+  "source": null,
+  "label": "Filændring: ${OUTSIDE}/ny-mappe/fil.txt",
+  "target": "${OUTSIDE}/ny-mappe/fil.txt",
+  "match": {
+   "kind": "edit",
+   "targets": [
+    {
+     "path": "${OUTSIDE}/ny-mappe/fil.txt",
+     "subtree": false
+    }
+   ]
+  },
+  "persistable": true,
+  "projectFile": false,
+  "scratch": false,
+  "folder": "${OUTSIDE}/ny-mappe",
+  "blockedMode": false
+ },
+ "toolResult": [
+  "Wrote file successfully."
+ ]
+}

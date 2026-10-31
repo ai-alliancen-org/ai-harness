@@ -1,0 +1,119 @@
+{
+ "opencode": "1.18.33",
+ "aura": "d816a9e",
+ "scenario": "apply-patch-git",
+ "outcome": "idle",
+ "case": "patch-opdater-inde",
+ "askIndex": 1,
+ "asksInStep": 1,
+ "layout": {
+  "mode": "build",
+  "git": true,
+  "copy": false,
+  "model": "gpt-5-kontrakt",
+  "worktree": "${ROOT}",
+  "directory": "${ROOT}"
+ },
+ "sequence": [
+  "del:pending",
+  "del:running",
+  "spørg:edit",
+  "svar:once",
+  "del:completed"
+ ],
+ "request": {
+  "id": "per_17898214d001lv2fV2DttHjLkj",
+  "sessionID": "ses_e8768872fffeYoWSYKTrl2VS1t",
+  "permission": "edit",
+  "patterns": [
+   "notes.txt"
+  ],
+  "metadata": {
+   "filepath": "notes.txt",
+   "diff": "Index: ${ROOT}/notes.txt\n===================================================================\n--- ${ROOT}/notes.txt\n+++ ${ROOT}/notes.txt\n@@ -1,1 +1,1 @@\n-Hej verden NEEDLE\n+Hej patch NEEDLE\n\n",
+   "files": [
+    {
+     "filePath": "${ROOT}/notes.txt",
+     "relativePath": "notes.txt",
+     "type": "update",
+     "patch": "Index: ${ROOT}/notes.txt\n===================================================================\n--- ${ROOT}/notes.txt\n+++ ${ROOT}/notes.txt\n@@ -1,1 +1,1 @@\n-Hej verden NEEDLE\n+Hej patch NEEDLE\n",
+     "additions": 1,
+     "deletions": 1
+    }
+   ]
+  },
+  "always": [
+   "*"
+  ],
+  "tool": {
+   "messageID": "msg_178981bd8001wKtxNKbzeA6Fag",
+   "callID": "kald-3-0"
+  }
+ },
+ "toolPartAtAsk": {
+  "status": "running",
+  "tool": "apply_patch",
+  "input": {
+   "patchText": "*** Begin Patch\n*** Update File: notes.txt\n@@\n-Hej verden NEEDLE\n+Hej patch NEEDLE\n*** End Patch"
+  }
+ },
+ "policyInput": {
+  "id": "per_17898214d001lv2fV2DttHjLkj",
+  "sessionID": "ses_e8768872fffeYoWSYKTrl2VS1t",
+  "permission": "edit",
+  "patterns": [
+   "notes.txt"
+  ],
+  "metadata": {
+   "filepath": "notes.txt",
+   "diff": "Index: ${ROOT}/notes.txt\n===================================================================\n--- ${ROOT}/notes.txt\n+++ ${ROOT}/notes.txt\n@@ -1,1 +1,1 @@\n-Hej verden NEEDLE\n+Hej patch NEEDLE\n\n",
+   "files": [
+    {
+     "filePath": "${ROOT}/notes.txt",
+     "relativePath": "notes.txt",
+     "type": "update",
+     "patch": "Index: ${ROOT}/notes.txt\n===================================================================\n--- ${ROOT}/notes.txt\n+++ ${ROOT}/notes.txt\n@@ -1,1 +1,1 @@\n-Hej verden NEEDLE\n+Hej patch NEEDLE\n",
+     "additions": 1,
+     "deletions": 1
+    }
+   ]
+  },
+  "always": [
+   "*"
+  ],
+  "tool": {
+   "messageID": "msg_178981bd8001wKtxNKbzeA6Fag",
+   "callID": "kald-3-0"
+  },
+  "toolInput": {
+   "patchText": "*** Begin Patch\n*** Update File: notes.txt\n@@\n-Hej verden NEEDLE\n+Hej patch NEEDLE\n*** End Patch",
+   "tool": "apply_patch",
+   "input": {
+    "patchText": "*** Begin Patch\n*** Update File: notes.txt\n@@\n-Hej verden NEEDLE\n+Hej patch NEEDLE\n*** End Patch"
+   }
+  }
+ },
+ "recordedAura": {
+  "allowed": false,
+  "source": null,
+  "label": "Filændring: ${ROOT}/notes.txt",
+  "target": "${ROOT}/notes.txt",
+  "match": {
+   "kind": "edit",
+   "targets": [
+    {
+     "path": "${ROOT}/notes.txt",
+     "subtree": false
+    }
+   ]
+  },
+  "persistable": true,
+  "projectFile": true,
+  "scratch": false,
+  "folder": "${ROOT}",
+  "blockedMode": false
+ },
+ "toolResult": [
+  "Success. Updated the following files:\nM notes.txt"
+ ]
+}

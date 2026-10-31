@@ -1,0 +1,96 @@
+{
+ "opencode": "1.18.33",
+ "aura": "d816a9e",
+ "scenario": "byg-uden-git-soeg",
+ "outcome": "idle",
+ "case": "grep-sti-ude",
+ "askIndex": 1,
+ "asksInStep": 2,
+ "layout": {
+  "mode": "build",
+  "git": false,
+  "copy": false,
+  "model": "kontraktmodel",
+  "worktree": "/",
+  "directory": "${ROOT}"
+ },
+ "sequence": [
+  "del:pending",
+  "spørg:grep",
+  "del:running",
+  "svar:once",
+  "spørg:external_directory",
+  "svar:once",
+  "del:completed"
+ ],
+ "request": {
+  "id": "per_1789f3198001nrufkLuen8zBx3",
+  "sessionID": "ses_e8761014fffe7C0Smxj9vvHr14",
+  "permission": "grep",
+  "patterns": [
+   "Ekstern"
+  ],
+  "metadata": {
+   "pattern": "Ekstern",
+   "path": "${OUTSIDE}"
+  },
+  "always": [
+   "*"
+  ],
+  "tool": {
+   "messageID": "msg_1789f2fde001mJ1Tgt1heRoAC8",
+   "callID": "kald-5-0"
+  }
+ },
+ "toolPartAtAsk": {
+  "status": "pending",
+  "tool": "grep",
+  "input": {}
+ },
+ "policyInput": {
+  "id": "per_1789f3198001nrufkLuen8zBx3",
+  "sessionID": "ses_e8761014fffe7C0Smxj9vvHr14",
+  "permission": "grep",
+  "patterns": [
+   "Ekstern"
+  ],
+  "metadata": {
+   "pattern": "Ekstern",
+   "path": "${OUTSIDE}"
+  },
+  "always": [
+   "*"
+  ],
+  "tool": {
+   "messageID": "msg_1789f2fde001mJ1Tgt1heRoAC8",
+   "callID": "kald-5-0"
+  },
+  "toolInput": {
+   "tool": "grep",
+   "input": {}
+  }
+ },
+ "recordedAura": {
+  "allowed": false,
+  "source": null,
+  "label": "Læsning: ${OUTSIDE}",
+  "target": "${OUTSIDE}",
+  "match": {
+   "kind": "grep",
+   "targets": [
+    {
+     "path": "${OUTSIDE}",
+     "subtree": false
+    }
+   ]
+  },
+  "persistable": true,
+  "projectFile": false,
+  "scratch": false,
+  "folder": "${DOCUMENTS}",
+  "blockedMode": false
+ },
+ "toolResult": [
+  "Found 2 matches\n${OUTSIDE}/fil2.txt:\n  Line 1: Ekstern fil 2\n\n\n${OUTSIDE}/fil.txt:\n  Line 1: Ekstern fil\n"
+ ]
+}

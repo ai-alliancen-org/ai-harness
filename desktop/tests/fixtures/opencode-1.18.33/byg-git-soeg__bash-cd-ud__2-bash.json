@@ -1,0 +1,103 @@
+{
+ "opencode": "1.18.33",
+ "aura": "d816a9e",
+ "scenario": "byg-git-soeg",
+ "outcome": "idle",
+ "case": "bash-cd-ud",
+ "askIndex": 2,
+ "asksInStep": 2,
+ "layout": {
+  "mode": "build",
+  "git": true,
+  "copy": false,
+  "model": "kontraktmodel",
+  "worktree": "${ROOT}",
+  "directory": "${ROOT}"
+ },
+ "sequence": [
+  "del:pending",
+  "del:running",
+  "spørg:external_directory",
+  "svar:once",
+  "spørg:bash",
+  "svar:once",
+  "del:running",
+  "del:completed"
+ ],
+ "request": {
+  "id": "per_1789ea21e002L7XCs8Y5AdTvWo",
+  "sessionID": "ses_e876210c4ffeTRFtBEUBE7VBjt",
+  "permission": "bash",
+  "patterns": [
+   "ls"
+  ],
+  "metadata": {
+   "command": "cd .. && ls"
+  },
+  "always": [
+   "ls *"
+  ],
+  "tool": {
+   "messageID": "msg_1789e9fee001zJP86K9Iinldis",
+   "callID": "kald-17-0"
+  }
+ },
+ "toolPartAtAsk": {
+  "status": "running",
+  "tool": "bash",
+  "input": {
+   "command": "cd .. && ls",
+   "description": "Går et niveau op"
+  }
+ },
+ "policyInput": {
+  "id": "per_1789ea21e002L7XCs8Y5AdTvWo",
+  "sessionID": "ses_e876210c4ffeTRFtBEUBE7VBjt",
+  "permission": "bash",
+  "patterns": [
+   "ls"
+  ],
+  "metadata": {
+   "command": "cd .. && ls"
+  },
+  "always": [
+   "ls *"
+  ],
+  "tool": {
+   "messageID": "msg_1789e9fee001zJP86K9Iinldis",
+   "callID": "kald-17-0"
+  },
+  "toolInput": {
+   "command": "cd .. && ls",
+   "description": "Går et niveau op",
+   "tool": "bash",
+   "input": {
+    "command": "cd .. && ls",
+    "description": "Går et niveau op"
+   }
+  }
+ },
+ "recordedAura": {
+  "allowed": false,
+  "source": null,
+  "label": "Kommando: cd .. && ls",
+  "target": "cd .. && ls",
+  "match": {
+   "kind": "bash",
+   "command": "cd .. && ls",
+   "cwd": "${ROOT}",
+   "input": {
+    "command": "cd .. && ls",
+    "description": "Går et niveau op"
+   }
+  },
+  "persistable": true,
+  "projectFile": false,
+  "scratch": false,
+  "folder": null,
+  "blockedMode": false
+ },
+ "toolResult": [
+  "(no output)"
+ ]
+}

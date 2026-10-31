@@ -1,0 +1,102 @@
+{
+ "opencode": "1.18.33",
+ "aura": "d816a9e",
+ "scenario": "byg-uden-git-filer",
+ "outcome": "idle",
+ "case": "write-inde-absolut",
+ "askIndex": 1,
+ "asksInStep": 1,
+ "layout": {
+  "mode": "build",
+  "git": false,
+  "copy": false,
+  "model": "kontraktmodel",
+  "worktree": "/",
+  "directory": "${ROOT}"
+ },
+ "sequence": [
+  "del:pending",
+  "del:running",
+  "spørg:edit",
+  "svar:once",
+  "del:completed"
+ ],
+ "request": {
+  "id": "per_1787c1da40014gTEoqZGfJAsxu",
+  "sessionID": "ses_e878463bbffePGhIoyv5KTAImI",
+  "permission": "edit",
+  "patterns": [
+   "${ROOT:rel/}/public/ny.html"
+  ],
+  "metadata": {
+   "filepath": "${ROOT}/public/ny.html",
+   "diff": "Index: ${ROOT}/public/ny.html\n===================================================================\n--- ${ROOT}/public/ny.html\n+++ ${ROOT}/public/ny.html\n@@ -0,0 +1,1 @@\n+<p>ny</p>\n"
+  },
+  "always": [
+   "*"
+  ],
+  "tool": {
+   "messageID": "msg_1787c1b43001n42byYy3lKsL4i",
+   "callID": "kald-8-0"
+  }
+ },
+ "toolPartAtAsk": {
+  "status": "running",
+  "tool": "write",
+  "input": {
+   "filePath": "${ROOT}/public/ny.html",
+   "content": "<p>ny</p>\n"
+  }
+ },
+ "policyInput": {
+  "id": "per_1787c1da40014gTEoqZGfJAsxu",
+  "sessionID": "ses_e878463bbffePGhIoyv5KTAImI",
+  "permission": "edit",
+  "patterns": [
+   "${ROOT:rel/}/public/ny.html"
+  ],
+  "metadata": {
+   "filepath": "${ROOT}/public/ny.html",
+   "diff": "Index: ${ROOT}/public/ny.html\n===================================================================\n--- ${ROOT}/public/ny.html\n+++ ${ROOT}/public/ny.html\n@@ -0,0 +1,1 @@\n+<p>ny</p>\n"
+  },
+  "always": [
+   "*"
+  ],
+  "tool": {
+   "messageID": "msg_1787c1b43001n42byYy3lKsL4i",
+   "callID": "kald-8-0"
+  },
+  "toolInput": {
+   "filePath": "${ROOT}/public/ny.html",
+   "content": "<p>ny</p>\n",
+   "tool": "write",
+   "input": {
+    "filePath": "${ROOT}/public/ny.html",
+    "content": "<p>ny</p>\n"
+   }
+  }
+ },
+ "recordedAura": {
+  "allowed": false,
+  "source": null,
+  "label": "Filændring: ${ROOT}/public/ny.html",
+  "target": "${ROOT}/public/ny.html",
+  "match": {
+   "kind": "edit",
+   "targets": [
+    {
+     "path": "${ROOT}/public/ny.html",
+     "subtree": false
+    }
+   ]
+  },
+  "persistable": true,
+  "projectFile": true,
+  "scratch": false,
+  "folder": "${ROOT}/public",
+  "blockedMode": false
+ },
+ "toolResult": [
+  "Wrote file successfully."
+ ]
+}

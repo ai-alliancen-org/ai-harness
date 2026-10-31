@@ -1,0 +1,217 @@
+{
+ "opencode": "1.18.33",
+ "aura": "d816a9e",
+ "kilde": "M1-kontraktdesignets direkte.cjs (Auras isolatedEnv og engineConfig med ændrede regler, skills eller mapper). Kørt uden writePluginRuntime, så OpenCode hentede @opencode-ai/plugin fra npm (kritik K3)",
+ "eksperiment": "regler-git",
+ "outcome": "idle",
+ "path": {
+  "home": "${BASE}/appdata/runtime/home",
+  "state": "${BASE}/appdata/runtime/state/opencode",
+  "config": "${BASE}/appdata/runtime/config/opencode",
+  "worktree": "${BASE}/Dokumenter/projekt",
+  "directory": "${BASE}/Dokumenter/projekt"
+ },
+ "project": {
+  "id": "global",
+  "worktree": "${BASE}/Dokumenter/projekt",
+  "vcs": "git",
+  "time": {
+   "created": 1793023845185,
+   "updated": 1793023845185
+  },
+  "sandboxes": []
+ },
+ "asked": [
+  {
+   "step": "write-src-absolut-regel",
+   "permission": "edit",
+   "patterns": [
+    "src/b.js"
+   ],
+   "always": [
+    "*"
+   ],
+   "metadata": {
+    "filepath": "${BASE}/Dokumenter/projekt/src/b.js"
+   }
+  },
+  {
+   "step": "write-lib-uden-skraastreg-regel",
+   "permission": "edit",
+   "patterns": [
+    "lib/c.js"
+   ],
+   "always": [
+    "*"
+   ],
+   "metadata": {
+    "filepath": "${BASE}/Dokumenter/projekt/lib/c.js"
+   }
+  },
+  {
+   "step": "bash-npm-run-build-og-rm",
+   "permission": "bash",
+   "patterns": [
+    "npm run build --if-present",
+    "rm -rf ikke-til-stede"
+   ],
+   "always": [
+    "npm run build *",
+    "rm *"
+   ],
+   "metadata": {
+    "command": "npm run build --if-present && rm -rf ikke-til-stede"
+   }
+  },
+  {
+   "step": "bash-git-status-pipe",
+   "permission": "bash",
+   "patterns": [
+    "git status --short",
+    "head -3"
+   ],
+   "always": [
+    "git status *",
+    "head *"
+   ],
+   "metadata": {
+    "command": "git status --short | head -3"
+   }
+  },
+  {
+   "step": "write-ude-tilladt-mappe",
+   "permission": "edit",
+   "patterns": [
+    "../ekstern/ny.txt"
+   ],
+   "always": [
+    "*"
+   ],
+   "metadata": {
+    "filepath": "${BASE}/Dokumenter/ekstern/ny.txt"
+   }
+  },
+  {
+   "step": "read-andet-sted",
+   "permission": "external_directory",
+   "patterns": [
+    "${BASE}/andet-sted/*"
+   ],
+   "always": [
+    "${BASE}/andet-sted/*"
+   ],
+   "metadata": {
+    "filepath": "${BASE}/andet-sted/anden.txt",
+    "parentDir": "${BASE}/andet-sted"
+   }
+  }
+ ],
+ "results": [
+  {
+   "step": "write-public-relativ-regel",
+   "status": "completed",
+   "output": "Wrote file successfully."
+  },
+  {
+   "step": "write-src-absolut-regel",
+   "status": "completed",
+   "output": "Wrote file successfully."
+  },
+  {
+   "step": "write-lib-uden-skraastreg-regel",
+   "status": "completed",
+   "output": "Wrote file successfully."
+  },
+  {
+   "step": "write-env",
+   "status": "error",
+   "output": "The user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules [{\"permission\":\"*\",\"action\":\"allow\",\"pattern\":\"*\"},{\"permission\":\"*\",\"action\":\"ask\",\"pattern\":\"*\"},{\"permission\":\"edit\",\"pattern\":\"*\",\"action\":\"ask\"},{\"permission\":\"edit\",\"pattern"
+  },
+  {
+   "step": "bash-npm-run-build",
+   "status": "completed",
+   "output": "npm ERR! code ENOENT npm ERR! syscall open npm ERR! path ${BASE}/Dokumenter/projekt/package.json npm ERR! errno -2 npm ERR! enoent Could not read package.json"
+  },
+  {
+   "step": "bash-npm-run-build-og-rm",
+   "status": "completed",
+   "output": "npm ERR! code ENOENT npm ERR! syscall open npm ERR! path ${BASE}/Dokumenter/projekt/package.json npm ERR! errno -2 npm ERR! enoent Could not read package.json"
+  },
+  {
+   "step": "bash-npm-run-buildx",
+   "status": "completed",
+   "output": "npm ERR! code ENOENT npm ERR! syscall open npm ERR! path ${BASE}/Dokumenter/projekt/package.json npm ERR! errno -2 npm ERR! enoent Could not read package.json"
+  },
+  {
+   "step": "bash-ls",
+   "status": "completed",
+   "output": "total 8 drwxr-xr-x@ 7 <bruger> wheel 224 Oct 26 15:13 . drwxr-xr-x@ 4 <bruger> wheel 128 Oct 26 15:10 .. drwxr-xr-x@ 9 <bruger> wheel 288 Oct 26 15:10 .git drwxr-xr-x@ 3 <bruger> wheel 96 Oct 26 15:13 lib -rw-r--r--@ 1 <bruger> wheel 11 Oct 26 15:10 notes.txt drwxr-xr-x@ 3 <bruger>"
+  },
+  {
+   "step": "bash-git-status-pipe",
+   "status": "completed",
+   "output": "?? lib/ ?? notes.txt ?? public/ "
+  },
+  {
+   "step": "read-ude-tilladt-mappe",
+   "status": "completed",
+   "output": "<path>${BASE}/Dokumenter/ekstern/fil.txt</path> <type>file</type> <content> 1: Ekstern (End of file - total 1 lines) </content>"
+  },
+  {
+   "step": "read-ude-undermappe",
+   "status": "completed",
+   "output": "<path>${BASE}/Dokumenter/ekstern/under/dyb.txt</path> <type>file</type> <content> 1: Dyb ekstern (End of file - total 1 lines) </content>"
+  },
+  {
+   "step": "write-ude-tilladt-mappe",
+   "status": "completed",
+   "output": "Wrote file successfully."
+  },
+  {
+   "step": "grep-ude-tilladt-mappe",
+   "status": "completed",
+   "output": "Found 1 matches ${BASE}/Dokumenter/ekstern/fil.txt: Line 1: Ekstern "
+  },
+  {
+   "step": "read-andet-sted",
+   "status": "completed",
+   "output": "<path>${BASE}/andet-sted/anden.txt</path> <type>file</type> <content> 1: Andet sted (End of file - total 1 lines) </content>"
+  }
+ ],
+ "files": [
+  "${BASE}/appdata/runtime/cache/",
+  "${BASE}/appdata/runtime/cache/opencode/",
+  "${BASE}/appdata/runtime/cache/opencode/bin/",
+  "${BASE}/appdata/runtime/config/",
+  "${BASE}/appdata/runtime/config/.gitignore 63",
+  "${BASE}/appdata/runtime/config/opencode/",
+  "${BASE}/appdata/runtime/config/opencode/.gitignore 63",
+  "${BASE}/appdata/runtime/data/",
+  "${BASE}/appdata/runtime/data/opencode/",
+  "${BASE}/appdata/runtime/data/opencode/log/",
+  "${BASE}/appdata/runtime/data/opencode/log/opencode.log 24376",
+  "${BASE}/appdata/runtime/data/opencode/opencode.db 425984",
+  "${BASE}/appdata/runtime/data/opencode/opencode.db-shm 32768",
+  "${BASE}/appdata/runtime/data/opencode/opencode.db-wal 1005312",
+  "${BASE}/appdata/runtime/data/opencode/repos/",
+  "${BASE}/appdata/runtime/home/",
+  "${BASE}/appdata/runtime/home/.npm/",
+  "${BASE}/appdata/runtime/home/.npm/_cacache/",
+  "${BASE}/appdata/runtime/home/.npm/_cacache/tmp/",
+  "${BASE}/appdata/runtime/home/.npm/_cacache/tmp/f177cb6c-a172-4708-899d-d6d24b6c3d57 19474705",
+  "${BASE}/appdata/runtime/home/.npm/_cacache/tmp/f426c825-2e3a-4555-be29-2f959430f4be 19867040",
+  "${BASE}/appdata/runtime/home/.npm/_logs/",
+  "${BASE}/appdata/runtime/home/.npm/_logs/2026-10-26T14_13_21_759Z-debug-0.log 3791",
+  "${BASE}/appdata/runtime/home/.npm/_logs/2026-10-26T14_13_32_590Z-debug-0.log 3788",
+  "${BASE}/appdata/runtime/home/.npm/_logs/2026-10-26T14_13_50_889Z-debug-0.log 3801",
+  "${BASE}/appdata/runtime/state/",
+  "${BASE}/appdata/runtime/state/opencode/",
+  "${BASE}/appdata/runtime/state/opencode/locks/",
+  "${BASE}/appdata/runtime/state/opencode/locks/90d41aa8258a53ad0b958096619e1d8f6b6fc096.lock/",
+  "${BASE}/appdata/runtime/state/opencode/locks/90d41aa8258a53ad0b958096619e1d8f6b6fc096.lock/heartbeat 0",
+  "${BASE}/appdata/runtime/state/opencode/locks/90d41aa8258a53ad0b958096619e1d8f6b6fc096.lock/meta.json 139",
+  "${BASE}/appdata/runtime/state/opencode/locks/bb7ed129dd3add2d71050c0f1ed3cf4e1bfd3894.lock/",
+  "${BASE}/appdata/runtime/state/opencode/locks/bb7ed129dd3add2d71050c0f1ed3cf4e1bfd3894.lock/heartbeat 0",
+  "${BASE}/appdata/runtime/state/opencode/locks/bb7ed129dd3add2d71050c0f1ed3cf4e1bfd3894.lock/meta.json 139"
+ ]
+}

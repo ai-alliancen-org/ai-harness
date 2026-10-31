@@ -1,0 +1,96 @@
+{
+ "opencode": "1.18.33",
+ "aura": "d816a9e",
+ "scenario": "byg-git-filer",
+ "outcome": "idle",
+ "case": "write-ude-absolut",
+ "askIndex": 2,
+ "asksInStep": 2,
+ "layout": {
+  "mode": "build",
+  "git": true,
+  "copy": false,
+  "model": "kontraktmodel",
+  "worktree": "${ROOT}",
+  "directory": "${ROOT}"
+ },
+ "sequence": [
+  "del:pending",
+  "spørg:external_directory",
+  "del:running",
+  "svar:once",
+  "spørg:edit",
+  "svar:once",
+  "del:completed"
+ ],
+ "request": {
+  "id": "per_17870aaf2001Nr4TSfGQ4yzZKB",
+  "sessionID": "ses_e878f66e4ffewOBgWF9eIkSqq1",
+  "permission": "edit",
+  "patterns": [
+   "../ekstern/ny.txt"
+  ],
+  "metadata": {
+   "filepath": "${OUTSIDE}/ny.txt",
+   "diff": "Index: ${OUTSIDE}/ny.txt\n===================================================================\n--- ${OUTSIDE}/ny.txt\n+++ ${OUTSIDE}/ny.txt\n@@ -0,0 +1,1 @@\n+ny ekstern\n"
+  },
+  "always": [
+   "*"
+  ],
+  "tool": {
+   "messageID": "msg_17870aa920015HOERRc4YbuTuX",
+   "callID": "kald-13-0"
+  }
+ },
+ "toolPartAtAsk": {
+  "status": "running",
+  "tool": "write",
+  "input": {
+   "filePath": "${OUTSIDE}/ny.txt",
+   "content": "ny ekstern\n"
+  }
+ },
+ "policyInput": {
+  "id": "per_17870aaf2001Nr4TSfGQ4yzZKB",
+  "sessionID": "ses_e878f66e4ffewOBgWF9eIkSqq1",
+  "permission": "edit",
+  "patterns": [
+   "../ekstern/ny.txt"
+  ],
+  "metadata": {
+   "filepath": "${OUTSIDE}/ny.txt",
+   "diff": "Index: ${OUTSIDE}/ny.txt\n===================================================================\n--- ${OUTSIDE}/ny.txt\n+++ ${OUTSIDE}/ny.txt\n@@ -0,0 +1,1 @@\n+ny ekstern\n"
+  },
+  "always": [
+   "*"
+  ],
+  "tool": {
+   "messageID": "msg_17870aa920015HOERRc4YbuTuX",
+   "callID": "kald-13-0"
+  },
+  "toolInput": {
+   "filePath": "${OUTSIDE}/ny.txt",
+   "content": "ny ekstern\n",
+   "tool": "write",
+   "input": {
+    "filePath": "${OUTSIDE}/ny.txt",
+    "content": "ny ekstern\n"
+   }
+  }
+ },
+ "recordedAura": {
+  "allowed": false,
+  "source": null,
+  "label": "Denne handling",
+  "target": "",
+  "match": null,
+  "persistable": false,
+  "projectFile": false,
+  "scratch": false,
+  "folder": null,
+  "blockedMode": false
+ },
+ "toolResult": [
+  "Wrote file successfully."
+ ]
+}
