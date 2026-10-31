@@ -47,6 +47,26 @@ Brugeren så en tom ramme, statusteksten "Tilsluttet lokal server" og ingen fejl
 
 **Ikke rettet, og værd at tage stilling til:** blokeringen er stadig tavs, når konteksten ikke findes, altså netop i denne fejlklasse, fordi `preview-session.cjs` kun diagnosticerer, når der ER en kontekst. `#preview-status` siger desuden "Tilsluttet lokal server", så snart `src` er sat, uden at nogen har set rammen indlæse. Og `installSession` tager allerede en `resolveFrame`-krog, som `main.cjs` aldrig sender; knyttes den på, behøver ingen gren at tro på måladressen.
 
+### Tre pakker bygget fra commit bc7bc35
+
+Versionen er bumpet til 0.7.0-beta.1 i `desktop/package.json`, låsefilens to rodfelter og `packaging/update-notice.json`; de fire felter er kontrolleret ens. `npm ci` kørte rent, og pakningen accepterede kildetræet, altså er alle produktfiler committet.
+
+| Platform | Kildekontrol | `runtime-lock.json` i app.asar | Runtimefiler |
+|---|---|---|---|
+| darwin-arm64 | består | ja, byte for byte lig kilden | 5222 |
+| darwin-x64 | består | ja, byte for byte lig kilden | 5222 |
+| win32-x64 | består | ja, byte for byte lig kilden | 2425 |
+
+Alle tre peger på commit `bc7bc35` med 193 filer i kildebeviset, 142 appfiler byte-sammenlignet fra arkivet og 34 profilfiler. Alle er usignerede (`signedReceipt: false`).
+
+**Det er beviset for pakningsrettelsen fra 29. oktober.** Arkivets rodposter er nu `/node_modules /core /main.cjs /package.json /preload.cjs /runtime-lock.json /ui`. I 0.6.0-beta.1 manglede den sidste, mens `core/chat-session.cjs` krævede den. Det er første gang filen faktisk er bygget ind, og det kunne ikke afprøves tidligere, fordi pakning kræver et committet kildetræ.
+
+`npm run test:package` består på den pakkede arm64-app: pakket app, isolerede brugerdata, begrænset PATH, medfølgende OpenCode, Git, Node og npm, faktiske filer fra pakkens projektfunktion og profiler, rigtig forhåndsvisning, og en eksisterende mappe uden Git åbnes uden at røre historikken.
+
+**Kun `darwin-arm64` havde sit runtimebevis på forhånd.** De to andre manifester manglede `payloads.schemaVersion`, og `electron-builder.cjs` stopper pakningen på netop det. De er forberedt igen med `runtime:prepare`, som kun rydder `.runtime/<mål>` og derfor ikke rørte den runtime, prøverne kører på.
+
+**Ikke gjort:** signering og notarisation, `test:package` på x64- og Windows-pakken, og `release-site.cjs`. Windows-pakken er bygget på Mac og er fortsat uprøvet på Windows. Installationsfilerne ligger under `desktop/release/`, som er ignoreret i Git.
+
 ### Hvor det står
 
 **Enhedstestet:** 717 af 717 prøver består med Node 22.23.3. De nye er `preload-channels` (3), `setup-error-scope` (7) og en sag i `project-runtime`.
@@ -55,7 +75,7 @@ Brugeren så en tom ramme, statusteksten "Tilsluttet lokal server" og ingen fejl
 
 **Målt af agenter, ikke gentaget af mig:** `.open`-rettelsen til Kontrollér adgang er målt i den rigtige Electron-app af to uafhængige agenter, som også viste, at en ren sletning af `!setupActive` ville skrive kontrolbeskeden ind i `#setup-provider-body`. Jeg har ikke selv gentaget den måling; ingen Electron-suite rører `#connection-test`.
 
-**Ikke verificeret:** Fortsæt-rettelsen er ikke set i den rigtige app, kun i prøvens DOM. Ingen pakning er bygget, og de øvrige Electron-suiter er ikke kørt igen i denne omgang.
+**Ikke verificeret:** Fortsæt-rettelsen er ikke set i den rigtige app, kun i prøvens DOM. De øvrige Electron-suiter er ikke kørt igen i denne omgang.
 
 **Forbehold om maskinen:** alle kørsler denne dag skete med belastningstal mellem 126 og 464 på 10 kerner, fra Xcode-kompileringer og andre processer uden for dette projekt. `test:approvals` bestod ved 464, så dens resultat er ikke et heldigt tidsvindue.
 
