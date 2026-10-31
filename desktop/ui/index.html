@@ -5,6 +5,7 @@
 <link rel="icon" type="image/png" href="aura-icon.png">
 <link rel="apple-touch-icon" href="aura-icon.png">
 <link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="network-report.css">
 <link rel="stylesheet" href="chat-materials.css">
 <script src="model-advice.js" defer></script>
 <script src="connection-overview.js" defer></script>
@@ -18,6 +19,7 @@
 <script src="app.js" defer></script>
 <script src="workspace.js" defer></script>
 <script src="live-work.js" defer></script>
+<script src="network-report.js" defer></script>
 <script src="chat-materials.js" defer></script>
 <script src="plan-view.js" defer></script>
 <script src="planning.js" defer></script>
@@ -222,7 +224,7 @@
       </div>
     </section>
     <section class="work-panel" id="panel-activity" role="tabpanel" aria-labelledby="tab-activity" inert>
-      <div class="panel-bar"><span id="activity-status" class="panel-status">Ingen opgave i gang</span></div>
+      <div class="panel-bar"><span id="activity-status" class="panel-status">Ingen opgave i gang</span><button type="button" id="network-report-open">Dan rapport</button></div>
       <div class="panel-scroll" id="activity-scroll">
         <div id="activity-empty" class="panel-empty"><span class="empty-code" aria-hidden="true">≡</span><h2>Ingen aktivitet endnu</h2><p>Her ser du, hvad AI’en gør: hvilke filer den læser og ændrer, hvilke kommandoer den kører, og hvornår den venter på dig.</p><p class="hint">Aktiviteten gemmes kun, så længe Aura er åben.</p></div>
         <ol id="activity-list" class="activity-list" aria-label="Aktivitet" hidden></ol>

@@ -25,6 +25,8 @@ module.exports = new Set([
   'live-work.js',
   'markdown.js',
   'model-advice.js',
+  'network-report.css',
+  'network-report.js',
   'palette.js',
   'plan-view.js',
   'planning.js',

@@ -1,6 +1,7 @@
 const http = require('node:http');
 const { randomBytes } = require('node:crypto');
 const { usesResponses, assertSupported } = require('./connections.cjs');
+const network = require('./network-journal.cjs');
 const { StreamProgress } = require('./stream-progress.cjs');
 
 const IDLE_LIMIT = 120_000, TOTAL_LIMIT = 20 * 60_000;
@@ -21,7 +22,7 @@ async function startGateway(connection, model, key, route, onFailure = () => {},
     const controller = new AbortController(); active.add(controller);
     res.on('close', () => { controller.abort(); active.delete(controller); });
     // Et langt svar må gerne tage tid, så længe der kommer data. Stilstand i to minutter afbryder kaldet.
-    const idle = new AbortController(); let idleTimer;
+    const idle = new AbortController(); let idleTimer, observedResponse;
     const touch = () => { clearTimeout(idleTimer); idleTimer = setTimeout(() => idle.abort(), idleLimit); };
     try {
       const responses = usesResponses(connection);
@@ -56,9 +57,10 @@ async function startGateway(connection, model, key, route, onFailure = () => {},
       else if (key) { if (connection.kind === 'azure') headers['api-key'] = key; else headers.authorization = `Bearer ${key}`; }
       touch();
       const progress = new StreamProgress({ emit: onProgress, root });
-      const response = await fetch(`${base}${responses ? '/responses' : anthropic ? '/messages' : '/chat/completions'}`, { method: 'POST', headers, body: JSON.stringify(body), signal: AbortSignal.any([controller.signal, idle.signal, AbortSignal.timeout(totalLimit)]), redirect: 'error' });
+      const response = observedResponse = await network.observedFetch(`${base}${responses ? '/responses' : anthropic ? '/messages' : '/chat/completions'}`, { method: 'POST', headers, body: JSON.stringify(body), signal: AbortSignal.any([controller.signal, idle.signal, AbortSignal.timeout(totalLimit)]), redirect: 'error' }, { category: 'model', purpose: 'model-response', provider: connection.kind, timeoutSignal: idle.signal });
       if (!response.ok) {
         await response.body?.cancel();
+        network.finishResponse(response, { outcome: 'failed', error: { status: response.status } });
         const advice = { 401: 'API-nøglen blev afvist. Kontrollér eller udskift den under AI-forbindelser.', 403: 'Din konto har ikke adgang til modellen. Kontrollér adgangen hos udbyderen.', 402: 'Udbyderen afviste kaldet på grund af saldo eller kvote. Kontrollér kontoen; appen vælger ikke en betalt erstatning.', 404: 'Modellen eller adressen blev ikke fundet. Hent modellisten igen, og kontrollér forbindelsen.', 429: 'Udbyderens forbrugsgrænse er nået. Prøv igen, når kvoten er tilgængelig.' }[response.status] || 'Kontrollér forbindelsen og modelvalget, og prøv igen.';
         const message = `Modelserveren afviste kaldet (HTTP ${response.status}). ${advice}`;
         const kind = { 401: 'key', 403: 'access', 402: 'quota', 404: 'notfound', 429: 'limit' }[response.status] || (response.status >= 500 ? 'server' : 'rejected');
@@ -67,10 +69,12 @@ async function startGateway(connection, model, key, route, onFailure = () => {},
       }
       res.writeHead(200, { 'content-type': response.headers.get('content-type') || 'application/json', 'cache-control': 'no-store' });
       const sse = (response.headers.get('content-type') || '').includes('text/event-stream');
-      for await (const chunk of response.body) { touch(); if (res.destroyed) break; res.write(chunk); try { progress.write(chunk, sse); } catch { /* Fremdrift må ikke afbryde svaret. */ } }
+      for await (const chunk of response.body) { network.observeResponseChunk(response, chunk); touch(); if (res.destroyed) break; res.write(chunk); try { progress.write(chunk, sse); } catch { /* Fremdrift må ikke afbryde svaret. */ } }
       try { progress.end(sse); } catch { /* Selve svaret er allerede sendt videre. */ }
+      network.finishResponse(response, { outcome: controller.signal.aborted ? 'cancelled' : 'completed' });
       res.end();
-    } catch {
+    } catch (error) {
+      network.finishResponse(observedResponse, { outcome: controller.signal.aborted ? 'cancelled' : 'failed', error: idle.signal.aborted ? { kind: 'idle' } : error });
       if (idle.signal.aborted) fail(`Modellen svarede ikke i ${idleLimit >= 60_000 ? `${Math.round(idleLimit / 60_000)} min` : `${Math.max(1, Math.round(idleLimit / 1000))} s`}, så forbindelsen blev afbrudt. Din besked er bevaret.`, 'idle');
       else fail('Modelforbindelsen blev afbrudt. Din besked er bevaret. Kontrollér forbindelsen, og prøv igen.', 'network');
       // En afbrudt strøm må ikke ligne et færdigt modelsvar for agentmotoren.

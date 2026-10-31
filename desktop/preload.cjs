@@ -83,6 +83,8 @@ const methods = {
   komplaiPublishState: 'komplai:publish-state',
   listDesigns: 'designs:list',
   models: 'connections:models',
+  networkReport: 'network:report',
+  networkReportSave: 'network:save',
   newConversation: 'workspace:new-conversation',
   newProject: 'project:new',
   openExternalLink: 'links:open',

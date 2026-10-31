@@ -1,3 +1,4 @@
+const network = require('./network-journal.cjs');
 const { randomUUID, createHash } = require('node:crypto');
 const definitions = {
   openai: { name: 'OpenAI API', provider: 'OpenAI', baseURL: 'https://api.openai.com/v1', protocol: 'responses', keyRequired: true, source: 'https://developers.openai.com/api/docs/guides/your-data', checkedAt: '2026-10-15',
@@ -205,38 +206,47 @@ async function readExcerpt(response) {
   try {
     const reader = response.body?.getReader(); if (!reader) return '';
     const chunks = []; let size = 0;
-    while (size < 4096) { const { done, value } = await reader.read(); if (done) break; chunks.push(value); size += value.length; }
+    while (size < 4096) { const { done, value } = await reader.read(); if (done) break; network.observeResponseChunk(response, value); chunks.push(value); size += value.length; }
     await reader.cancel().catch(() => {});
     return Buffer.concat(chunks).toString('utf8').slice(0, 4096);
   } catch { return ''; }
 }
-async function requestJSON(url, { key = '', kind, method = 'GET', body, signal } = {}) {
+async function requestJSON(url, { key = '', kind, method = 'GET', body, signal, purpose = 'model-catalog' } = {}) {
   const headers = { accept: 'application/json' };
   if (key) Object.assign(headers, kind === 'anthropic' ? { 'x-api-key': key, 'anthropic-version': '2023-06-01' } : kind === 'azure' ? { 'api-key': key } : { Authorization: `Bearer ${key}` });
   if (body) headers['content-type'] = 'application/json';
   let response;
-  try { response = await fetch(url, { method, headers, body: body && JSON.stringify(body), signal: signal || AbortSignal.timeout(15000), redirect: 'error' }); }
+  try { response = await network.observedFetch(url, { method, headers, body: body && JSON.stringify(body), signal: signal || AbortSignal.timeout(15000), redirect: 'error' }, { category: 'catalog', purpose, provider: kind }); }
   catch (error) { throw networkFailure(error); }
-  if (!response.ok) {
-    const excerpt = await readExcerpt(response);
-    let said = excerpt; try { const data = JSON.parse(excerpt); said = data?.error?.message || data?.error || data?.message || data?.detail || excerpt; } catch { /* Svaret er ikke JSON. */ }
-    if (typeof said !== 'string') said = JSON.stringify(said);
-    const known = providerReasons.find(([pattern]) => pattern.test(said))?.[1];
-    const details = redact(`HTTP ${response.status}${said ? ': ' + said : ''}`, [key]);
-    // En Corti-nøgle virker kun i sit eget miljø. Beskeden siger, hvilken adresse appen prøvede, så testeren ved, hvad der skal tjekkes.
-    if (kind === 'corti' && (response.status === 401 || response.status === 403)) throw failure(`Corti afviste nøglen på ${url.startsWith(CORTI.fr) ? 'adressen i Frankrig' : url.startsWith(CORTI['eu-s']) ? 'adressen i EU-S (Sovereign)' : 'adressen i EU'}. ${known ? known + ' ' : ''}Brug en nøgle fra Corti Models i et projekt i EU, EU-S eller Frankrig; en nøgle virker kun i sit eget miljø.`, 'rejected', details);
-    if (response.status === 401 || response.status === 403) throw failure(`Serveren afviste adgangen. ${known || 'Kontrollér API-nøglen og tilladelserne.'}`, 'rejected', details);
-    if (response.status === 429 || response.status === 402) throw failure(known || `Udbyderen svarede med HTTP ${response.status}. Prøv igen senere.`, 'rejected', details);
-    throw failure(`Serveren svarede med HTTP ${response.status}. ${known ? known + ' ' : ''}Ingen anden forbindelse blev valgt.`, response.status >= 500 ? 'server' : 'rejected', details);
+  try {
+    if (!response.ok) {
+      const excerpt = await readExcerpt(response);
+      let said = excerpt; try { const data = JSON.parse(excerpt); said = data?.error?.message || data?.error || data?.message || data?.detail || excerpt; } catch { /* Svaret er ikke JSON. */ }
+      if (typeof said !== 'string') said = JSON.stringify(said);
+      const known = providerReasons.find(([pattern]) => pattern.test(said))?.[1];
+      const details = redact(`HTTP ${response.status}${said ? ': ' + said : ''}`, [key]);
+      // En Corti-nøgle virker kun i sit eget miljø. Beskeden siger, hvilken adresse appen prøvede, så testeren ved, hvad der skal tjekkes.
+      if (kind === 'corti' && (response.status === 401 || response.status === 403)) throw failure(`Corti afviste nøglen på ${url.startsWith(CORTI.fr) ? 'adressen i Frankrig' : url.startsWith(CORTI['eu-s']) ? 'adressen i EU-S (Sovereign)' : 'adressen i EU'}. ${known ? known + ' ' : ''}Brug en nøgle fra Corti Models i et projekt i EU, EU-S eller Frankrig; en nøgle virker kun i sit eget miljø.`, 'rejected', details);
+      if (response.status === 401 || response.status === 403) throw failure(`Serveren afviste adgangen. ${known || 'Kontrollér API-nøglen og tilladelserne.'}`, 'rejected', details);
+      if (response.status === 429 || response.status === 402) throw failure(known || `Udbyderen svarede med HTTP ${response.status}. Prøv igen senere.`, 'rejected', details);
+      throw failure(`Serveren svarede med HTTP ${response.status}. ${known ? known + ' ' : ''}Ingen anden forbindelse blev valgt.`, response.status >= 500 ? 'server' : 'rejected', details);
+    }
+    const chunks = []; let size = 0;
+    for await (const chunk of response.body) {
+      network.observeResponseChunk(response, chunk);
+      size += chunk.length;
+      if (size > 8_000_000) throw new Error('Serverens svar er for stort.');
+      chunks.push(chunk);
+    }
+    const text = Buffer.concat(chunks).toString('utf8');
+    let result;
+    try { result = JSON.parse(text); } catch { throw new Error('Serveren returnerede ikke gyldige modeloplysninger.'); }
+    network.finishResponse(response, { outcome: 'completed' });
+    return result;
+  } catch (error) {
+    network.finishResponse(response, { outcome: signal?.aborted || error.name === 'AbortError' ? 'cancelled' : 'failed', error });
+    throw error;
   }
-  const chunks = []; let size = 0;
-  for await (const chunk of response.body) {
-    size += chunk.length;
-    if (size > 8_000_000) throw new Error('Serverens svar er for stort.');
-    chunks.push(chunk);
-  }
-  const text = Buffer.concat(chunks).toString('utf8');
-  try { return JSON.parse(text); } catch { throw new Error('Serveren returnerede ikke gyldige modeloplysninger.'); }
 }
 // Tænkning og indsatsniveauer fra kataloget: Corti oplyser capabilities.reasoning og effort.levels, OpenRouter supported_parameters.
 function catalogReasoning(model) {
@@ -266,7 +276,7 @@ async function listModels(connection, key) {
 async function routes(connection, key, model) {
   assertSupported(connection);
   if (connection.kind !== 'openrouter') return [];
-  const data = await requestJSON(`${connection.baseURL}/models/${model.split('/').map(encodeURIComponent).join('/')}/endpoints`, { key });
+  const data = await requestJSON(`${connection.baseURL}/models/${model.split('/').map(encodeURIComponent).join('/')}/endpoints`, { key, kind: connection.kind, purpose: 'route-catalog' });
   return (data.data?.endpoints || []).map(item => ({ id: item.tag || item.provider_name, name: item.provider_name, price: item.pricing || null, policy: item.data_policy || null, capabilities: { tools: item.supported_parameters?.includes('tools') ?? null, vision: typeof item.capabilities?.vision === 'boolean' ? item.capabilities.vision : Array.isArray(item.input_modalities) ? item.input_modalities.includes('image') : null } })).filter(route => route.id);
 }
 function disclosure(connection, model, route = null) {
