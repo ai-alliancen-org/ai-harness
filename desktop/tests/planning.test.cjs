@@ -4,7 +4,7 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const os = require('node:os');
 const { initialBrief, normalizeBrief, addAnswers, addWishes, briefText } = require('../core/brief.cjs');
-const { parsePlan, planSummary, answerOptions } = require('../ui/plan-view.js');
+const { parsePlan, planSummary, planOutline, answerOptions } = require('../ui/plan-view.js');
 const { Workbench } = require('../core/workbench.cjs');
 const { WorkspaceHistory } = require('../core/workspace-history.cjs');
 const profiles = path.join(__dirname, '../../profiles');
@@ -121,4 +121,13 @@ test('motoren får spørgeværktøjet; OpenCode tilbyder det ellers kun til sine
   const { isolatedEnv } = require('../core/engine.cjs');
   const env = isolatedEnv(os.tmpdir(), {}, 'adgangskode');
   assert.equal(env.OPENCODE_CLIENT, 'harness'); assert.equal(env.OPENCODE_ENABLE_QUESTION_TOOL, 'true');
+});
+
+// Overblikket er afledt visning; ingen plan-id'er eller fuld tekst bliver omskrevet.
+test('kort planoverblik viser design og afprøvning, mens tekniske og ukendte afsnit bevares i fuld plan', () => {
+  const source = '## Det bygger vi\nBooking.\n## Sådan skal det se ud\nRoligt og læsbart.\n## Teknik og data\nHTML og lokale data.\n## Det skal du prøve\n- Bestil et lokale\n- Annuller\n## Et ekstra krav\nBevar dette.';
+  assert.deepEqual(planOutline(source), [{ title: 'Sådan skal det se ud', text: 'Roligt og læsbart.' }, { title: 'Det skal du prøve', text: 'Bestil et lokale Annuller' }]);
+  assert.equal(parsePlan(source).sections.at(-1).body, 'Bevar dette.');
+  assert.deepEqual(planOutline('En fri plan uden faste overskrifter.'), []);
+  assert.ok(planOutline('## Sådan skal det se ud\n' + 'lang tekst '.repeat(100))[0].text.length < 170);
 });

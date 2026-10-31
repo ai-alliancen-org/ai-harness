@@ -10,6 +10,8 @@ module.exports = new Set([
   'chat-materials.css',
   'chat-materials.js',
   'chats.js',
+  'composer-options.css',
+  'composer-options.js',
   'connection-overview.js',
   'context-display.js',
   'conversation-mode.js',

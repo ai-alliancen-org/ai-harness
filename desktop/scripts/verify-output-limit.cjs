@@ -88,7 +88,7 @@ async function main() {
     assert.match(await page.locator('#model-chip').textContent(), /lav indsats/);
     await page.locator('#messages').filter({ hasText: 'Her er svaret.' }).waitFor();
     // Tilbage til udbyderens standard: et nyt forsøg uden indsats tænker igen for længe, og samtalen gøres kortere.
-    await page.click('#model-chip'); await page.click('#model-effort-reset'); await helpers.closeTaskOptions(page);
+    await helpers.taskOptions(page); await page.click('#model-effort-reset'); await helpers.closeTaskOptions(page);
     assert.doesNotMatch(await page.locator('#model-chip').textContent(), /lav indsats/);
     await send('Byg siden igen.');
     await card.locator('button', { hasText: 'Gør samtalen kortere og prøv igen' }).waitFor();

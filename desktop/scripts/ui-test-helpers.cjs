@@ -27,7 +27,10 @@ async function menuClick(page, selector) {
   if (selector === '#attach-preview' && !await page.locator('#server-manual').evaluate(el => el.open)) await page.click('#server-manual > summary');
 }
 async function taskOptions(page) {
-  if (!await page.locator('#task-dialog').evaluate(el => el.open)) await page.click('#model-chip');
+  if (!await page.locator('#task-dialog').evaluate(el => el.open)) {
+    await page.click('#model-chip');
+    if (await page.locator('#composer-model-menu').isVisible()) await page.getByRole('button', { name: 'Alle modeller og forbindelser', exact: true }).click();
+  }
   if (!await page.locator('#model-options').evaluate(el => el.open)) await page.click('#model-summary');
 }
 async function closeTaskOptions(page) {

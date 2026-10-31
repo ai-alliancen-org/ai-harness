@@ -280,7 +280,7 @@ class Workbench {
     const request = Symbol(); this.catalogRequests.set(id, request); this.catalogs.delete(id);
     const connection = await this.connection(id);
     connections.assertSupported(connection);
-    const models = await connections.listModels(connection, this.store.decrypt(connection));
+    const models = (await connections.listModels(connection, this.store.decrypt(connection))).map(model => ({ ...model, effortLevels: connections.effortLevels(connection, model) }));
     // Et sent katalogsvar må ikke genindføre adgang efter redigering, fjernelse eller en nyere kontrol.
     if (this.catalogRequests.get(id) !== request) throw new Error('Forbindelsen blev ændret eller kontrolleret igen. Hent modellerne på ny.');
     this.catalogs.set(id, models); this.catalogTimes.set(id, new Date().toISOString()); return models;

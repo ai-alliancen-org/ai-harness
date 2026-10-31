@@ -36,6 +36,7 @@ view.log = document.getElementById('messages'); view.approvals = document.getEle
 const viewFor = id => !id ? view : views.get(id) || makeView(id);
 // Den åbne samtales visning sættes i siden. Status, plan og knapper følger den.
 function mountView(v) {
+  window.composerOptions?.close();
   if (view !== v) { view.scrollTop = $('#chat-content').scrollTop; view.historyNotice = ''; }
   for (const [key, id] of [['log', 'messages'], ['approvals', 'approvals'], ['review', 'run-review']]) {
     const old = document.getElementById(id); if (old === v[key]) continue;
@@ -871,6 +872,7 @@ function setRunning(value, status, v = view) {
 }
 // Navigation og indstillinger er tilgængelige, mens opgaver fortsætter i baggrunden.
 function applyRunning() {
+  if (projectLoading) window.composerOptions?.close();
   const busy = projectLoading || running;
   clearInterval(runTimer); runTimer = running ? setInterval(renderStatus, 1000) : null;
   // Den tomme forhåndsvisning ånder roligt, mens AI'en arbejder. Animationen slås fra ved reduceret bevægelse.
@@ -1828,7 +1830,7 @@ $('#work-mode').onchange = () => {
   view.ideaApproach = false; updateIdeaApproach();
   if ($('#work-mode').value === 'chat') { view.planCard = false; $('#plan-card').hidden = true; }
 };
-$('#composer-mode').onclick = () => { $('#task-dialog').showModal(); $('#task-dialog .workflow').open = true; $('#work-mode').focus(); };
+$('#composer-mode').onclick = () => window.composerOptions?.openMode();
 $('#accept-plan-offer').onclick = () => {
   if (running) return;
   if (activePlan) { view.planCard = true; $('#plan-card').hidden = false; updatePlanOffer(); $('#build-plan').focus(); return; }
@@ -1883,14 +1885,26 @@ function undoAction(result, label, title, v = view) {
 }
 function resultActions(result, v = view) {
   const actions = node('div', undefined, 'review-actions');
+  const ownsResult = () => v === view && v.root === current?.root && !v.running && !projectLoading && v.review.dataset.task === result.task;
   if (result.files.length && result.task) {
-    const changes = reviewButton(v.reviewedTask === result.task ? 'Ændringer gennemgået' : 'Se ændringer', () => action(async () => {
-      await window.workspace.showChange(result.task);
-      v.reviewedTask = result.task; changes.textContent = 'Ændringer gennemgået';
+    v.review.dataset.task = result.task;
+    // At åbne en diff er ikke det samme som at have gennemgået resultatet.
+    const changes = reviewButton('Se ændringer', () => { if (ownsResult()) return action(() => window.workspace.showChange(result.task)); });
+    if (result.status === 'idle') {
+      const preview = reviewButton('Afprøv resultatet', () => {
+        if (!ownsResult()) return;
+        window.workspace.show('preview', { focus: true });
+        if (!current.previewURL) { $('#preview-dialog').showModal(); window.previewServer?.refresh(); }
+      }, true);
+      actions.append(preview);
+    }
+    const reviewed = reviewButton(v.reviewedTask === result.task ? 'Gennemgået af dig' : 'Markér som gennemgået', () => {
+      if (!ownsResult()) return;
+      v.reviewedTask = result.task; reviewed.textContent = 'Gennemgået af dig'; reviewed.disabled = true;
       v.review.classList.add('is-reviewed');
-      for (const details of v.review.querySelectorAll('details')) details.open = false;
-    }));
-    actions.append(changes);
+    });
+    reviewed.disabled = v.reviewedTask === result.task;
+    actions.append(changes, reviewed);
   }
   const undo = undoAction(result, 'Fortryd opgaven', 'Fortryd opgaven', v);
   if (undo) { const menu = node('details', undefined, 'result-options'); menu.append(node('summary', 'Flere valg'), undo); actions.append(menu); }
@@ -1920,7 +1934,7 @@ async function checkPreview(result) {
 }
 const targetLine = (box, v = view) => { if (v.lastTarget) box.append(node('p', `Mål: ${v.lastTarget}`, 'review-target')); };
 function renderRunReview(result, v = view) {
-  const box = v.review; box.replaceChildren();
+  const box = v.review; box.replaceChildren(); delete box.dataset.task;
   const { lastCheckpoint, lastSentText, rejectedThisRun, lastRejection } = v;
   result = { files: [], tools: [], ...result };
   v.buildOffer = ['chat', 'plan'].includes(result.mode) && result.status === 'idle' && result.buildOffer === true && !v.plan && !v.waitingFor?.length;
@@ -2058,7 +2072,7 @@ function openTaskSettings() {
   if (!state?.connections?.length) { showSetup('Tilslut en AI for at bygge videre. Din kladde er bevaret.'); return; }
   $('#model-options').open = true; if (!$('#task-dialog').open) $('#task-dialog').showModal();
 }
-$('#model-chip').onclick = openTaskSettings;
+$('#model-chip').onclick = () => window.composerOptions?.openModel();
 // En valgt indsats hører til modellen. Et skift af model eller forbindelse vender tilbage til udbyderens standard.
 const resetEffort = () => { if (view) view.effort = null; updateModelSummary(); };
 $('#model-effort-reset').onclick = resetEffort;

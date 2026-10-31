@@ -29,6 +29,14 @@
     const first = source.split(/\n\s*\n/)[0].replace(/^\s*(?:[-*+]|\d+[.)])\s+/gm, '').replace(/[*_`#]/g, '').replace(/\s+/g, ' ').trim();
     return first.length <= max ? first : first.slice(0, max).replace(/[\s,.;:]+\S*$/, '') + ' …';
   }
+  // Et kort overblik supplerer resuméet; den fulde plan og dens id ændres aldrig.
+  function planOutline(text) {
+    const parsed = parsePlan(text);
+    return ['design', 'proev'].flatMap(key => {
+      const section = parsed.sections.find(item => item.key === key && item.body.trim());
+      return section ? [{ title: section.title, text: planSummary(section.body, 160) }] : [];
+    });
+  }
   // Svarmuligheder fra question-værktøjet. Et anbefalet svar markeres og står først; etiketten sendes uændret tilbage.
   const recommendedPattern = /\s*[([]\s*(anbefalet|anbefales|recommended)\s*[)\]]\s*$/i;
   function answerOptions(options) {
@@ -37,6 +45,6 @@
     if (first > 0) list.unshift(...list.splice(first, 1));
     return list;
   }
-  const api = { parsePlan, planSummary, answerOptions };
+  const api = { parsePlan, planSummary, planOutline, answerOptions };
   if (typeof module === 'object' && module.exports) module.exports = api; else root.PlanView = api;
 })(typeof window === 'object' ? window : globalThis);
