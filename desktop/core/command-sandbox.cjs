@@ -43,7 +43,7 @@ async function prepare({ workspaceRoot, scratchRoot, directory }) {
     : ['/bin', '/sbin', '/usr/bin', '/usr/sbin', '/usr/lib', '/usr/lib64', '/lib', '/lib64', '/usr/share', '/etc/ssl', '/etc/resolv.conf', '/etc/hosts', '/etc/localtime'];
   // Runtimefilerne er læsbare, men brugerens hjem, appdata og øvrige projekter er ikke.
   const runtimeRoot = path.dirname(path.dirname(node));
-  const sensitive = ['**/.env', '**/.env.*', '**/*.key', '**/*.pem', '**/.git', '**/secrets', '**/references', '**/.ssh', '**/.aws', '**/.npmrc', '**/.pypirc'];
+  const sensitive = require('./protected-paths.cjs').toSandboxGlobs();
   const policy = { version: 1, workspaceRoot: root, scratchRoot: scratch, node, env: { PATH: [path.dirname(node), '/usr/bin', '/bin', '/usr/sbin', '/sbin'].join(':'), HOME: home, TMPDIR: temp, TMP: temp, TEMP: temp, LANG: 'en_US.UTF-8', npm_config_cache: path.join(home, '.npm'), PIP_CACHE_DIR: path.join(home, '.cache', 'pip') }, config: {
     network: { allowedDomains: PACKAGE_HOSTS, deniedDomains: [], strictAllowlist: true, allowLocalBinding: false, allowUnixSockets: [], allowAllUnixSockets: false },
     filesystem: { denyRead: ['/', ...[root, scratch].flatMap(folder => sensitive.map(pattern => path.join(folder, pattern)))], allowRead: [root, scratch, runtimeRoot, ...systemRead, '/dev/null', '/dev/urandom', '/dev/random', '/dev/fd'].map(literal), allowWrite: [root, scratch].map(literal), denyWrite: ['/tmp/claude', '/private/tmp/claude', ...[root, scratch].flatMap(folder => sensitive.map(pattern => path.join(folder, pattern)))] },

@@ -8,7 +8,7 @@ const { createHash } = require('node:crypto');
 const digest = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const within = (root, target) => { const relative = path.relative(root, target); return relative === '' || (relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative)); };
 const stable = value => Array.isArray(value) ? value.map(stable) : value && typeof value === 'object' ? Object.fromEntries(Object.keys(value).sort().map(key => [key, stable(value[key])])) : value;
-const protectedPath = value => String(value).split(/[\\/]/).some(part => ['.git', 'secrets', 'references'].includes(part.toLowerCase()) || /^\.env/i.test(part) || /\.(key|pem)$/i.test(part));
+const { isProtected: protectedPath } = require('./protected-paths.cjs');
 const writable = mode => ['free', 'build'].includes(mode);
 
 // realpath på den nærmeste eksisterende forælder dækker også nye filer. Et link

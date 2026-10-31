@@ -1,13 +1,14 @@
 const fs = require('node:fs/promises');
 const path = require('node:path');
-const OMIT = new Set(['.git', 'node_modules', '.next', 'dist', 'build', 'references', '.venv', '.secrets']);
+const { isProtected } = require('./protected-paths.cjs');
+const OMIT = new Set(['node_modules', '.next', 'dist', 'build', '.venv']);
 async function capture(root) {
   // Filer, der er for store eller ikke er tekst, huskes kun ved navn, så en sammenligning ikke tror, de er nye eller slettede.
   const files = new Map(), skippedFiles = new Set(); let bytes = 0, skipped = 0;
   async function visit(dir, depth) {
     if (depth > 12) { skipped++; return; }
     for (const entry of await fs.readdir(dir, { withFileTypes: true })) {
-      if (OMIT.has(entry.name) || /(^\.env($|\.)|\.(pem|key|p12|pfx)$|credentials|secrets)/i.test(entry.name) || entry.isSymbolicLink()) continue;
+      if (OMIT.has(entry.name) || isProtected(entry.name) || entry.isSymbolicLink()) continue;
       const file = path.join(dir, entry.name);
       if (entry.isDirectory()) await visit(file, depth + 1);
       else if (entry.isFile()) {
