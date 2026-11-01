@@ -21,6 +21,8 @@ const { fileDetail } = require('./core/change-review.cjs');
 const { OwnTools } = require('./core/own-tools.cjs');
 const uiFiles = require('./core/ui-files.cjs');
 const connections = require('./core/connections.cjs');
+const networkJournal = require('./core/network-journal.cjs');
+const networkReport = require('./core/network-report.cjs');
 // Nøgler og GitHub-token indtastes kun i nøglevinduet. Hovedvinduet får en engangskvittering.
 const { KeyWindow, connectionPurpose, githubPurpose } = require('./core/key-window.cjs');
 
@@ -101,7 +103,7 @@ function supportReport() {
   return require('./core/diagnostics.cjs').diagnostics({ version: app.getVersion(), platform: process.platform, arch: process.arch, packaged: app.isPackaged, versions: require('./core/runtime.cjs').get()?.versions, project: Boolean(currentProject()), running: workbench?.running, preview: currentSpace().devServer?.state, failures });
 }
 function shutdown() {
-  if (!shuttingDown) shuttingDown = (async () => { keyWindow.close(); github?.cancel(); deploymentSetup?.promte.cancelAll(); await registry?.close(); await closeSpaces(); })().finally(() => { shuttingDown = null; });
+  if (!shuttingDown) shuttingDown = (async () => { keyWindow.close(); github?.cancel(); deploymentSetup?.promte.cancelAll(); await registry?.close(); await closeSpaces(); await networkJournal.flush(); })().finally(() => { shuttingDown = null; });
   return shuttingDown;
 }
 const uiURL = 'harness://app/index.html';
@@ -361,6 +363,16 @@ function requireIdleProject() {
   if (['installing', 'starting', 'stopping'].includes(currentSpace().devServer?.state)) throw new Error('Vent på opstarten af forhåndsvisningen, eller stop den først.');
   return currentProject().root;
 }
+handle('network:report', () => networkJournal.snapshot());
+handle('network:save', async input => {
+  if (!['json', 'csv'].includes(input?.format)) throw new Error('Vælg CSV eller JSON.');
+  // Only main owns records. The renderer can choose filters, never export content.
+  const report = networkReport.select(networkJournal.snapshot(), input?.filters);
+  const chosen = await dialog.showSaveDialog(window, { title: 'Gem netværksrapport', defaultPath: `Aura-netvaerk.${input.format}`, filters: [{ name: 'Netværksrapport', extensions: [input.format] }] });
+  if (chosen.canceled || !chosen.filePath) return false;
+  await fs.writeFile(chosen.filePath, networkReport.serialize(report, input.format), { mode: 0o600 });
+  return true;
+});
 handle('support:report', () => supportReport());
 handle('support:save', async () => {
   const report = supportReport();
@@ -885,6 +897,7 @@ handle('preview:execute', token => exclusive(async () => {
 handle('preview:stop', () => currentSpace().devServer.stop().then(() => currentSpace().devServer.snapshot()));
 
 app.whenReady().then(async () => {
+  await networkJournal.configure({ directory: path.join(app.getPath('userData'), 'harness', 'network-journal') });
   app.setAboutPanelOptions({ applicationName: DISPLAY_NAME, applicationVersion: app.getVersion() });
   Menu.setApplicationMenu(Menu.buildFromTemplate([
     { label: DISPLAY_NAME, submenu: [
