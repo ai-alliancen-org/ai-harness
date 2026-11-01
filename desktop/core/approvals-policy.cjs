@@ -46,7 +46,9 @@ async function canonicalWithin(root, target) {
 const allCanonicalWithin = async (root, targets) => (await Promise.all(targets.map(target => canonicalWithin(root, target)))).every(Boolean);
 async function fileTargets(p, workspace) {
   let candidates = [p.metadata?.filepath, p.metadata?.filePath, p.toolInput?.filePath, p.toolInput?.filepath].filter(value => typeof value === 'string');
-  const patterns = Array.isArray(p.patterns) ? p.patterns : [];
+  // OpenCode markerer en mappe med <mappe>/* i patterns. Stjernen fjernes, så mappen selv kan bindes, og mappen er et helt undertræ.
+  const folderOnly = p.permission === 'external_directory';
+  const patterns = (Array.isArray(p.patterns) ? p.patterns : []).map(value => folderOnly && typeof value === 'string' ? value.replace(/[\\/]\*{1,2}$/, '') : value);
   // OpenCode viser projekt-relative patterns, men sender det konkrete absolutte
   // mål i metadata. Hvert mønster skal passe entydigt til et helt sti-suffix;
   // det må hverken indføre et nyt mål eller skjule ../, jokere eller navnesammenfald.
@@ -95,11 +97,19 @@ async function fileTargets(p, workspace) {
     };
     return bindTargets([...candidates, ...targets.map(absolute)]);
   }
+  // For mappeadgang er mønsteret <mappe>/* det autoritative mål. filepath kan være en fil inde i mappen, og den må ikke
+  // gøres til undertræets rod.
+  if (folderOnly) {
+    const folders = patterns.filter(value => typeof value === 'string');
+    const bound = folders.length ? await bindTargets(folders) : [];
+    if (bound.length) return bound.map(item => ({ ...item, subtree: true }));
+  }
   if (candidates.length) {
     return bindTargets(candidates);
   }
   if (!['external_directory', 'read', 'grep', 'glob', 'list'].includes(p.permission)) return [];
-  const specified = p.toolInput?.path || p.metadata?.path;
+  // OpenCode 1.18.33 sender mappeadgang med metadata.filepath og metadata.parentDir (tests/fixtures); path er ældre.
+  const specified = p.toolInput?.path || p.metadata?.path || p.metadata?.filepath || p.metadata?.parentDir;
   const requested = specified ? [specified] : p.patterns;
   if (!Array.isArray(requested) || !requested.length || requested.length > 100) return [];
   return requested.map(value => typeof value === 'string' && /[\\/]\*{1,2}$/.test(value) ? { value: value.replace(/[\\/]\*{1,2}$/, ''), subtree: true } : { value, subtree: p.permission === 'external_directory' });
