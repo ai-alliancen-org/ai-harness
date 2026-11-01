@@ -69,3 +69,10 @@ Seks agenter undersøgte nr. 6, 7, 8, 9, 11 og 12, og seks skeptikere angreb kon
 2. Må AI'en starte forhåndsvisningen, og må et samtykke huskes? Det er ny adfærd (`decisions.md:385-387` dækker kun OpenCode-kommandoer).
 3. Hvem kontrollerer komplais adresse, og med hvilket interval? Det er et produktvalg.
 4. Må AI'en bruge Tailwind, webskrifter og eksterne billeder? Reglen står i `project-guidance.cjs:25`, men listen mangler.
+
+## Beslutninger fra brugeren, 1. november 2026
+
+1. **Resultatet af forhåndsvisningskontrollen må gå til modellen.** Det ændrer `docs/decisions.md:158`, som i dag siger, at resultatet står i Aktivitet. Beslutningsloggen skal opdateres, når rettelsen bygges.
+2. **AI'en må starte forhåndsvisningen selv, og samtykket må huskes.** Det er ny adfærd, og den skal skrives ind i `docs/decisions.md`. Samtykket huskes, indtil `package.json` eller lockfilen ændres, jf. nr. 6-punkt 5.
+3. **Komplais adressekontrol og interval afgøres af brugeren selv.** Planen tager ikke stilling. Trin 8 leverer kun de muligheder, der findes, og holder valget åbent.
+4. **Tailwind, webskrifter og eksterne billeder skal ideelt være tilladt.** Det er et mål, ikke en færdig beslutning: reglen i `desktop/core/project-guidance.cjs:25` skal ændres, og der skal være en konkret liste over tilladte kilder. Netadgangen i sandkassen er et sikkerhedsspørgsmål, og den liste skal godkendes, før den bygges.
