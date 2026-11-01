@@ -1,5 +1,6 @@
 const { spawn, execFile } = require('node:child_process');
 const { promisify, isDeepStrictEqual } = require('node:util');
+const { RULES, createPathClassifier, classify, isProtected, toOpenCodeGlobs } = require('./protected-paths.cjs');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const os = require('node:os');
@@ -45,16 +46,13 @@ const SKILL_NAME = /^harness-[a-z0-9]+(-[a-z0-9]+)*$/;
 const SKILL_FILE = /^(SKILL\.md|references\/[a-z0-9-]+\.md)$/;
 // OpenCode sammenligner fil- og læsetilladelser med stien i forhold til projektets Git-rod, eller til computerens rod uden Git.
 // En mappe spærres derfor både som "mappe/…" og "…/mappe/…"; en fuld sti ville aldrig blive ramt. Sidste regel, der passer, gælder.
-const everywhere = dir => [`${dir}/*`, `*/${dir}/*`];
 // Aktive skills ligger i motorens egen konfigurationsmappe uden for projektet. Mappens navn er projektets nøgle, så mønsteret kun rammer den.
 const skillPattern = directory => `*/${path.basename(directory)}/config/skills/*`;
 function permissions(root, references, mode = 'free', skills = null) {
-  const read = { '*': 'allow', '*.env': 'deny', '*.env.*': 'deny', '*.key': 'deny', '*.pem': 'deny', '*.env:*': 'deny', '*.key:*': 'deny', '*.pem:*': 'deny' };
-  // NTFS kan åbne samme fil via fx nøgle.key::$DATA. Et andet navn på dens
-  // datastrøm ophæver ikke beskyttelsen, heller ikke før Auras godkendelseskort.
-  for (const dir of ['.git', 'secrets', 'references']) for (const pattern of [...everywhere(dir), `${dir}:*`, `*/${dir}:*`]) read[pattern] = 'deny';
-  // Udvalgte referencer har et unikt filnavn fra appen, så mønsteret kun rammer den valgte fil.
-  for (const file of references) for (const pattern of [file, `*/${file}`]) read[pattern] = 'allow';
+  const denials = Object.fromEntries(toOpenCodeGlobs().map(pattern => [pattern, 'deny']));
+  const read = { '*': 'allow', ...denials };
+  // Udvalgte referencer kan åbnes, men kan aldrig frigive nøgler eller private metadata.
+  for (const file of references) if (!isProtected(file, { references: false })) for (const pattern of [file, `*/${file}`]) read[pattern] = 'allow';
   const external = { '*': 'ask' };
   let skill = 'deny';
   if (skills?.names.length) {
@@ -64,8 +62,7 @@ function permissions(root, references, mode = 'free', skills = null) {
     skill = { '*': 'deny', ...Object.fromEntries(skills.names.map(name => [name, 'allow'])) };
   }
   if (['chat', 'plan'].includes(mode)) return { '*': 'deny', read, glob: 'allow', list: 'allow', grep: 'ask', webfetch: 'ask', external_directory: external, skill, question: 'allow' };
-  const edit = { '*': 'ask', '*.env*': 'deny', '*.key': 'deny', '*.pem': 'deny', '*.key:*': 'deny', '*.pem:*': 'deny' };
-  for (const pattern of [...everywhere('.git'), '.git:*', '*/.git:*']) edit[pattern] = 'deny';
+  const edit = { '*': 'ask', ...denials };
   if (skills?.names.length) edit[skillPattern(skills.directory)] = 'deny';
   return { '*': 'ask', read, glob: 'allow', grep: 'ask', list: 'allow', edit, bash: 'ask', external_directory: external, webfetch: 'ask', websearch: 'deny', task: 'deny', skill, lsp: 'deny', question: 'allow', todowrite: 'allow', todoread: 'allow' };
 }
@@ -158,12 +155,13 @@ async function writePluginRuntime(directory) {
 }
 // Funktionen indlejres i en lokal plugin, så kontrollen sker før OpenCodes read.
 // Den bruger kun Nodes indbyggede moduler og virker også uden kommandosandbox.
-function createReadGuard({ fs, path, root, references = [], selectedFiles = [] }) {
+function createReadGuard({ fs, path, root, references = [], selectedFiles = [], classifyPath = classify }) {
   const selected = new Set([...references.map(file => path.resolve(root, file)), ...selectedFiles]);
-  const protectedFile = file => file.split(/[\\/]/).some(component => {
-    const name = component.split(':')[0].replace(/[. ]+$/, '').toLowerCase();
-    return ['.git', 'secrets', 'references'].includes(name) || name.startsWith('.env') || /\.(key|pem)$/.test(name);
-  });
+  const protectedFile = file => {
+    const result = classifyPath(file);
+    if (result.invalid || result.credentials || result.metadata) throw new Error('Aura beskytter denne fil.');
+    return result.references;
+  };
   return async (input, output) => {
     if (input.tool !== 'read') return;
     const file = output.args?.filePath;
@@ -182,7 +180,7 @@ async function writeReadGuard(directory, root, references, skills = []) {
   const pluginPath = path.join(directory, 'read-guard.mjs'), readyPath = path.join(directory, 'read-guard-ready.json'), token = randomBytes(32).toString('hex');
   const selectedFiles = skills.flatMap(skill => skill.files.map(file => path.join(directory, 'config', 'skills', skill.name, file.path)));
   await fs.rm(readyPath, { force: true });
-  const source = `import fs from 'node:fs/promises';\nimport path from 'node:path';\nconst guard = (${createReadGuard.toString()})({ fs, path, root: ${JSON.stringify(root)}, references: ${JSON.stringify(references)}, selectedFiles: ${JSON.stringify(selectedFiles)} });\nexport const AuraReadProtection = async () => {\n await fs.writeFile(${JSON.stringify(readyPath)}, ${JSON.stringify(JSON.stringify({ token }))}, { mode: 0o600 });\n return { 'tool.execute.before': guard };\n};\n`;
+  const source = `import fs from 'node:fs/promises';\nimport path from 'node:path';\nconst classify = (${createPathClassifier.toString()})(${JSON.stringify(RULES)});\nconst guard = (${createReadGuard.toString()})({ fs, path, root: ${JSON.stringify(root)}, references: ${JSON.stringify(references)}, selectedFiles: ${JSON.stringify(selectedFiles)}, classifyPath: classify });\nexport const AuraReadProtection = async () => {\n await fs.writeFile(${JSON.stringify(readyPath)}, ${JSON.stringify(JSON.stringify({ token }))}, { mode: 0o600 });\n return { 'tool.execute.before': guard };\n};\n`;
   await fs.writeFile(pluginPath, source, { mode: 0o600 });
   return { pluginURL: pathToFileURL(pluginPath).href, readyPath, token };
 }
