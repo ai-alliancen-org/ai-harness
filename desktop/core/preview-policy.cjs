@@ -27,6 +27,8 @@ function allowedRequest(input, supplied) {
   const origin = originOf(url);
   if (!origin) return false;
   if (origin === policy.origin) return true;
+  // https: for billeder og medier er et skema, ikke en adresse (beslutning for beta 2).
+  if (kind === 'images' && policy.network.images?.includes('https:') && origin.startsWith('https://')) return true;
   if (kind === 'connect' && policy.serviceOrigins.some(service => origin === service || origin === socketOrigin(service))) return true;
   return Boolean(kind && policy.network[kind]?.includes(origin));
 }

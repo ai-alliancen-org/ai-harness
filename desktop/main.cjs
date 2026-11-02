@@ -192,7 +192,8 @@ handle('project:create', input => exclusive(async () => {
   // Med Versioner og fortryd får nye projekter Git fra start og en version efter hver AI-opgave, så de altid kan fortrydes.
   // Et hostingønske eller en designpakke under en slået fra funktion følger ikke med projektet. Brugerens gemte standarder bevares.
   const projectStartup = { ...startup.values, ...(features.deling ? {} : { hosting: '' }), ...(features.design ? {} : { designID: '' }) };
-  await workbench.store.saveProject(created.root, { startup: projectStartup, ...(features.versioner ? { autoCheckpoint: true } : {}) });
+  // Nye projekter får designets netliste som standard (beslutning for beta 2). Eksisterende projekter ændres ikke.
+  await workbench.store.saveProject(created.root, { startup: projectStartup, runtime: { network: require('./core/project-runtime.cjs').DESIGN_PREVIEW_NETWORK }, ...(features.versioner ? { autoCheckpoint: true } : {}) });
   let versionWarning = '';
   if (features.versioner) {
     try { await workbench.git.startProject(created.root); }

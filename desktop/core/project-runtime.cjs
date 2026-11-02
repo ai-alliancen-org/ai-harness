@@ -5,7 +5,9 @@ const { createHash } = require('node:crypto');
 const NETWORK_KINDS = ['scripts', 'connect', 'images', 'styles'];
 const LOOPBACK = new Set(['localhost', '127.0.0.1', '[::1]']);
 const cleanText = (value, limit = 2000) => typeof value === 'string' && value.length > 0 && value.length <= limit && !/[\x00-\x1f\x7f]/.test(value);
-function networkOrigin(value) {
+// Skemaet https: er kun tilladt for billeder og medier: det giver ingen kode og ingen stilarter (beslutning for beta 2).
+function networkOrigin(value, kind) {
+  if (kind === 'images' && value === 'https:') return 'https:';
   let url; try { url = new URL(value); } catch { throw Error('Netadgang skal være en fuld adresse med https.'); }
   if (!cleanText(value, 500) || url.username || url.password || url.search || url.hash || url.pathname !== '/' || value.includes('*') || !['http:', 'https:', 'ws:', 'wss:'].includes(url.protocol)) throw Error('Angiv kun en præcis serveradresse uden sti, login, parametre eller jokertegn.');
   if (!['https:', 'wss:'].includes(url.protocol) && !LOOPBACK.has(url.hostname)) throw Error('Eksterne tjenester skal bruge https eller wss.');
@@ -39,7 +41,7 @@ function normalizeRuntimeConfig(value = {}) {
     for (const kind of NETWORK_KINDS) {
       const entries = value.network[kind] ?? [];
       if (!Array.isArray(entries) || entries.length > 20) throw Error('Der kan angives højst 20 adresser pr. slags netadgang.');
-      result.network[kind] = [...new Set(entries.map(networkOrigin))];
+      result.network[kind] = [...new Set(entries.map(entry => networkOrigin(entry, kind)))];
     }
   }
   return result;
@@ -100,4 +102,7 @@ async function inspectPreviewDependencies(root, config = {}) {
   return diagnostics;
 }
 
-module.exports = { normalizeRuntimeConfig, describeRuntime, describe: describeRuntime, detectServices, inspectPreviewDependencies, serviceDirectory, networkOrigin, NETWORK_KINDS, LOOPBACK };
+// Netlisten for nye projekter: Tailwind, webskrifter og billeder fra https (beslutning for beta 2). Eksisterende projekter ændres ikke.
+const CDN_HOSTS = ['https://cdn.tailwindcss.com', 'https://cdn.jsdelivr.net', 'https://unpkg.com', 'https://cdnjs.cloudflare.com'];
+const DESIGN_PREVIEW_NETWORK = { scripts: [...CDN_HOSTS], styles: [...CDN_HOSTS, 'https://fonts.googleapis.com', 'https://fonts.gstatic.com'], connect: [], images: ['https:'] };
+module.exports = { normalizeRuntimeConfig, describeRuntime, describe: describeRuntime, detectServices, inspectPreviewDependencies, serviceDirectory, networkOrigin, NETWORK_KINDS, LOOPBACK, DESIGN_PREVIEW_NETWORK };
