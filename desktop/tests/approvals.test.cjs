@@ -35,13 +35,22 @@ test('modelserverens fejl får en type, så appen kan vise den rigtige vej vider
   let status = 401;
   const server = http.createServer(async (req, res) => { for await (const _ of req) {} res.writeHead(status); res.end('privat'); });
   await new Promise(r => server.listen(0, '127.0.0.1', r)); t.after(() => { server.closeAllConnections(); server.close(); });
-  for (const [code, kind] of [[401, 'key'], [403, 'access'], [402, 'quota'], [404, 'notfound'], [429, 'limit'], [503, 'server'], [400, 'rejected']]) {
+  // Endelige fejl kaldes af gatewayen med en type. Forbigående fejl (429 og 5xx) videresendes til OpenCode, som genforsøger,
+  // og typen kommer i stedet fra OpenCodes egen fejl, når den giver op (sessionFailure læser error.data.statusCode).
+  for (const [code, kind] of [[401, 'key'], [403, 'access'], [402, 'quota'], [404, 'notfound'], [400, 'rejected']]) {
     status = code; const failures = [];
     const gateway = await startGateway({ kind: 'compatible', baseURL: `http://127.0.0.1:${server.address().port}/v1` }, { id: 'm' }, '', null, (message, failure) => failures.push([message, failure]));
     await fetch(gateway.url + '/chat/completions', { method: 'POST', headers: { authorization: `Bearer ${gateway.token}` }, body: JSON.stringify({ model: 'm' }) });
     assert.equal(failures[0][1].kind, kind, String(code)); assert.equal(failures[0][1].status, code); assert.match(failures[0][0], new RegExp(`HTTP ${code}`));
     await gateway.close();
   }
+});
+
+test('forbigående fejl får typen fra OpenCodes endelige fejl, så resultatkortet kan vise den rigtige vej videre', async () => {
+  const { sessionFailure } = require('../core/chat-session.cjs');
+  assert.equal(sessionFailure({ data: { statusCode: 429 } }), 'limit');
+  assert.equal(sessionFailure({ data: { statusCode: 503 } }), 'server');
+  assert.equal(sessionFailure({ data: { statusCode: 500 } }), 'server');
 });
 
 test('afvisning med en besked sendes til motoren og stopper ikke; Stop giver et resultatkort med det, AI’en nåede', async t => {

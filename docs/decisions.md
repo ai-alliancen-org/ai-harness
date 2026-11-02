@@ -750,3 +750,4 @@ Brugeren har delegeret disse valg til Claude og vil have dem ændret, hvis de vi
 - **`.aura/tmp` holdes ude af Git, Ændringer, versioner og kopier.**
 - **Skrivning uden for projektet nægtes i Byg** med en besked til AI'en uden godkendelseskort. `.aura/tmp` er AI'ens egen mappe og er ikke omfattet af nægtelsen.
 - **Ordlyden på kortene** er «Må AI'en skrive i en mappe uden for projektet?» og «Må AI'en se en mappe uden for projektet?».
+- **Forbigående udbyderfejl (408, 429 og 5xx) videresendes til OpenCode, som genforsøger**, og Aura låser ikke forbindelsen. Det er i overensstemmelse med OpenCodes egen SDK, som markerer 408, 429 og 5xx som gen-forsøgbare og læser Retry-After. Risiko: SDK'en markerer også 409 som gen-forsøgbar, og Aura returnerer 409, når forbindelsen er låst. Det skal måles i den ende-til-ende-prøve, før beta-2 udgives.
