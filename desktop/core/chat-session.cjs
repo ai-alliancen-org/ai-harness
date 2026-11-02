@@ -17,6 +17,7 @@ const { projectInstructions, instructionText } = require('./project-instructions
 const { guidanceFor, appRules } = require('./project-guidance.cjs');
 const { startGateway } = require('./gateway.cjs');
 const { toolEntry, toolFiles, approvalTarget, approvalTitles } = require('./activity.cjs');
+const { refusesOutsideWrite } = require('./approvals-policy.cjs');
 const { taskSummary, sessionSummary, fileDetail, sessionAttribution, hash } = require('./change-review.cjs');
 const projectFiles = require('./project-files.cjs');
 const { materialText, materialSummary } = require('./chat-materials.cjs');
@@ -376,7 +377,7 @@ class ChatSession {
     this.log({ id: `run-${this.task.id}`, kind: 'run', task: this.task.id, title: modeTitles[prepared.mode], target: shortText(input.text), detail: `${prepared.disclosure.modelName || prepared.model.id} · ${prepared.disclosure.provider || prepared.connection.name}${prepared.fileRefs?.length ? ` · ${prepared.fileRefs.length === 1 ? '1 filhenvisning' : `${prepared.fileRefs.length} filhenvisninger`}` : ''}${prepared.disclosure.previewReference ? ` · mål: ${prepared.disclosure.previewReference}` : ''}`, status: 'running', started: this.task.startedAt });
     try {
       await bench.allocate(this); checkStopped(); this.task.root = this.root;
-      this.scratchRoot = path.join(bench.store.root, 'scratch', bench.store.projectKey(projectRoot), this.task.id);
+      this.scratchRoot = scratchRootFor(this.root, this.task.id);
       await fs.mkdir(this.scratchRoot, { recursive: true, mode: 0o700 }); checkStopped();
       this.runBefore = await capture(this.root); checkStopped();
       // Billede af forhåndsvisningen før opgaven. Det må højst forsinke starten lidt; uden billede fortsætter opgaven.
@@ -405,7 +406,7 @@ class ChatSession {
         checkStopped();
         // Samtalen fortsætter sin tidligere AI-session, når forbindelse, model og regler er de samme som sidst.
         const resume = this.data.opencode?.fingerprint === (prepared.disclosure.sessionFingerprint || prepared.disclosure.fingerprint) ? this.data.opencode.session : null;
-        this.engine = bench.engineFactory({ root: this.root, directory: path.join(bench.store.root, 'runtime', bench.store.projectKey(this.root)), provider, model: prepared.model, references: prepared.references, mode: prepared.mode, skills: prepared.context.skills, resume, sandbox: this.commandSandbox, onEvent: event => { if (this.engine === instance) this.event(event); } });
+        this.engine = bench.engineFactory({ root: this.root, directory: path.join(bench.store.root, 'runtime', bench.store.projectKey(this.root)), provider, model: prepared.model, references: prepared.references, mode: prepared.mode, skills: prepared.context.skills, resume, sandbox: this.commandSandbox, tempRoot: path.join(this.root, '.aura', 'tmp'), onEvent: event => { if (this.engine === instance) this.event(event); } });
         const instance = this.engine;
         await this.engine.start(); checkStopped(); this.engineIdentity = (prepared.disclosure.sessionFingerprint || prepared.disclosure.fingerprint);
         this.engineConversation = this.engine.resumed ? this.data.opencode?.conversation || '' : prepared.disclosure.conversation || '';
@@ -425,7 +426,7 @@ class ChatSession {
       // Herefter følger de linjer, der først kendes her, og som derfor står uden for gennemgangen.
       let system = appContext.system;
       if (this.copy) system += '\nArbejd kun i denne samtales kopi: ' + this.root + '. Projektets oprindelige mappe er ikke dit arbejdsområde. Aura håndterer indfletning separat efter brugerens gennemgang.';
-      system += '\nMidlertidige hjælpefiler til denne opgave kan ligge i ' + JSON.stringify(this.scratchRoot) + '. Brug kun denne midlertidige mappe; den hører til netop denne opgave.';
+      system += scratchInstruction(this.task.id);
       if (this.commandSandbox) system += '\nAlle kommandoer kører med teknisk isolation. Du kan arbejde i arbejdsområdet og den midlertidige mappe. Hemmeligheder og øvrige mapper er spærret. Netadgang er afgrænset til registry.npmjs.org, pypi.org og files.pythonhosted.org. Forklar en afvist adgang; forsøg ikke at omgå den.';
       if (Object.hasOwn(prepared.context, 'projectInstructions') && JSON.stringify(await projectInstructions(this.root)) !== JSON.stringify(prepared.context.projectInstructions)) throw new Error('Projektets AGENTS.md har ændret sig under opstart. Gennemgå oplysningerne igen før afsendelse.');
       this.gateway?.setEffort?.(prepared.disclosure.effort);
@@ -655,6 +656,13 @@ class ChatSession {
       } catch { /* Vis godkendelsen, hvis den automatiske kvittering ikke kunne sendes. */ }
     }
     if (!current()) return;
+    if (refusesOutsideWrite(context, p, descriptor)) {
+      // Ingen kort i Byg: AI'en får besked om at skrive i projektmappen eller .aura/tmp i stedet.
+      await engine.reply(p.id, false, 'Skriv ikke uden for projektmappen i Byg. Brug mappen .aura/tmp/' + this.task.id + ' til midlertidige filer.');
+      this.approvals.delete(p.id);
+      this.log({ id: `approval-${p.id}`, kind: 'approval', permission: p.permission, title: 'Skrivning uden for projektet er ikke tilladt i Byg', target: approvalTarget(p, this.root), status: 'rejected', ended: Date.now(), task: this.task?.id });
+      return;
+    }
     this.waiting = true; this.bench.chatsChanged();
     this.log({ id: `approval-${p.id}`, kind: 'approval', permission: p.permission, title: approvalTitles[p.permission] || 'Godkendelse', target: approvalTarget(p, this.root), status: 'waiting', started: Date.now(), task: this.task?.id });
     this.emit({ ...event, properties: { ...p, policy: descriptor } });
@@ -846,4 +854,7 @@ class ChatSession {
     if (reset) { this.running = false; this.prepared = null; }
   }
 }
-module.exports = { composeAppContext, ChatSession, planningReply, sessionFailure, emptyUsage, addStep };
+// AI'ens arbejdsfiler ligger i projektmappen under .aura/tmp/<opgave>, så de følger projektet (beslutning for beta 2).
+function scratchRootFor(root, taskId) { return path.join(root, '.aura', 'tmp', String(taskId)); }
+function scratchInstruction(taskId) { return '\nAI-filer til denne opgave ligger i .aura/tmp/' + taskId + ' i projektmappen. Brug kun den mappe; den hører til netop denne opgave.'; }
+module.exports = { composeAppContext, ChatSession, planningReply, sessionFailure, emptyUsage, addStep, scratchRootFor, scratchInstruction };

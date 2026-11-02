@@ -262,4 +262,10 @@ class ApprovalsPolicy {
     return descriptor;
   }
 }
-module.exports = { ApprovalsPolicy, canonicalPath, within };
+// I Byg afvises skrivning uden for projektet med en besked til AI'en og uden godkendelseskort (beslutning for beta 2).
+// .aura/tmp er AI'ens egen mappe og er ikke omfattet. Planlæg og Samtale har ingen skrivning, så de rammes ikke her.
+function refusesOutsideWrite(context, p, descriptor) {
+  const tool = p?.toolInput?.tool || p?.tool?.name;
+  return context?.mode === 'build' && ['write', 'edit', 'apply_patch'].includes(tool) && (p.permission === 'external_directory' || p.permission === 'edit') && descriptor?.projectFile !== true && descriptor?.scratch !== true;
+}
+module.exports = { ApprovalsPolicy, canonicalPath, within, refusesOutsideWrite };

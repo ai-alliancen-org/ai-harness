@@ -5,7 +5,7 @@ const path = require('node:path');
 const { constants } = require('node:fs');
 const { createHash, randomUUID } = require('node:crypto');
 const { protectedPath, secretContent } = require('./git.cjs');
-const OMIT = new Set(['.git', '.next', 'dist', 'build', '.venv', '.secrets']);
+const OMIT = new Set(['.git', '.next', 'dist', 'build', '.venv', '.secrets', '.aura']);
 const digest = data => createHash('sha256').update(data).digest('hex');
 const validID = id => /^[a-f0-9-]{36}$/.test(id || '');
 async function snapshot(root) {

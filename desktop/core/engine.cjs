@@ -89,9 +89,11 @@ async function writeSkills(directory, skills) {
 function engineConfig(provider, model, permission) {
   return { $schema: 'https://opencode.ai/config.json', model: `harness/${model.id}`, small_model: `harness/${model.id}`, enabled_providers: ['harness'], provider: { harness: provider }, permission, agent: { plan: { permission } }, share: 'disabled', autoupdate: false, snapshot: false, plugin: [], mcp: {}, lsp: false, formatter: false };
 }
-function isolatedEnv(directory, config, password, { commandIsolation = false } = {}) {
+function isolatedEnv(directory, config, password, { commandIsolation = false, tempRoot = null } = {}) {
   const env = {};
   for (const key of ['PATH', 'HOME', 'USERPROFILE', 'SystemRoot', 'WINDIR', 'COMSPEC', 'PATHEXT', 'TEMP', 'TMP', 'TMPDIR', 'LANG']) if (process.env[key]) env[key] = process.env[key];
+  // AI'ens midlertidige mappe er projektets .aura/tmp, ikke systemets temp-mappe (beslutning for beta 2).
+  if (tempRoot) env.TEMP = env.TMP = env.TMPDIR = tempRoot;
   for (const [key, sub] of Object.entries({ XDG_CONFIG_HOME: 'config', XDG_DATA_HOME: 'data', XDG_CACHE_HOME: 'cache', XDG_STATE_HOME: 'state' })) env[key] = path.join(directory, sub);
   // OpenCode søger altid også i HOME/.opencode, selv med projektkonfiguration slået fra.
   // Motorens plugins, pakker og hjælpeprocesser må kun bruge Auras egne mapper.
@@ -188,7 +190,7 @@ async function writeReadGuard(directory, root, references, skills = []) {
 }
 class OpenCodeEngine {
   // resume: en tidligere OpenCode-session for samme samtale. Findes den ikke længere, oprettes en ny.
-  constructor({ root, directory, provider, model, references = [], mode = 'free', skills = [], resume = null, sandbox = null, detached = false, recovery = {}, onEvent = () => {} }) { Object.assign(this, { root, directory, provider, model, references, mode, skills, resume, sandbox, detached, recovery, onEvent }); this.promptEpoch = 0; this.closedPermissions = new Set(); this.closedQuestions = new Set(); this.pendingQuestions = new Map(); this.pending = new Map(); this.active = false; this.resumed = false; }
+  constructor({ root, directory, provider, model, references = [], mode = 'free', skills = [], resume = null, sandbox = null, detached = false, recovery = {}, tempRoot = null, onEvent = () => {} }) { Object.assign(this, { tempRoot, root, directory, provider, model, references, mode, skills, resume, sandbox, detached, recovery, onEvent }); this.promptEpoch = 0; this.closedPermissions = new Set(); this.closedQuestions = new Set(); this.pendingQuestions = new Map(); this.pending = new Map(); this.active = false; this.resumed = false; }
   async request(url, method = 'GET', body, signal) {
     const response = await fetch(`${this.url}${url}`, { method, headers: { authorization: this.auth, 'content-type': 'application/json', 'x-opencode-directory': encodeURIComponent(this.root) }, body: body === undefined ? undefined : JSON.stringify(body), signal: signal || AbortSignal.timeout(15000), redirect: 'error' });
     if (!response.ok) throw Object.assign(new Error(`Agentmotoren afviste handlingen (HTTP ${response.status}).`), { status: response.status });
@@ -225,7 +227,7 @@ class OpenCodeEngine {
     this.config.plugin = [readGuard.pluginURL, ...(this.sandbox ? [this.sandbox.pluginURL] : [])];
     if (/\{(?:env|file):/.test(JSON.stringify(this.config))) throw new Error('Konfigurationen indeholder en ikke tilladt variabelhenvisning.');
     // Terminalklienten styrer Stop via API'et; dens Ctrl+C må ikke også ramme motorens procesgruppe.
-    const args = ['serve', '--hostname', '127.0.0.1', '--port', '0'], env = isolatedEnv(this.directory, this.config, password, { commandIsolation: Boolean(this.sandbox) });
+    const args = ['serve', '--hostname', '127.0.0.1', '--port', '0'], env = isolatedEnv(this.directory, this.config, password, { commandIsolation: Boolean(this.sandbox), tempRoot: this.tempRoot });
     this.enginePID = null;
     if (process.platform === 'win32') this.child = spawn(executable, args, { cwd: this.root, env, detached: this.detached, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
     else {

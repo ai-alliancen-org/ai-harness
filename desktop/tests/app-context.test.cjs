@@ -49,8 +49,10 @@ test('det viste er det sendte: fragmenterne står ordret forrest i systeminstruk
   const system = engines[0].sent[0].system;
   assert.ok(system.startsWith(review.appContext.components.map(part => part.text).join('')), 'de gennemgåede fragmenter står ordret og i samme rækkefølge');
   // Linjerne, der først kendes under opstarten, står efter fragmenterne og uden for gennemgangen.
-  assert.match(system, /Midlertidige hjælpefiler/);
-  assert.equal(review.appContext.components.some(part => part.text.includes('Midlertidige hjælpefiler')), false);
+  // AI-filer ligger i projektets .aura/tmp, og systemprompten må ikke nævne en absolut appdata-sti (beslutning for beta 2).
+  assert.match(system, /\.aura\/tmp\//);
+  assert.doesNotMatch(system, /appdata|scratch/i);
+  assert.equal(review.appContext.components.some(part => part.text.includes('.aura/tmp')), false);
 });
 
 test('en afsendelse uden eller med en forældet binding afvises', async t => {

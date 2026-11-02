@@ -69,6 +69,11 @@
     const next = Math.min(step, rest), status = rest ? `Viser ${visible} af ${lines} linjer i ændringen.` : visible > step ? `Alle ${lines} linjer vises.` : '';
     return { end, status, more: rest ? `Vis ${next} ${next === 1 ? 'linje' : 'linjer'} mere` : '' };
   }
-  const api = { parseUnifiedDiff, commandHints, failureText, commandResult, groupKey, receiptText, diffPage };
+  // Mappeadgang uden for projektet: skrivning og læsning har hver sin titel (beslutning for beta 2).
+  function directoryTitle(p) {
+    const writing = ['write', 'edit', 'apply_patch'].includes(p?.toolInput?.tool || p?.tool?.name);
+    return writing ? ['Må AI’en skrive i en mappe uden for projektet?', 'Mappen kan få filer, der ligger uden for dit projekt. Tillad kun, hvis du ved, hvad AI’en skriver.'] : ['Må AI’en se en mappe uden for projektet?', 'Mappen kan indeholde materiale, du ikke vil dele med din AI.'];
+  }
+  const api = { directoryTitle, parseUnifiedDiff, commandHints, failureText, commandResult, groupKey, receiptText, diffPage };
   if (typeof module === 'object' && module.exports) module.exports = api; else root.ApprovalView = api;
 })(typeof window === 'object' ? window : globalThis);

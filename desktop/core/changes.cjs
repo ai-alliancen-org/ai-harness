@@ -1,7 +1,7 @@
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const { isProtected } = require('./protected-paths.cjs');
-const OMIT = new Set(['node_modules', '.next', 'dist', 'build', '.venv']);
+const OMIT = new Set(['node_modules', '.next', 'dist', 'build', '.venv', '.aura']);
 async function capture(root) {
   // Filer, der er for store eller ikke er tekst, huskes kun ved navn, så en sammenligning ikke tror, de er nye eller slettede.
   const files = new Map(), skippedFiles = new Set(); let bytes = 0, skipped = 0;

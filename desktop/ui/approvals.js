@@ -21,7 +21,7 @@
       edit: where.projectFile ? ['Må AI’en ændre filer i projektet?', 'Filen ændres på din computer. Du kan fortryde det med en version.'] : ['Må AI’en ændre en fil uden for projektet?', 'Filen ligger ikke i projektmappen. Tillad kun, hvis du ved, hvorfor den skal ændres.'],
       bash: ['Må AI’en køre en kommando?', 'Kommandoen kører med dine rettigheder. Tillad kun, hvis du forstår, hvad den gør.'],
       webfetch: ['Må AI’en åbne en hjemmeside?', 'Hjemmesiden får besked om besøget, og indholdet sendes videre til din AI.'],
-      external_directory: ['Må AI’en se en mappe uden for projektet?', 'Mappen kan indeholde materiale, du ikke vil dele med din AI.'],
+      external_directory: window.ApprovalView.directoryTitle(p),
       grep: ['Må AI’en søge i projektets filer?', 'Det, AI’en finder, sendes videre til din AI.']
     };
     const [title, effect] = texts[p.permission] || ['Gennemgå denne handling', 'Læs de tekniske detaljer, før du tillader den.'];
