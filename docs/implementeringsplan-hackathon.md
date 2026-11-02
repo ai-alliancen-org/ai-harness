@@ -793,3 +793,27 @@ Grundlag: [årsagsdokumentet](hackathon-aarsager.md) og [planen](plan-hackathon-
 - Oprettelse eller ændring af workflows i .github. Der ændres ingen CI-opsætning.
 - Afgørelse af beslutning 1 til 8. Prøven og specifikationen afgør ikke tallene.
 
+
+## Status 2. november 2026
+
+Det her er den faktiske status. Hvert trin er bygget med prøver, der fejlede først, og prøvesættet er grønt efter hvert trin (789 af 789 ved seneste kørsel). Ingen af trinene er verificeret i Electron med en rigtig OpenCode-motor endnu.
+
+| Trin | Status | Hvad er gjort | Hvad mangler |
+|---|---|---|---|
+| 1 #58 | bygget | Cherry-pick med Partheds forfatter bevaret; konflikten i engine.cjs løst | Den rigtige Electron-prøve test:recovery |
+| 2 #56 | bygget | Fælles liste over beskyttede stier overtaget | Redigering af references/ er nu blokeret; accepteret |
+| 3 godkendelser | bygget | Mappeadgang læser filepath og mønsteret <mappe>/*; kontraktprøve del 2 over alle 55 optagne forespørgsler | Tre skrivninger til en ny mappe er undtaget og hører til trin 4 |
+| 4 AI-filer | bygget | .aura/tmp i projektet; TEMP/TMP/TMPDIR; nægtelse af skrivning uden for projektet i Byg uden kort; korttitler skriv/se; udeladt fra ændringer og kopier | Ende-til-ende-prøve mod rigtig motor |
+| 5 udbyderfejl | bygget | 408, 429 og 5xx videresendes til OpenCode med Retry-After; 401-404 er endelige | OpenCode genforsøger rigtigt; 409 er en risiko, der skal måles |
+| 6 sandkasse | bygget | Husket kommando tænder ikke sandkassen; «Godkend alt i denne samtale» under Flere valg; stabil sandkasse; motoren genstartes kun ved behov; CLT må læses | Knappen er ikke set i Electron; netadgang uændret |
+| 7 forhåndsvisning | delvist | Resultatet af kontrollen går til modellen som data ved næste besked | AI'en kan ikke selv starte forhåndsvisningen; samtykke huskes ikke; serverstatus til modellen mangler |
+| 8 netlister | bygget | Standardlisten for nye projekter: Tailwind, webskrifter og billeder fra https; eksisterende projekter ændres ikke | Ikke set i Electron |
+| 9 prompt | bygget | AGENTS.md gentages ikke, når den er identisk med grundreglerne | Størrelse ikke målt før og efter |
+| 10 nøgler | delvist | Fejlbesked for adresser der ikke findes (ENOTFOUND) | Den fælles rensning findes allerede; token=-præfikser og regionsrækkefølge er ikke bygget |
+| 11 CLI | ikke bygget | | Nøglering er en separat udgivelsesstrøm; ikke besluttet at bygge i beta-2 |
+| 12 komplai | ikke bygget | | Intervallet og hvem der kontrollerer adressen er din beslutning |
+| 13 ende-til-ende | ikke bygget | | Kortgrænsen på fem pr. opgave og samlingen af resterende kort; prøven mod rigtig motor |
+
+**Åbne beslutninger, der er din:** komplais adressekontrol og interval (trin 12). Alt andet er valgt og ligger i docs/decisions.md under «Beslutninger for 0.8.0-beta.2».
+
+**Før beta-2 kan udgives:** trin 7 og 13 skal være bygget, trin 12 besluttet af dig, og hele løbet skal køres i Electron mod en rigtig OpenCode-motor. Udgivelsen kræver derefter en ny version, pakning, signering, notarisation og to Actions-kørsler, som du godkender selv.
