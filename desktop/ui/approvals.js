@@ -145,6 +145,11 @@
     more.onclick = () => { row.hidden = true; more.hidden = true; extra.hidden = false; };
     const back = node('button', 'Tilbage', 'text-button'); back.type = 'button'; back.onclick = () => { extra.hidden = true; row.hidden = false; more.hidden = false; };
     if (projectFile) { const task = node('button', 'Tillad for denne opgave'); task.type = 'button'; task.onclick = () => reply(true, 'task'); extra.append(task); }
+    // «Godkend alt» findes kun, når kommandosandkassen er aktiv, og gælder kun denne samtale (beslutning for beta 2).
+    if (p.policy?.approveAllAvailable) {
+      const all = node('button', 'Godkend alt i denne samtale'); all.type = 'button'; all.onclick = () => reply(true, 'chat');
+      extra.append(all, node('p', 'AI’en må køre kommandoer, ændre filer og hente fra nettet i denne samtale uden at spørge igen, også uden for projektmappen. Brug det kun, hvis du stoler på opgaven.', 'hint'));
+    }
     if (p.policy?.folder && p.policy.persistable && !projectFile) {
       const folderButton = node('button', 'Tillad en mappe fremover'); folderButton.type = 'button';
       folderButton.onclick = () => {

@@ -89,7 +89,7 @@ class ChatSession {
     this.usageBase = { ...emptyUsage(), ...(data.usage || {}) };
     this.contextUsage = new ContextUsage();
     this.running = false; this.starting = false; this.finishing = null; this.generation = 0; this.task = null; this.prepared = null;
-    this.engine = null; this.gateway = null; this.engineIdentity = null; this.allowProjectEdits = false; this.historyWarning = '';
+    this.engine = null; this.gateway = null; this.engineIdentity = null; this.allowProjectEdits = false; this.approveAll = false; this.historyWarning = '';
     this.taskRules = new Set(); this.approvals = new Map();
     this.runUser = null; this.runText = new Map(); this.runRoles = new Map(); this.runSteps = new Map(); this.runPrice = null; this.questions = new Map(); this.closedQuestions = new Set();
     // Ændringer og Aktivitet for denne samtale, så længe appen er åben: udgangspunkt, afsluttede opgaver og loggen.
@@ -224,9 +224,7 @@ class ChatSession {
     const autoCommandsSnapshot = !['chat', 'plan'].includes(mode) && approvalSettings.autoCommands === true;
     const commandSupport = !['chat', 'plan'].includes(mode) ? await require('./command-sandbox.cjs').support() : { available: false };
     if (autoCommandsSnapshot && !commandSupport.available) throw new Error(commandSupport.reason);
-    // En husket kommando på en platform uden isolation må kun spørge igen. Den må
-    // hverken starte automatisk eller blokere almindelige filopgaver i projektet.
-    const commandIsolation = commandSupport.available && (autoCommandsSnapshot || approvalSettings.rules.some(rule => rule.kind === 'bash'));
+    const commandIsolation = commandIsolationFor({ support: commandSupport, autoCommandsSnapshot, approveAll: this.approveAll === true });
     const startup = settings.startup || null, autoCheckpoint = settings.autoCheckpoint === true;
     const disclosure = connections.disclosure(selection.connection, selection.model, selection.route);
     disclosure.projectChoices = startup ? `Hostingønske: ${startup.hosting || 'beslut senere'}. Teststrategi: ${startup.tests}. Ønsker er ikke en deploymentgodkendelse.` : 'Ingen ekstra opstartsvalg.';
@@ -390,9 +388,9 @@ class ChatSession {
       // Automatiske versioner kræver både projektets valg og funktionen Versioner og fortryd.
       if (!this.copy) bench.checkpointOwner = this;
       await this.checkpoints.begin(projectRoot, !this.copy && prepared.autoCheckpoint === true && prepared.context.features.versioner === true && !['chat', 'plan'].includes(prepared.mode), input.text); checkStopped();
-      if (this.engineIdentity !== (prepared.disclosure.sessionFingerprint || prepared.disclosure.fingerprint) || !this.engine?.active || prepared.commandIsolation) {
+      if (engineRestartNeeded({ identityChanged: this.engineIdentity !== (prepared.disclosure.sessionFingerprint || prepared.disclosure.fingerprint), engineActive: Boolean(this.engine?.active), engineSandbox: this.engineSandbox === true, sandboxNext: Boolean(prepared.commandIsolation) })) {
         await this.close(false); await bench.closeOthers(this); checkStopped();
-        this.commandSandbox = prepared.commandIsolation ? await require('./command-sandbox.cjs').prepare({ workspaceRoot: this.root, scratchRoot: this.scratchRoot, directory: path.join(bench.store.root, 'sandboxes', bench.store.projectKey(projectRoot), this.id, this.task.id + '-policy') }) : null;
+        this.commandSandbox = prepared.commandIsolation ? await require('./command-sandbox.cjs').prepare({ workspaceRoot: this.root, scratchRoot: scratchAllowedRoot(this.root), directory: path.join(bench.store.root, 'sandboxes', bench.store.projectKey(projectRoot), this.id, 'policy') }) : null;
         checkStopped();
         const key = bench.store.decrypt(prepared.connection);
         const gateway = await startGateway(prepared.connection, prepared.model, key, prepared.route, (message, failure) => {
@@ -408,7 +406,7 @@ class ChatSession {
         const resume = this.data.opencode?.fingerprint === (prepared.disclosure.sessionFingerprint || prepared.disclosure.fingerprint) ? this.data.opencode.session : null;
         this.engine = bench.engineFactory({ root: this.root, directory: path.join(bench.store.root, 'runtime', bench.store.projectKey(this.root)), provider, model: prepared.model, references: prepared.references, mode: prepared.mode, skills: prepared.context.skills, resume, sandbox: this.commandSandbox, tempRoot: path.join(this.root, '.aura', 'tmp'), onEvent: event => { if (this.engine === instance) this.event(event); } });
         const instance = this.engine;
-        await this.engine.start(); checkStopped(); this.engineIdentity = (prepared.disclosure.sessionFingerprint || prepared.disclosure.fingerprint);
+        await this.engine.start(); checkStopped(); this.engineIdentity = (prepared.disclosure.sessionFingerprint || prepared.disclosure.fingerprint); this.engineSandbox = Boolean(prepared.commandIsolation);
         this.engineConversation = this.engine.resumed ? this.data.opencode?.conversation || '' : prepared.disclosure.conversation || '';
         const opencode = { session: this.engine.session?.id || null, fingerprint: (prepared.disclosure.sessionFingerprint || prepared.disclosure.fingerprint), ...(this.engineConversation ? { conversation: this.engineConversation } : {}) };
         if (opencode.session) this.data = await bench.history.updateChat(projectRoot, this.id, data => { data.opencode = opencode; }).catch(() => this.data);
@@ -631,7 +629,7 @@ class ChatSession {
     if (relative.split(/[\\/]/).includes('.git') || /(^|[\\/])\.env|\.(key|pem)$/i.test(relative)) return null;
     return relative.split(path.sep).join('/');
   }
-  approvalContext() { return { projectRoot: this.project.root, workspaceRoot: this.root, mode: this.runMode || this.prepared?.mode || 'chat', scratchRoot: this.scratchRoot, commandSandbox: Boolean(this.prepared?.commandIsolation && this.commandSandbox && this.engine?.sandbox === this.commandSandbox), commandSandboxSupported: this.prepared?.commandSandboxSupported === true, autoCommandsSnapshot: this.prepared?.autoCommandsSnapshot === true, taskRules: this.taskRules }; }
+  approvalContext() { return { projectRoot: this.project.root, workspaceRoot: this.root, mode: this.runMode || this.prepared?.mode || 'chat', scratchRoot: scratchAllowedRoot(this.root), commandSandbox: Boolean(this.prepared?.commandIsolation && this.commandSandbox && this.engine?.sandbox === this.commandSandbox), commandSandboxSupported: this.prepared?.commandSandboxSupported === true, autoCommandsSnapshot: this.prepared?.autoCommandsSnapshot === true, taskRules: this.taskRules }; }
   async permissionAsked(event) {
     const engine = this.engine, generation = this.generation, context = this.approvalContext();
     const source = event.properties || {}, request = engine?.pending?.get(source.id), part = source.tool?.callID ? [...(this.runTools?.values() || [])].find(item => item.callID === source.tool.callID) : null;
@@ -656,6 +654,12 @@ class ChatSession {
       } catch { /* Vis godkendelsen, hvis den automatiske kvittering ikke kunne sendes. */ }
     }
     if (!current()) return;
+    if (approveAllApplies(this.approveAll, descriptor)) {
+      await engine.reply(p.id, true); this.approvals.delete(p.id);
+      this.log({ id: `approval-${p.id}`, kind: 'approval', title: approvalTitles[p.permission] || descriptor.label, target: descriptor.target, status: 'auto', started: Date.now(), ended: Date.now(), task: this.task?.id });
+      this.emit({ type: 'permission.auto', file: descriptor.projectFile ? this.projectEdit(p) : undefined, policy: descriptor, source: 'approve-all' });
+      return;
+    }
     if (refusesOutsideWrite(context, p, descriptor)) {
       // Ingen kort i Byg: AI'en får besked om at skrive i projektmappen eller .aura/tmp i stedet.
       await engine.reply(p.id, false, 'Skriv ikke uden for projektmappen i Byg. Brug mappen .aura/tmp/' + this.task.id + ' til midlertidige filer.');
@@ -665,7 +669,7 @@ class ChatSession {
     }
     this.waiting = true; this.bench.chatsChanged();
     this.log({ id: `approval-${p.id}`, kind: 'approval', permission: p.permission, title: approvalTitles[p.permission] || 'Godkendelse', target: approvalTarget(p, this.root), status: 'waiting', started: Date.now(), task: this.task?.id });
-    this.emit({ ...event, properties: { ...p, policy: descriptor } });
+    this.emit({ ...event, properties: { ...p, policy: { ...descriptor, approveAllAvailable: Boolean(this.commandSandbox) } } });
   }
   event(event) {
     const p = event.properties || {}, bench = this.bench, owner = (this.copy || bench.checkpointOwner === this);
@@ -777,7 +781,8 @@ class ChatSession {
   async reply(input) {
     if (!this.engine) throw new Error('Ingen aktiv agent.');
     const ids = input.ids || [input.id], scope = input.scope || 'once';
-    if (!Array.isArray(ids) || !ids.length || ids.length > 100 || ids.some(id => typeof id !== 'string') || new Set(ids).size !== ids.length || !['once', 'task', 'project'].includes(scope)) throw new Error('Ugyldig godkendelse.');
+    if (!Array.isArray(ids) || !ids.length || ids.length > 100 || ids.some(id => typeof id !== 'string') || new Set(ids).size !== ids.length || !['once', 'task', 'project', 'chat'].includes(scope)) throw new Error('Ugyldig godkendelse.');
+    if (input.allow === true && scope === 'chat' && !this.commandSandbox) throw new Error('Godkend alt kræver kommandosandkassen.');
     const records = ids.map(id => this.approvals.get(id));
     const valid = (record, id) => this.running && record && record.engine === this.engine && record.generation === this.generation && !this.runStopped && this.engine.pending.get(id) === record.request;
     for (let i = 0; i < records.length; i++) {
@@ -788,7 +793,7 @@ class ChatSession {
       if (i && descriptor.key !== records[0].descriptor.key) throw new Error('Handlingerne skal godkendes hver for sig.');
     }
     const message = input.allow !== true && typeof input.message === 'string' ? input.message.trim().slice(0, 2000) : '';
-    if (input.allow === true && scope !== 'once') {
+    if (input.allow === true && scope !== 'once' && scope !== 'chat') {
       const descriptor = await this.bench.approvalsPolicy.grant(records[0].context, records[0].p, { scope, fingerprint: records[0].descriptor.fingerprint, ...(input.folder !== undefined ? { folder: input.folder } : {}) });
       if (descriptor.fingerprint !== records[0].descriptor.fingerprint) throw new Error('Handlingen er ændret. Gennemgå godkendelsen igen.');
       if (scope === 'task') this.allowProjectEdits = true;
@@ -800,6 +805,7 @@ class ChatSession {
       await record.engine.reply(id, input.allow === true, message); this.approvals.delete(id);
       this.log({ id: `approval-${id}`, status: input.allow !== true ? (message ? 'corrected' : 'rejected') : scope === 'task' ? 'allowed-task' : scope === 'project' ? 'allowed-project' : 'allowed', ended: Date.now(), ...(message ? { detail: `Din besked: ${message}` } : {}) });
     }
+    if (input.allow === true && scope === 'chat') this.approveAll = true;
     this.waiting = this.approvals.size > 0 || this.questions.size > 0; this.bench.chatsChanged();
   }
   // Svar på AI'ens spørgsmål. Svarene sendes til motoren og kommer i briefen med spørgsmålets korte overskrift.
@@ -849,12 +855,22 @@ class ChatSession {
       await this.bench.history.queue;
     }
     const engine = this.engine, gateway = this.gateway;
-    this.engine = null; this.gateway = null; this.engineIdentity = null; this.contextUsage.bind(null);
+    this.engine = null; this.gateway = null; this.engineIdentity = null; this.engineSandbox = false; this.contextUsage.bind(null);
     await engine?.close(); await gateway?.close();
     if (reset) { this.running = false; this.prepared = null; }
   }
 }
 // AI'ens arbejdsfiler ligger i projektmappen under .aura/tmp/<opgave>, så de følger projektet (beslutning for beta 2).
+// Sandkassen tændes af projektets automatiske kørsel eller af «Godkend alt i denne samtale». En husket kommando gør det ikke
+// for projektets øvrige opgaver (beslutning for beta 2). Uden understøttet sandkasse tændes den aldrig.
+// Motoren genstartes kun ved ændret identitet, ved en stoppet motor eller ved skift i sandkassens tilstand (årsag 4).
+function engineRestartNeeded({ identityChanged, engineActive, engineSandbox, sandboxNext }) { return identityChanged === true || engineActive !== true || (engineSandbox === true) !== (sandboxNext === true); }
+// AI'ens fælles arbejdsrod i projektet. Sandkassen og godkendelserne bruger den, så de ikke skifter mellem opgaver.
+function scratchAllowedRoot(root) { return path.join(root, '.aura', 'tmp'); }
+function commandIsolationFor({ support, autoCommandsSnapshot, approveAll }) { return Boolean(support?.available && (autoCommandsSnapshot || approveAll)); }
+// «Godkend alt i denne samtale» automatiserer kort med et match, men aldrig låste handlinger (beskyttede filer og
+// handlinger i Planlæg eller Samtale). Det laver ingen vedvarende regel (beslutning for beta 2).
+function approveAllApplies(approveAll, descriptor) { return approveAll === true && Boolean(descriptor?.match) && descriptor.blockedMode !== true; }
 function scratchRootFor(root, taskId) { return path.join(root, '.aura', 'tmp', String(taskId)); }
 function scratchInstruction(taskId) { return '\nAI-filer til denne opgave ligger i .aura/tmp/' + taskId + ' i projektmappen. Brug kun den mappe; den hører til netop denne opgave.'; }
-module.exports = { composeAppContext, ChatSession, planningReply, sessionFailure, emptyUsage, addStep, scratchRootFor, scratchInstruction };
+module.exports = { composeAppContext, ChatSession, planningReply, sessionFailure, emptyUsage, addStep, scratchRootFor, scratchInstruction, commandIsolationFor, approveAllApplies, engineRestartNeeded, scratchAllowedRoot };

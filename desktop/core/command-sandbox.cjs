@@ -11,6 +11,9 @@ const unpacked = file => file.replace(/app\.asar([/\\])/, 'app.asar.unpacked$1')
 const runnerPath = () => unpacked(path.join(__dirname, 'command-sandbox-runner.mjs'));
 const quote = value => "'" + String(value).replaceAll("'", "'\\''") + "'";
 const contains = (root, target) => { const relative = path.relative(root, target); return relative === '' || (!relative.startsWith('..' + path.sep) && relative !== '..' && !path.isAbsolute(relative)); };
+// Systemets læsbare mapper på macOS. Command Line Tools læses, så git virker; hele /Library/Developer gives ikke,
+// og intet af det kan skrives.
+const DARWIN_SYSTEM_READ = ['/bin', '/sbin', '/usr/bin', '/usr/sbin', '/usr/lib', '/usr/share', '/System/Library', '/Library/Apple', '/Library/Developer/CommandLineTools', '/private/etc/ssl', '/private/etc/resolv.conf', '/private/etc/hosts', '/private/etc/localtime'];
 async function nodePath() {
   const bundled = require('./runtime.cjs').get();
   const prepared = path.join(__dirname, '..', '.runtime', `${process.platform}-${process.arch}`, 'node', 'bin', 'node');
@@ -39,7 +42,7 @@ async function prepare({ workspaceRoot, scratchRoot, directory }) {
   await fs.mkdir(home, { recursive: true, mode: 0o700 }); await fs.mkdir(temp, { recursive: true, mode: 0o700 });
   const literal = value => ({ path: value, literal: true });
   const systemRead = process.platform === 'darwin'
-    ? ['/bin', '/sbin', '/usr/bin', '/usr/sbin', '/usr/lib', '/usr/share', '/System/Library', '/Library/Apple', '/private/etc/ssl', '/private/etc/resolv.conf', '/private/etc/hosts', '/private/etc/localtime']
+    ? DARWIN_SYSTEM_READ
     : ['/bin', '/sbin', '/usr/bin', '/usr/sbin', '/usr/lib', '/usr/lib64', '/lib', '/lib64', '/usr/share', '/etc/ssl', '/etc/resolv.conf', '/etc/hosts', '/etc/localtime'];
   // Runtimefilerne er læsbare, men brugerens hjem, appdata og øvrige projekter er ikke.
   const runtimeRoot = path.dirname(path.dirname(node));
@@ -58,4 +61,4 @@ async function prepare({ workspaceRoot, scratchRoot, directory }) {
   await fs.writeFile(pluginPath, source, { mode: 0o600 });
   return { pluginURL: pathToFileURL(pluginPath).href, policyPath, identity, readyPath, readyToken, node, runner: runnerPath(), workspaceRoot: root, scratchRoot: scratch };
 }
-module.exports = { support, prepare, PACKAGE_HOSTS, contains, nodePath };
+module.exports = { support, prepare, PACKAGE_HOSTS, contains, nodePath, DARWIN_SYSTEM_READ };
