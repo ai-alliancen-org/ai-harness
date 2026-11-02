@@ -738,6 +738,7 @@ const previewLog = { documents: [], errors: [] };
 const previewOrigin = () => currentSpace().preview?.url || (currentSpace().externalPreview ? new URL(currentSpace().externalPreview).origin + '/' : null);
 function fromPreview(url) { const origin = previewOrigin(); return Boolean(origin && typeof url === 'string' && url.startsWith(origin)); }
 function remember(list, entry) { list.push(entry); while (list.length > 50) list.shift(); }
+const { previewNoteFor } = require('./core/preview-note.cjs');
 handle('preview:check', input => {
   if (!currentProject()) throw new Error('Åbn et projekt først.');
   const since = Number(input?.since) || 0, origin = previewOrigin();
@@ -746,6 +747,7 @@ handle('preview:check', input => {
   const last = documents.at(-1) || null;
   const result = { preview: true, loaded: Boolean(last), status: last?.status || null, errors: errors.slice(0, 5).map(({ message, source, line }) => ({ message, source, line })), errorCount: errors.length };
   const shown = !last ? 'siden svarede ikke' : last.status >= 400 ? `siden svarede med fejl ${last.status}` : 'siden blev vist';
+  currentChat()?.setPreviewNote(previewNoteFor(result));
   workbench.log({ kind: 'check', title: 'Kontrol af forhåndsvisningen', detail: `${shown[0].toUpperCase()}${shown.slice(1)} · ${errors.length ? `${errors.length} ${errors.length === 1 ? 'fejl' : 'fejl'} i siden: ${errors[0].message}` : 'ingen fejl i konsollen'}. Aura har ikke klikket eller afprøvet funktioner.`, status: !last || last.status >= 400 || errors.length ? 'error' : 'completed' }, requestChatID());
   return result;
 });
