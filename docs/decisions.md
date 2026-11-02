@@ -745,3 +745,8 @@ Brugeren har delegeret disse valg til Claude og vil have dem ændret, hvis de vi
 - **Design- og netlisten for nye projekter er standard**: Tailwind, webskrifter og eksterne billeder fra de sædvanlige CDN-værter (cdn.tailwindcss.com, cdn.jsdelivr.net, unpkg.com, cdnjs.cloudflare.com, fonts.googleapis.com, fonts.gstatic.com) og https-billeder. Eksisterende projekters netlister bevares. Subresource integrity kræves ikke i beta-2.
 - **Grænse for godkendelseskort**: højst fem kort pr. opgave, før resterende godkendelser samles i ét kort. Prøven i trin 13 bruger denne grænse.
 - **Komplais adressekontrol og interval** afgøres af brugeren og er ikke truffet her.
+- **AI-arbejdsfiler ligger i `<projekt>/.aura/tmp/<opgave>`** og er TMPDIR, TEMP og TMP for AI'ens kommandoer. Mappen følger projektet, så den findes også efter en genstart.
+- **Én motor pr. samtale**, ikke pr. opgave, så mappen ikke tvinger en genstart for hver opgave.
+- **`.aura/tmp` holdes ude af Git, Ændringer, versioner og kopier.**
+- **Skrivning uden for projektet nægtes i Byg** med en besked til AI'en uden godkendelseskort. `.aura/tmp` er AI'ens egen mappe og er ikke omfattet af nægtelsen.
+- **Ordlyden på kortene** er «Må AI'en skrive i en mappe uden for projektet?» og «Må AI'en se en mappe uden for projektet?».
