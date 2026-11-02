@@ -751,3 +751,11 @@ Brugeren har delegeret disse valg til Claude og vil have dem ændret, hvis de vi
 - **Skrivning uden for projektet nægtes i Byg** med en besked til AI'en uden godkendelseskort. `.aura/tmp` er AI'ens egen mappe og er ikke omfattet af nægtelsen.
 - **Ordlyden på kortene** er «Må AI'en skrive i en mappe uden for projektet?» og «Må AI'en se en mappe uden for projektet?».
 - **Forbigående udbyderfejl (408, 429 og 5xx) videresendes til OpenCode, som genforsøger**, og Aura låser ikke forbindelsen. Det er i overensstemmelse med OpenCodes egen SDK, som markerer 408, 429 og 5xx som gen-forsøgbare og læser Retry-After. Risiko: SDK'en markerer også 409 som gen-forsøgbar, og Aura returnerer 409, når forbindelsen er låst. Det skal måles i den ende-til-ende-prøve, før beta-2 udgives.
+- **Netadgang i kommandosandkassen er uændret**: npm, pypi og files.pythonhosted.org, og ingen lokal binding. Designets CDN-kilder (trin 8) gælder kun forhåndsvisningens side, ikke kommandoer.
+- **En husket kommando tænder ikke sandkassen for projektets øvrige opgaver.** Sandkassen tændes kun af det, der står i projektets indstillinger, eller af «Godkend alt». Det erstatter den nuværende adfærd i chat-session.cjs:228.
+- **«Godkend alt» hedder «Godkend alt i denne samtale»** og viser denne advarsel: AI'en må køre kommandoer, ændre filer og hente fra nettet i denne samtale uden at spørge igen, også uden for projektmappen. Brug det kun, hvis du stoler på opgaven.
+- **«Godkend alt» gælder over projektmappens grænse, også for filer uden for projektet.** Det står i konflikt med `decisions.md:387`, som siger, at filer uden for projektet spørger hver gang. Den nyere beslutning om «Godkend alt» (linjen om «Godkendelse: Godkend alt er et udtrykkeligt valg pr. samtale») har forrang for den for denne ene valgmulighed.
+- **Gating**: «Godkend alt» vises kun, når kommandosandkassen er aktiv, og aldrig på Windows, hvor sandkassen ikke findes endnu.
+- **En husket kommando matcher præcis kommando og mappe** som i dag. Kategorier og præfikser kommer ikke i beta-2.
+- **Den delte npm-cache er ikke med i beta-2**; den hører til en senere runde.
+- **/Library/Developer/CommandLineTools må læses i sandkassen**, fordi git uden det ikke kan køre. Det er kun læsning, og skrivning dertil er fortsat forbudt.
