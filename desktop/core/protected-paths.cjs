@@ -1,6 +1,7 @@
 // One trusted name policy; callers retain their own realpath, content and consent checks.
 const RULES = Object.freeze({
-  credentials: Object.freeze(['.ssh', '.aws', '.gnupg', '.kube', '.azure', '.npmrc', '.pypirc', '.env*', '*.env', '*.env.*', '*.env*', '*.key', '*.pem', '*.p12', '*.pfx', '*credentials*', '*secrets*']),
+  credentials: Object.freeze(['.ssh', '.aws', '.gnupg', '.kube', '.azure', '.npmrc', '.pypirc', '.env*', '*.env', '*.env.*', '*.env*', '*.key', '*.pem', '*.p12', '*.pfx', '*credentials*', 'secrets', '.secrets', 'secrets.*']),
+  // "secrets" er navnet på en hemmelighedsmappe eller -fil, ikke en delstreng: SecretsPage.jsx og useSecrets.js er almindelig kode.
   metadata: Object.freeze(['.git', '.aura-private']),
   references: Object.freeze(['references'])
 });
