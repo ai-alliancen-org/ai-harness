@@ -69,8 +69,10 @@ function priceFor(connection, model, route = null) {
 }
 function knownPrice(kind, id) { const found = knownPrices.find(([provider, pattern]) => provider === kind && pattern.test(id)); return found ? { input: found[2], output: found[3], source: priceSources[kind], checkedAt: definitions[kind].checkedAt, ...found[4] } : null; }
 const usd = value => value.toLocaleString('da-DK', { maximumFractionDigits: 2 });
+// En lokal adresse som localhost:11434 er uden http:// den mest almindelige kopiering fra en vejledning.
+function withScheme(value) { return typeof value === 'string' && !/^[a-z][a-z0-9+.-]*:\/\//i.test(value.trim()) && /^(?:localhost|127\.\d+\.\d+\.\d+|\[::1\])(?::\d+)?(?:\/|$)/i.test(value.trim()) ? 'http://' + value.trim() : value; }
 function endpoint(value) {
-  let url; try { url = new URL(value); } catch { throw new Error('Angiv en fuld serveradresse med http:// eller https://.'); }
+  let url; try { url = new URL(withScheme(value)); } catch { throw new Error('Angiv en fuld serveradresse med http:// eller https://.'); }
   if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.search || url.hash) throw new Error('Serveradressen må ikke indeholde login, parametre eller fragmenter.');
   return url.href.replace(/\/$/, '');
 }
@@ -119,10 +121,14 @@ function cleanKey(raw, kind, { strict = false } = {}) {
     strip(/^authorization\s*:\s*/i, 'Authorization foran');
     // Kun navne som i en .env-fil, fx CORTI_API_KEY=. En base64-nøgle med = til sidst rammes ikke.
     strip(/^(?:export\s+)?[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\s*=\s*/, 'navn foran');
+    strip(/^(?:x-)?api-key\s*:\s*/i, 'api-key foran');
+    strip(/^(?:api[_-]?key|apikey|access[_-]?token|token|key)\s*[=:]\s*/i, 'navn foran');
     strip(/^bearer\s+/i, 'Bearer foran');
     const quoted = QUOTED.exec(key);
     if (quoted) { key = quoted[2]; changes.add('anførselstegn'); }
   }
+  // En udbyder, der ikke kræver en nøgle (fx en lokal model), accepterer et tomt felt.
+  if (!key && definitions[kind]?.keyRequired === false) return { key: '', changes: [...changes] };
   if (!key) throw keyError('Feltet er tomt. Sæt nøglen ind fra udbyderens side.');
   if (/\s/.test(key)) throw keyError('Nøglen har mellemrum inde i sig. Kopiér den igen med kopiér-knappen hos udbyderen.');
   if (strict ? /[^\x21-\x7e]/.test(key) : /[\x00-\x1f\x7f]|[^\x00-\xff]/.test(key)) throw keyError('Nøglen indeholder tegn, der ikke hører til en API-nøgle, fx typografiske tegn. Kopiér den igen med kopiér-knappen hos udbyderen.');
@@ -152,7 +158,7 @@ function normalize(input) {
   assertSupported(input);
   const def = definitions[input.kind];
   const key = input.apiKey ? cleanKey(input.apiKey, input.kind).key : '';
-  const baseURL = input.kind === 'azure' ? azureEndpoint(input.baseURL) : endpoint(['compatible', 'ollama'].includes(input.kind) ? input.baseURL : input.kind === 'corti' && key ? cortiEndpoint(key) : def.baseURL);
+  const baseURL = input.kind === 'azure' ? azureEndpoint(input.baseURL) : input.kind === 'ollama' ? ollamaEndpoint(input.baseURL) : endpoint(['compatible', 'ollama'].includes(input.kind) ? input.baseURL : input.kind === 'corti' && key ? cortiEndpoint(key) : def.baseURL);
   if (typeof input.name !== 'string' || !input.name.trim() || input.name.length > 100) throw new Error('Angiv et forbindelsesnavn på højst 100 tegn.');
   const extra = {};
   if (input.kind === 'azure') {
@@ -162,9 +168,12 @@ function normalize(input) {
   }
   return { id: input.id || randomUUID(), name: input.name.trim(), kind: input.kind, baseURL, ...extra };
 }
+function ollamaEndpoint(value) { const url = endpoint(value); return new URL(url).pathname === '/' ? url + '/v1' : url; }
 function azureEndpoint(value) {
-  const url = new URL(endpoint(value));
-  if (url.protocol !== 'https:' || url.port || !/^[a-z0-9-]+\.(openai\.azure\.com|services\.ai\.azure\.com)$/.test(url.hostname) || !['/', '/openai/v1'].includes(url.pathname)) throw new Error('Brug ressourcens HTTPS-adresse fra Azure OpenAI eller Foundry, fx https://mit-projekt.openai.azure.com.');
+  // En fuld adresse fra Azure (med sti og api-version) indeholder ressourcens adresse. Kun den bruges; login i adressen afvises stadig.
+  let url; try { url = new URL(value); } catch { throw new Error('Brug ressourcens HTTPS-adresse fra Azure OpenAI eller Foundry, fx https://mit-projekt.openai.azure.com.'); }
+  if (url.username || url.password) throw new Error('Serveradressen må ikke indeholde login, parametre eller fragmenter.');
+  if (url.protocol !== 'https:' || url.port || !/^[a-z0-9-]+\.(openai\.azure\.com|services\.ai\.azure\.com)$/.test(url.hostname)) throw new Error('Brug ressourcens HTTPS-adresse fra Azure OpenAI eller Foundry, fx https://mit-projekt.openai.azure.com.');
   return `${url.origin}/openai/v1`;
 }
 // Udbyderne oplyser billedstøtte tre forskellige steder. Står den ingen af dem, er den ikke oplyst.
