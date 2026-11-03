@@ -8,7 +8,6 @@ const os = require('node:os');
 const path = require('node:path');
 const chat = require('../core/chat-session.cjs');
 const { isolatedEnv } = require('../core/engine.cjs');
-const { ApprovalsPolicy, refusesOutsideWrite } = require('../core/approvals-policy.cjs');
 
 test('AI-arbejdsfilerne ligger i projektets .aura/tmp under opgavens id', () => {
   assert.equal(typeof chat.scratchRootFor, 'function', 'scratchRootFor skal være eksporteret');
@@ -23,26 +22,25 @@ test('systemprompten peger på den relative mappe og ikke på en absolut sti', (
   assert.doesNotMatch(tekst, /appdata|\/Users\//i, 'ingen appdata- eller brugersti');
 });
 
-test('motoren bruger AI-mappen som TEMP, TMP og TMPDIR, ikke systemets temp-mappe', () => {
-  const mappe = path.join('/projekt', '.aura', 'tmp');
-  const env = isolatedEnv('/appdata/runtime', {}, 'kode', { commandIsolation: false, tempRoot: mappe });
-  assert.equal(env.TMPDIR, mappe);
-  assert.equal(env.TEMP, mappe);
-  assert.equal(env.TMP, mappe);
+test('motorprocessen har sin egen temp-mappe i appdata, ikke i projektet', () => {
+  const env = isolatedEnv('/appdata/runtime', {}, 'kode', { commandIsolation: false });
+  assert.equal(env.TMPDIR, path.join('/appdata/runtime', 'tmp'));
+  assert.equal(env.TEMP, env.TMPDIR); assert.equal(env.TMP, env.TMPDIR);
 });
 
-test('i Byg nægtes skrivning uden for projektet, og i Planlæg og Samtale gør den ikke det', async t => {
-  const rod = await fs.mkdtemp(path.join(os.tmpdir(), 'aura-skriv-'));
+test('opgavestart: .aura/tmp får en .gitignore, der ignorerer alt, og links afvises', async t => {
+  const rod = await fs.mkdtemp(path.join(os.tmpdir(), 'aura-scratch-'));
   t.after(() => fs.rm(rod, { recursive: true, force: true }));
-  const projekt = path.join(rod, 'projekt'), udenfor = path.join(rod, 'ekstern');
-  await fs.mkdir(projekt); await fs.mkdir(udenfor);
-  const politik = new ApprovalsPolicy({ project: async () => ({ approvals: null }) });
-  const p = { id: 'p1', permission: 'external_directory', patterns: [udenfor + '/*'], metadata: { filepath: path.join(udenfor, 'a.txt'), parentDir: udenfor }, toolInput: { tool: 'write' } };
-  const i_byg = { projectRoot: projekt, workspaceRoot: projekt, mode: 'build' };
-  const i_planlaeg = { ...i_byg, mode: 'plan' };
-  const beskrivelse = await politik.describe(i_byg, p);
-  assert.equal(refusesOutsideWrite(i_byg, p, beskrivelse), true, 'Byg skal afvise skrivning uden for projektet');
-  assert.equal(refusesOutsideWrite(i_planlaeg, p, await politik.describe(i_planlaeg, p)), false, 'Planlæg er ikke omfattet af nægtelsen her');
+  const projekt = path.join(rod, 'projekt'); await fs.mkdir(projekt);
+  await chat.prepareScratch(projekt, chat.scratchRootFor(projekt, 'op-1'));
+  assert.equal(await fs.readFile(path.join(projekt, '.aura', 'tmp', '.gitignore'), 'utf8'), '*\n');
+  assert.ok((await fs.stat(chat.scratchRootFor(projekt, 'op-1'))).isDirectory());
+  const ekstern = path.join(rod, 'ekstern'); await fs.mkdir(ekstern);
+  const andet = path.join(rod, 'andet'); await fs.mkdir(path.join(andet, '.aura'), { recursive: true });
+  await fs.symlink(ekstern, path.join(andet, '.aura', 'tmp'));
+  await assert.rejects(chat.prepareScratch(andet, chat.scratchRootFor(andet, 'op-1')), /almindelig mappe/);
+  const tredje = path.join(rod, 'tredje'); await fs.mkdir(tredje); await fs.symlink(ekstern, path.join(tredje, '.aura'));
+  await assert.rejects(chat.prepareScratch(tredje, chat.scratchRootFor(tredje, 'op-1')), /almindelig mappe/);
 });
 
 test('kortet siger skrive, når AI\'en skriver i en mappe uden for projektet, og se, når den læser', () => {

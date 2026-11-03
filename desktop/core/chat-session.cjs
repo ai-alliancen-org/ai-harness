@@ -17,7 +17,6 @@ const { projectInstructions, instructionText } = require('./project-instructions
 const { guidanceFor, appRules } = require('./project-guidance.cjs');
 const { startGateway } = require('./gateway.cjs');
 const { toolEntry, toolFiles, approvalTarget, approvalTitles } = require('./activity.cjs');
-const { refusesOutsideWrite } = require('./approvals-policy.cjs');
 const { taskSummary, sessionSummary, fileDetail, sessionAttribution, hash } = require('./change-review.cjs');
 const projectFiles = require('./project-files.cjs');
 const { materialText, materialSummary } = require('./chat-materials.cjs');
@@ -269,14 +268,15 @@ class ChatSession {
     const { planContext, conversation, historyIncluded, fileReferences, fileReferenceText, previewReference, previewReferenceText, brief: briefContext, workspace: localWorkspace, effort: chosenEffort, effortLevels, ...consent } = disclosure;
     // Grundregler, skills og funktioner indgår, så en ændring starter en ny modelsession med de nye instruktioner.
     disclosure.fingerprint = crypto.createHash('sha256').update(JSON.stringify(consent) + JSON.stringify({ connectionRevision: selection.connection.revision || null, rules: context.rules, skills: context.skills, features: context.features, projectInstructions: context.projectInstructions, surface: bench.surface, autoCheckpoint, commandIsolation, autoCommandsSnapshot })).digest('hex');
+    // Motorens identitet er adskilt fra fingeraftrykket til gennemgangen, så en ændret startside ikke starter en ny AI-session.
+    disclosure.sessionFingerprint = engineIdentityOf(disclosure, { connectionRevision: selection.connection.revision || null, rules: context.rules, skills: context.skills, features: context.features, projectInstructions: context.projectInstructions, surface: bench.surface, autoCheckpoint, commandIsolation, autoCommandsSnapshot });
     // Resuméet før afsendelse vises igen, når modtager, model, vilkår, pris eller delt materiale ændrer sig. Skift fra plan til byg er ikke en ny modtager.
     Object.assign(disclosure, modelConsent.review(selection.connection.id, disclosure, settings, context.projectInstructions?.hash));
     if (chatMaterials) {
       // En vedhæftning gælder én besked, så gennemgangen kan ikke genbruges: fingeraftrykket er nyt hver gang.
       // Modelsessionen følger stadig det oprindelige fingeraftryk, så en vedhæftning ikke starter en ny AI-session.
-      disclosure.sessionFingerprint = disclosure.fingerprint;
       disclosure.chatMaterials = chatMaterials;
-      disclosure.fingerprint = crypto.createHash('sha256').update(JSON.stringify([disclosure.sessionFingerprint, chatMaterials.sha256, crypto.randomUUID()])).digest('hex');
+      disclosure.fingerprint = crypto.createHash('sha256').update(JSON.stringify([disclosure.fingerprint, chatMaterials.sha256, crypto.randomUUID()])).digest('hex');
       disclosure.accepted = false;
     }
     disclosure.modelName = selection.model.name || selection.model.id;
@@ -380,7 +380,7 @@ class ChatSession {
     try {
       await bench.allocate(this); checkStopped(); this.task.root = this.root;
       this.scratchRoot = scratchRootFor(this.root, this.task.id);
-      await fs.mkdir(this.scratchRoot, { recursive: true, mode: 0o700 }); checkStopped();
+      await prepareScratch(this.root, this.scratchRoot); checkStopped();
       this.runBefore = await capture(this.root); checkStopped();
       // Billede af forhåndsvisningen før opgaven. Det må højst forsinke starten lidt; uden billede fortsætter opgaven.
       if (prepared.view && !['chat', 'plan'].includes(prepared.mode) && bench.imageHook) {
@@ -667,13 +667,6 @@ class ChatSession {
       this.emit({ type: 'permission.auto', file: descriptor.projectFile ? this.projectEdit(p) : undefined, policy: descriptor, source: 'approve-all' });
       return;
     }
-    if (refusesOutsideWrite(context, p, descriptor)) {
-      // Ingen kort i Byg: AI'en får besked om at skrive i projektmappen eller .aura/tmp i stedet.
-      await engine.reply(p.id, false, 'Skriv ikke uden for projektmappen i Byg. Brug mappen .aura/tmp/' + this.task.id + ' til midlertidige filer.');
-      this.approvals.delete(p.id);
-      this.log({ id: `approval-${p.id}`, kind: 'approval', permission: p.permission, title: 'Skrivning uden for projektet er ikke tilladt i Byg', target: approvalTarget(p, this.root), status: 'rejected', ended: Date.now(), task: this.task?.id });
-      return;
-    }
     this.waiting = true; this.bench.chatsChanged();
     this.log({ id: `approval-${p.id}`, kind: 'approval', permission: p.permission, title: approvalTitles[p.permission] || 'Godkendelse', target: approvalTarget(p, this.root), status: 'waiting', started: Date.now(), task: this.task?.id });
     this.emit({ ...event, properties: { ...p, policy: { ...descriptor, approveAllAvailable: Boolean(this.commandSandbox) } } });
@@ -878,6 +871,24 @@ function commandIsolationFor({ support, autoCommandsSnapshot, approveAll }) { re
 // «Godkend alt i denne samtale» automatiserer kort med et match, men aldrig låste handlinger (beskyttede filer og
 // handlinger i Planlæg eller Samtale). Det laver ingen vedvarende regel (beslutning for beta 2).
 function approveAllApplies(approveAll, descriptor) { return approveAll === true && Boolean(descriptor?.match) && descriptor.blockedMode !== true; }
+// .aura og .aura/tmp må ikke være links (et projekt hentet udefra kunne ellers pege dem ud af projektet), og .aura/tmp holdes
+// ude af Git, versioner og udgivelser med en .gitignore, der ignorerer alt, også sig selv (beslutning for beta 2).
+async function prepareScratch(root, scratchRoot) {
+  const tmp = path.join(root, '.aura', 'tmp');
+  for (const folder of [path.join(root, '.aura'), tmp]) {
+    const stat = await fs.lstat(folder).catch(() => null);
+    if (stat && (stat.isSymbolicLink() || !stat.isDirectory())) throw new Error('Mappen .aura i projektet skal være en almindelig mappe. Fjern linket eller filen ' + path.relative(root, folder) + ', og prøv igen.');
+    if (!stat && folder === tmp) await fs.mkdir(folder, { recursive: true, mode: 0o700 });
+  }
+  await fs.writeFile(path.join(tmp, '.gitignore'), '*\n', { flag: 'w', mode: 0o600 });
+  await fs.mkdir(scratchRoot, { recursive: true, mode: 0o700 });
+}
+// Motorens identitet er det, motoren er bundet til ved start. Designstatus, plan og beskedtekster følger med den enkelte besked og
+// må ikke genstarte motoren (årsag 4). Arbejdsmåden indgår, fordi tilladelserne er sat ved start.
+function engineIdentityOf(disclosure, extras) {
+  const recipient = Object.fromEntries(['connection', 'model', 'endpoint', 'protocol', 'recipients', 'region', 'mode'].map(key => [key, disclosure[key] ?? null]));
+  return crypto.createHash('sha256').update(JSON.stringify({ recipient, ...extras })).digest('hex');
+}
 function scratchRootFor(root, taskId) { return path.join(root, '.aura', 'tmp', String(taskId)); }
 function scratchInstruction(taskId) { return '\nAI-filer til denne opgave ligger i .aura/tmp/' + taskId + ' i projektmappen. Brug kun den mappe; den hører til netop denne opgave.'; }
-module.exports = { composeAppContext, ChatSession, planningReply, sessionFailure, emptyUsage, addStep, scratchRootFor, scratchInstruction, commandIsolationFor, approveAllApplies, engineRestartNeeded, scratchAllowedRoot, agentsDuplicatesRules };
+module.exports = { composeAppContext, ChatSession, planningReply, sessionFailure, emptyUsage, addStep, scratchRootFor, engineIdentityOf, prepareScratch, scratchInstruction, commandIsolationFor, approveAllApplies, engineRestartNeeded, scratchAllowedRoot, agentsDuplicatesRules };

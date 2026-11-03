@@ -38,7 +38,10 @@ async function prepare({ workspaceRoot, scratchRoot, directory }) {
   await fs.mkdir(directory, { recursive: true, mode: 0o700 });
   const trusted = await fs.realpath(directory);
   if (contains(root, trusted) || contains(scratch, trusted)) throw new Error('Kommandobeskyttelsens indstillinger skal ligge uden for arbejdsområdet.');
-  const home = path.join(scratch, 'home'), temp = path.join(scratch, 'tmp');
+  // HOME og pakkecaches ligger i appdata ved siden af indstillingerne, aldrig i projektet: en npm-installation kan ellers lægge
+  // hundredvis af filer i projektmappen (OneDrive, Git). Kun den midlertidige mappe ligger i .aura/tmp.
+  const home = path.join(path.dirname(trusted), 'home'), temp = path.join(scratch, 'tmp');
+  if (contains(root, home)) throw new Error('Kommandobeskyttelsens hjemmemappe skal ligge uden for arbejdsområdet.');
   await fs.mkdir(home, { recursive: true, mode: 0o700 }); await fs.mkdir(temp, { recursive: true, mode: 0o700 });
   const literal = value => ({ path: value, literal: true });
   const systemRead = process.platform === 'darwin'
@@ -47,9 +50,9 @@ async function prepare({ workspaceRoot, scratchRoot, directory }) {
   // Runtimefilerne er læsbare, men brugerens hjem, appdata og øvrige projekter er ikke.
   const runtimeRoot = path.dirname(path.dirname(node));
   const sensitive = require('./protected-paths.cjs').toSandboxGlobs();
-  const policy = { version: 1, workspaceRoot: root, scratchRoot: scratch, node, env: { PATH: [path.dirname(node), '/usr/bin', '/bin', '/usr/sbin', '/sbin'].join(':'), HOME: home, TMPDIR: temp, TMP: temp, TEMP: temp, LANG: 'en_US.UTF-8', npm_config_cache: path.join(home, '.npm'), PIP_CACHE_DIR: path.join(home, '.cache', 'pip') }, config: {
+  const policy = { version: 1, workspaceRoot: root, scratchRoot: scratch, node, env: { PATH: [path.dirname(node), '/usr/bin', '/bin', '/usr/sbin', '/sbin'].join(':'), HOME: home, TMPDIR: temp, TMP: temp, TEMP: temp, NODE_DISABLE_COMPILE_CACHE: '1', LANG: 'en_US.UTF-8', npm_config_cache: path.join(home, '.npm'), PIP_CACHE_DIR: path.join(home, '.cache', 'pip') }, config: {
     network: { allowedDomains: PACKAGE_HOSTS, deniedDomains: [], strictAllowlist: true, allowLocalBinding: false, allowUnixSockets: [], allowAllUnixSockets: false },
-    filesystem: { denyRead: ['/', ...[root, scratch].flatMap(folder => sensitive.map(pattern => path.join(folder, pattern)))], allowRead: [root, scratch, runtimeRoot, ...systemRead, '/dev/null', '/dev/urandom', '/dev/random', '/dev/fd'].map(literal), allowWrite: [root, scratch].map(literal), denyWrite: ['/tmp/claude', '/private/tmp/claude', ...[root, scratch].flatMap(folder => sensitive.map(pattern => path.join(folder, pattern)))] },
+    filesystem: { denyRead: ['/', ...[root, scratch].flatMap(folder => sensitive.map(pattern => path.join(folder, pattern)))], allowRead: [root, scratch, home, runtimeRoot, ...systemRead, '/dev/null', '/dev/urandom', '/dev/random', '/dev/fd'].map(literal), allowWrite: [root, scratch, home].map(literal), denyWrite: ['/tmp/claude', '/private/tmp/claude', ...[root, scratch].flatMap(folder => sensitive.map(pattern => path.join(folder, pattern)))] },
     allowPty: false, enableWeakerNestedSandbox: false, enableWeakerNetworkIsolation: false
   } };
   const identity = crypto.createHash('sha256').update(JSON.stringify(policy)).digest('hex');

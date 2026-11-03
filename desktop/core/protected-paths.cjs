@@ -39,10 +39,14 @@ function toOpenCodeGlobs(options) {
   // aliases, the actual target and exact selected references before reading.
   return [...new Set([...patterns(options).flatMap(pattern => [pattern, pattern + ':*']), '*.', '* ', '*.:*', '* :*'].flatMap(name => [name, '*/' + name, name + '/*', '*/' + name + '/*']))];
 }
+// Mønstrene for Windows-navne med punktum eller mellemrum til sidst. De passer også på stier, der begynder med "..", så de skal
+// lægges først, med en undtagelse for "../*" efter sig, før de egentlige nægtelser (sidste passende regel gælder).
+const ALIAS_NAMES = ['*.', '* ', '*.:*', '* :*'];
+function toOpenCodeAliasGlobs() { return [...new Set(ALIAS_NAMES.flatMap(name => [name, '*/' + name, name + '/*', '*/' + name + '/*']))]; }
 function toSandboxGlobs(options) {
   const insensitive = value => value.replace(/[a-z]/g, letter => '[' + letter + letter.toUpperCase() + ']');
   // SRT deny globs cover the matching directory and every descendant. Character
   // sets are supported by its native macOS regex and Linux glob expansion.
   return [...new Set([...patterns(options).flatMap(pattern => [pattern, pattern + ':*']), '*.', '* ', '*.:*', '* :*'].map(pattern => '**/' + insensitive(pattern)))];
 }
-module.exports = { RULES, createPathClassifier, classify, isProtected, toOpenCodeGlobs, toSandboxGlobs };
+module.exports = { RULES, createPathClassifier, classify, isProtected, toOpenCodeGlobs, toOpenCodeAliasGlobs, toSandboxGlobs };

@@ -18,7 +18,7 @@ class EngineEvents {
       const messages = await this.engine.request(`/session/${this.engine.session.id}/message`, 'GET', undefined, AbortSignal.any([this.controller.signal, AbortSignal.timeout(15_000)]));
       if (!this.current(epoch)) return [];
       if (!Array.isArray(messages)) throw new Error('Invalid message snapshot');
-      const current = messages.filter(m => m.info?.id === promptID || m.info?.parentID === promptID);
+      const current = messages.filter(m => m.info?.id && (m.info.id === promptID || m.info.parentID === promptID || m.info.id > promptID));
       for (const message of current) {
         this.engine.handleEvent({ type: 'message.updated', recovered: true, properties: { info: message.info } });
         for (const part of message.parts || []) this.engine.handleEvent({ type: 'message.part.updated', recovered: true, properties: { part } });

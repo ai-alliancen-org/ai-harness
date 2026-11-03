@@ -1,6 +1,6 @@
 const { spawn, execFile } = require('node:child_process');
 const { promisify, isDeepStrictEqual } = require('node:util');
-const { RULES, createPathClassifier, classify, isProtected, toOpenCodeGlobs } = require('./protected-paths.cjs');
+const { RULES, createPathClassifier, classify, isProtected, toOpenCodeGlobs, toOpenCodeAliasGlobs } = require('./protected-paths.cjs');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const os = require('node:os');
@@ -51,8 +51,13 @@ const SKILL_FILE = /^(SKILL\.md|references\/[a-z0-9-]+\.md)$/;
 // Aktive skills ligger i motorens egen konfigurationsmappe uden for projektet. Mappens navn er projektets nøgle, så mønsteret kun rammer den.
 const skillPattern = directory => `*/${path.basename(directory)}/config/skills/*`;
 function permissions(root, references, mode = 'free', skills = null) {
-  const denials = Object.fromEntries(toOpenCodeGlobs().map(pattern => [pattern, 'deny']));
-  const read = { '*': 'allow', ...denials };
+  // Rækkefølge: navne-alias først, så undtagelsen for stier uden for projektet ("../*"), og til sidst de egentlige nægtelser.
+  // Ellers afviser mønstret "*./*" en godkendt læsning eller skrivning uden for et Git-projekt.
+  const alias = new Set(toOpenCodeAliasGlobs()), all = toOpenCodeGlobs();
+  const denyOnly = list => Object.fromEntries(list.map(pattern => [pattern, 'deny']));
+  const withOutside = base => ({ ...denyOnly(all.filter(pattern => alias.has(pattern))), '../*': base, ...denyOnly(all.filter(pattern => !alias.has(pattern))) });
+  const denials = withOutside('ask');
+  const read = { '*': 'allow', ...withOutside('allow') };
   // Udvalgte referencer kan åbnes, men kan aldrig frigive nøgler eller private metadata.
   for (const file of references) if (!isProtected(file, { references: false })) for (const pattern of [file, `*/${file}`]) read[pattern] = 'allow';
   const external = { '*': 'ask' };
@@ -92,8 +97,9 @@ function engineConfig(provider, model, permission) {
 function isolatedEnv(directory, config, password, { commandIsolation = false, tempRoot = null } = {}) {
   const env = {};
   for (const key of ['PATH', 'HOME', 'USERPROFILE', 'SystemRoot', 'WINDIR', 'COMSPEC', 'PATHEXT', 'TEMP', 'TMP', 'TMPDIR', 'LANG']) if (process.env[key]) env[key] = process.env[key];
-  // AI'ens midlertidige mappe er projektets .aura/tmp, ikke systemets temp-mappe (beslutning for beta 2).
-  if (tempRoot) env.TEMP = env.TMP = env.TMPDIR = tempRoot;
+  // Selve motorprocessen (Bun udpakker et bibliotek på 4,8 MB ved hver start) har sin egen temp-mappe i appdata, aldrig i
+  // projektet. AI'ens kommandoer får .aura/tmp gennem pluginets shell.env.
+  env.TEMP = env.TMP = env.TMPDIR = path.join(directory, 'tmp');
   for (const [key, sub] of Object.entries({ XDG_CONFIG_HOME: 'config', XDG_DATA_HOME: 'data', XDG_CACHE_HOME: 'cache', XDG_STATE_HOME: 'state' })) env[key] = path.join(directory, sub);
   // OpenCode søger altid også i HOME/.opencode, selv med projektkonfiguration slået fra.
   // Motorens plugins, pakker og hjælpeprocesser må kun bruge Auras egne mapper.
@@ -179,15 +185,43 @@ function createReadGuard({ fs, path, root, references = [], selectedFiles = [], 
     output.args.filePath = actual;
   };
 }
-async function writeReadGuard(directory, root, references, skills = []) {
+// Skrivevagten nægter kun ved positivt bevis for en sti uden for projektet. Som plugin giver afvisningen en almindelig
+// værktøjsfejl, ikke et godkendelseskort, og den lukker ikke andre ventende kort (beslutning for beta 2).
+function createWriteGuard({ fs, path, root }) {
+  const inside = (base, target) => { const rel = path.relative(base, target); return rel === '' || (rel !== '..' && !rel.startsWith('..' + path.sep) && !path.isAbsolute(rel)); };
+  const real = async file => {
+    let current = file; const rest = [];
+    for (;;) {
+      try { return path.join(await fs.realpath(current), ...rest.reverse()); }
+      catch { const parent = path.dirname(current); if (parent === current) return file; rest.push(path.basename(current)); current = parent; }
+    }
+  };
+  const refuse = () => { throw new Error('Skriv ikke uden for projektmappen. Brug mappen .aura/tmp til midlertidige filer, og læg alt andet i projektet.'); };
+  const check = async file => {
+    if (typeof file !== 'string' || !file || /[\0\r\n]/.test(file)) return;
+    const resolved = path.resolve(root, file);
+    if (!inside(root, resolved) || !inside(root, await real(resolved))) refuse();
+  };
+  return async (input, output) => {
+    if (input.tool === 'write' || input.tool === 'edit') return check(output.args?.filePath);
+    if (input.tool === 'apply_patch') {
+      for (const line of String(output.args?.patchText || '').split('\n')) {
+        const match = /^\*\*\* (?:Add File|Update File|Delete File|Move to):\s*(.+?)\s*$/.exec(line);
+        if (match) await check(match[1]);
+      }
+    }
+  };
+}
+async function writeReadGuard(directory, root, references, skills = [], { tempRoot = null } = {}) {
   root = await fs.realpath(root);
   const pluginPath = path.join(directory, 'read-guard.mjs'), readyPath = path.join(directory, 'read-guard-ready.json'), token = randomBytes(32).toString('hex');
   const selectedFiles = skills.flatMap(skill => skill.files.map(file => path.join(directory, 'config', 'skills', skill.name, file.path)));
   await fs.rm(readyPath, { force: true });
-  const source = `import fs from 'node:fs/promises';\nimport path from 'node:path';\nconst classify = (${createPathClassifier.toString()})(${JSON.stringify(RULES)});\nconst guard = (${createReadGuard.toString()})({ fs, path, root: ${JSON.stringify(root)}, references: ${JSON.stringify(references)}, selectedFiles: ${JSON.stringify(selectedFiles)}, classifyPath: classify });\nexport const AuraReadProtection = async () => {\n await fs.writeFile(${JSON.stringify(readyPath)}, ${JSON.stringify(JSON.stringify({ token }))}, { mode: 0o600 });\n return { 'tool.execute.before': guard };\n};\n`;
+  const source = `import fs from 'node:fs/promises';\nimport path from 'node:path';\nconst classify = (${createPathClassifier.toString()})(${JSON.stringify(RULES)});\nconst guard = (${createReadGuard.toString()})({ fs, path, root: ${JSON.stringify(root)}, references: ${JSON.stringify(references)}, selectedFiles: ${JSON.stringify(selectedFiles)}, classifyPath: classify });\nconst writeGuard = (${createWriteGuard.toString()})({ fs, path, root: ${JSON.stringify(root)} });\nconst tempRoot = ${JSON.stringify(tempRoot)};\nexport const AuraReadProtection = async () => {\n await fs.writeFile(${JSON.stringify(readyPath)}, ${JSON.stringify(JSON.stringify({ token }))}, { mode: 0o600 });\n return {\n 'shell.env': async (_input, output) => {\n  // AI'ens kommandoer bruger projektets .aura/tmp. Sandkassens plugin kommer efter og overskriver miljøet helt.\n  if (tempRoot && !output.env.TMPDIR) output.env = { ...output.env, TMPDIR: tempRoot, TMP: tempRoot, TEMP: tempRoot, NODE_DISABLE_COMPILE_CACHE: '1' };\n },\n 'tool.execute.before': async (input, output) => { await guard(input, output); await writeGuard(input, output); }\n };\n};\n`;
   await fs.writeFile(pluginPath, source, { mode: 0o600 });
   return { pluginURL: pathToFileURL(pluginPath).href, readyPath, token };
 }
+const ownsMessage = (info, promptID) => Boolean(info?.id) && (info.id === promptID || info.parentID === promptID || info.id > promptID);
 class OpenCodeEngine {
   // resume: en tidligere OpenCode-session for samme samtale. Findes den ikke længere, oprettes en ny.
   constructor({ root, directory, provider, model, references = [], mode = 'free', skills = [], resume = null, sandbox = null, detached = false, recovery = {}, tempRoot = null, onEvent = () => {} }) { Object.assign(this, { tempRoot, root, directory, provider, model, references, mode, skills, resume, sandbox, detached, recovery, onEvent }); this.promptEpoch = 0; this.closedPermissions = new Set(); this.closedQuestions = new Set(); this.pendingQuestions = new Map(); this.pending = new Map(); this.active = false; this.resumed = false; }
@@ -211,9 +245,11 @@ class OpenCodeEngine {
     await fs.mkdir(this.directory, { recursive: true, mode: 0o700 });
     this.directory = await fs.realpath(this.directory);
     await fs.mkdir(path.join(this.directory, 'home'), { recursive: true, mode: 0o700 });
+    // Motorens egen temp-mappe ryddes ved start, så udpakkede biblioteker fra tidligere starter ikke hober sig op.
+    await fs.rm(path.join(this.directory, 'tmp'), { recursive: true, force: true }); await fs.mkdir(path.join(this.directory, 'tmp'), { recursive: true, mode: 0o700 });
     await writeSkills(this.directory, this.skills);
     await writePluginRuntime(this.directory);
-    const readGuard = await writeReadGuard(this.directory, this.root, this.references, this.skills);
+    const readGuard = await writeReadGuard(this.directory, this.root, this.references, this.skills, { tempRoot: this.tempRoot });
     const password = randomBytes(32).toString('hex');
     this.auth = `Basic ${Buffer.from(`harness:${password}`).toString('base64')}`;
     const permission = permissions(this.root, this.references, this.mode, { directory: this.directory, names: this.skills.map(skill => skill.name) });
@@ -293,7 +329,9 @@ class OpenCodeEngine {
       if (turnEvent && this.completedPromptID === this.promptID) return;
       if (event.type === 'message.updated') {
         const info = props.info;
-        if (info?.id !== this.promptID && info?.parentID !== this.promptID) return;
+        // OpenCodes id'er sorterer efter tid. Beskeder nyere end prompten hører til opgaven, også dem en automatisk komprimering
+        // opretter (en syntetisk besked, hvis svar har den som parentID). Ældre beskeder fra en tidligere tur holdes ude.
+        if (!ownsMessage(info, this.promptID)) return;
         this.currentMessageIDs ||= new Set(); this.currentMessageIDs.add(info.id);
         if (info.role === 'assistant') this.currentReplySeen = true;
       }
@@ -412,4 +450,4 @@ class OpenCodeEngine {
     if (this.child && this.child.exitCode !== null && this.enginePID) { try { process.kill(-this.enginePID, 'SIGKILL'); } catch { /* Gruppen er allerede væk. */ } }
     this.cancelCompletionCheck(); this.cancelCompaction(); this.active = false; this.eventsAbort?.abort(); this.pending.clear(); if (this.child && this.child.exitCode === null) { this.child.kill(); await new Promise(resolve => { const timer = setTimeout(() => { this.child.kill('SIGKILL'); resolve(); }, 3000); this.child.once('exit', () => { clearTimeout(timer); resolve(); }); }); } }
 }
-module.exports = { OpenCodeEngine, findExecutable, isolatedEnv, permissions, engineConfig, writeSkills, writePluginRuntime, pluginRuntimeFiles, pluginRuntimePatterns, createReadGuard, writeReadGuard, VERSION, SUMMARIZE_TIMEOUT_MS };
+module.exports = { createWriteGuard, OpenCodeEngine, findExecutable, isolatedEnv, permissions, engineConfig, writeSkills, writePluginRuntime, pluginRuntimeFiles, pluginRuntimePatterns, createReadGuard, writeReadGuard, VERSION, SUMMARIZE_TIMEOUT_MS };
