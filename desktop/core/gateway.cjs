@@ -21,7 +21,7 @@ async function startGateway(connection, model, key, route, onFailure = () => {},
     const controller = new AbortController(); active.add(controller);
     res.on('close', () => { controller.abort(); active.delete(controller); });
     // Et langt svar må gerne tage tid, så længe der kommer data. Stilstand i to minutter afbryder kaldet.
-    const idle = new AbortController(); let idleTimer;
+    const idle = new AbortController(); let idleTimer, reachedUpstream = false;
     const touch = () => { clearTimeout(idleTimer); idleTimer = setTimeout(() => idle.abort(), idleLimit); };
     try {
       const responses = usesResponses(connection);
@@ -56,6 +56,7 @@ async function startGateway(connection, model, key, route, onFailure = () => {},
       else if (key) { if (connection.kind === 'azure') headers['api-key'] = key; else headers.authorization = `Bearer ${key}`; }
       touch();
       const progress = new StreamProgress({ emit: onProgress, root });
+      reachedUpstream = true;
       const response = await fetch(`${base}${responses ? '/responses' : anthropic ? '/messages' : '/chat/completions'}`, { method: 'POST', headers, body: JSON.stringify(body), signal: AbortSignal.any([controller.signal, idle.signal, AbortSignal.timeout(totalLimit)]), redirect: 'error' });
       if (!response.ok) {
         await response.body?.cancel();
@@ -82,7 +83,7 @@ async function startGateway(connection, model, key, route, onFailure = () => {},
       if (idle.signal.aborted) fail(`Modellen svarede ikke i ${idleLimit >= 60_000 ? `${Math.round(idleLimit / 60_000)} min` : `${Math.max(1, Math.round(idleLimit / 1000))} s`}, så forbindelsen blev afbrudt. Din besked er bevaret.`, 'idle');
       // En netfejl, før modellen har svaret (forbindelse nægtet, DNS, afbrudt), er forbigående: den sendes videre som 502, så OpenCode kan
       // prøve igen, og forbindelsen låses ikke. En strøm, der afbrydes midt i svaret, er stadig endelig, fordi svaret er ufuldstændigt.
-      else if (!res.headersSent && !controller.signal.aborted) { /* videresendes som 502 nedenfor */ }
+      else if (reachedUpstream && !res.headersSent && !controller.signal.aborted) { /* videresendes som 502 nedenfor */ }
       else fail('Modelforbindelsen blev afbrudt. Din besked er bevaret. Kontrollér forbindelsen, og prøv igen.', 'network');
       // En afbrudt strøm må ikke ligne et færdigt modelsvar for agentmotoren.
       if (res.headersSent) { res.destroy(); return; }
