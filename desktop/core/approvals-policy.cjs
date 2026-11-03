@@ -138,6 +138,12 @@ class ApprovalsPolicy {
     });
     return this.settings(root);
   }
+  // Nye projekter bruger projektmappen som grænse (beslutning for beta 2): filændringer i projektet sker uden kort, med versioner og
+  // fortryd som sikkerhedsnet, og kommandoer kører automatisk i sandkassen, hvor den findes. Eksisterende projekter ændres ikke.
+  async applyNewProjectDefaults(root, { commandsAvailable }) {
+    await this.setProjectFiles(root, true);
+    if (commandsAvailable === true) await this.setCommands(root, true);
+  }
   setProjectFiles(root, enabled) {
     if (typeof enabled !== 'boolean') throw new Error('Vælg, om projektfiler skal godkendes automatisk.');
     return this.update(root, data => { data.autoProjectFiles = enabled; });

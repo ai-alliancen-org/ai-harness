@@ -218,3 +218,16 @@ test('OpenCodes apply_patch-visningsliste erstatter aldrig metadata.files eller 
   const display = structuredClone(request); display.metadata.filepath = path.join(outside, 'hemmelig.js');
   assert.equal((await policy.allowed(context, display)).allowed, false);
 });
+
+test('et nyt projekt får filændringer i projektet og kommandoer i sandkassen automatisk, hvor sandkassen findes (beslutning for beta 2)', async t => {
+  const { root, policy } = await fixture(t);
+  assert.equal((await policy.settings(root)).autoProjectFiles, false, 'et eksisterende projekt er uændret');
+  await policy.applyNewProjectDefaults(root, { commandsAvailable: true });
+  assert.deepEqual([(await policy.settings(root)).autoProjectFiles, (await policy.settings(root)).autoCommands], [true, true]);
+});
+
+test('uden sandkasse slås kun filændringer til, så en ny opgave ikke fejler på kommandoer', async t => {
+  const { root, policy } = await fixture(t);
+  await policy.applyNewProjectDefaults(root, { commandsAvailable: false });
+  assert.deepEqual([(await policy.settings(root)).autoProjectFiles, (await policy.settings(root)).autoCommands], [true, false]);
+});
