@@ -80,7 +80,7 @@ const questions = [
     // Projektet oprettes med en idé og to ønsker. Ønskerne kommer i briefen, ikke i beskeden.
     await helpers.toOnboarding(page);
     await page.fill('#purpose', 'Jeg vil lave en oversigt over tre fiktive mødelokaler.');
-    await page.click('#create'); await page.waitForSelector('#workspace:not([hidden])');
+    await page.click('#create'); await page.waitForSelector('#workspace:not([hidden])'); await helpers.manualApprovals(page);
     project = path.join(documents, 'Aura', (await fs.readdir(path.join(documents, 'Aura')))[0]);
     await page.fill('#prompt', '');
     await page.locator('#idea-options').evaluate(el => { el.open = true; });

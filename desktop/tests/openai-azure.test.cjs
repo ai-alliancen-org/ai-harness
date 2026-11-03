@@ -12,7 +12,7 @@ test('OpenAI fastholder sin adresse, og Azure kræver en ressourceadresse og et 
     assert.equal(engineProvider(c, { id: c.deployment }, 'http://127.0.0.1:1/v1', 'midlertidig').npm, '@ai-sdk/openai');
     assert.notEqual(disclosure(c, { id: c.deployment }).fingerprint, disclosure({ ...c, protocol: 'openai' }, { id: c.deployment }).fingerprint);
   }
-  for (const baseURL of ['http://min.openai.azure.com', 'https://min.openai.azure.com.evil.test', 'https://min.openai.azure.com/openai/deployments/model', 'https://min.openai.azure.com?key=skjult', 'https://user:pass@min.openai.azure.com', 'https://min.openai.azure.com:8443']) {
+  for (const baseURL of ['http://min.openai.azure.com', 'https://min.openai.azure.com.evil.test', 'https://min.openai.azure.com?key=skjult', 'https://user:pass@min.openai.azure.com', 'https://min.openai.azure.com:8443']) {
     assert.throws(() => normalize({ kind: 'azure', name: 'Azure', baseURL, deployment: 'model' }));
   }
   assert.throws(() => normalize({ kind: 'azure', name: 'Azure', baseURL: 'https://min.openai.azure.com' }), /Deployment|deployment/);

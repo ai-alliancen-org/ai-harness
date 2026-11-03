@@ -184,4 +184,6 @@ async function firstVersion(page, projectDir, title) {
   await fs.writeFile(index, (await fs.readFile(index, 'utf8')).replace('HER BEGYNDER DIN IDÉ', 'FØRSTE VERSION'));
   await page.frameLocator('#preview').locator('h1').filter({ hasText: title }).waitFor({ timeout: 15000 });
 }
-module.exports = { firstVersion, approve, awaitApproval, resultOption, openSetup, addConnection, chooseProviderCard, keyWindow, enterCredential, assertNoKeyFields, enableSharing, skipIntroduction, toOnboarding, menuClick, taskOptions, closeTaskOptions, selectMode, previewOptions, projectOptions, isolateDocuments, chooseLocation, openExistingProject, forbidGitWrites, assertNoGitWrites };
+// Nye projekter får filændringer og kommandoer godkendt automatisk (beslutning for beta 2). Prøver, der skal vise godkendelseskortene, slår det fra.
+async function manualApprovals(page) { await page.evaluate(() => window.harness.saveProjectSettings({ autoProjectFiles: false, autoCommands: false })); }
+module.exports = { manualApprovals, firstVersion, approve, awaitApproval, resultOption, openSetup, addConnection, chooseProviderCard, keyWindow, enterCredential, assertNoKeyFields, enableSharing, skipIntroduction, toOnboarding, menuClick, taskOptions, closeTaskOptions, selectMode, previewOptions, projectOptions, isolateDocuments, chooseLocation, openExistingProject, forbidGitWrites, assertNoGitWrites };

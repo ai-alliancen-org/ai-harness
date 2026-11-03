@@ -8,8 +8,9 @@ test('samme motor, aktiv, samme sandkasse: ingen genstart, også når sandkassen
   assert.equal(engineRestartNeeded({ identityChanged: false, engineActive: true, engineSandbox: true, sandboxNext: true }), false);
 });
 
-test('sandkassen slås fra eller til: motoren genstartes, fordi konfigurationen er sat ved start', () => {
+test('sandkassen skal tændes: motoren genstartes, fordi den er sat ved start; en eksisterende sandkasse beholdes', () => {
   assert.equal(engineRestartNeeded({ identityChanged: false, engineActive: true, engineSandbox: false, sandboxNext: true }), true);
+  assert.equal(engineRestartNeeded({ identityChanged: false, engineActive: true, engineSandbox: true, sandboxNext: false }), false, 'skift fra Byg til Samtale genstarter ikke');
 });
 
 test('ændret motoridentitet eller stoppet motor genstarter altid', () => {

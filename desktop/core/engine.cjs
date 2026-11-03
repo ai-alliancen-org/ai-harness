@@ -91,8 +91,10 @@ async function writeSkills(directory, skills) {
     }
   }
 }
-function engineConfig(provider, model, permission) {
-  return { $schema: 'https://opencode.ai/config.json', model: `harness/${model.id}`, small_model: `harness/${model.id}`, enabled_providers: ['harness'], provider: { harness: provider }, permission, agent: { plan: { permission } }, share: 'disabled', autoupdate: false, snapshot: false, plugin: [], mcp: {}, lsp: false, formatter: false };
+// Én motor kan tjene alle arbejdsmåder: den skrivebeskyttede agent (plan) bruges til Samtale og Planlæg, den skrivbare (build) til Byg, og
+// agenten vælges for hver besked. Uden en skrivbar tilladelse er motoren som før skrivebeskyttet.
+function engineConfig(provider, model, permission, buildPermission = null) {
+  return { $schema: 'https://opencode.ai/config.json', model: `harness/${model.id}`, small_model: `harness/${model.id}`, enabled_providers: ['harness'], provider: { harness: provider }, permission, agent: { plan: { permission }, ...(buildPermission ? { build: { permission: buildPermission } } : {}) }, share: 'disabled', autoupdate: false, snapshot: false, plugin: [], mcp: {}, lsp: false, formatter: false };
 }
 function isolatedEnv(directory, config, password, { commandIsolation = false, tempRoot = null } = {}) {
   const env = {};
@@ -252,17 +254,20 @@ class OpenCodeEngine {
     const readGuard = await writeReadGuard(this.directory, this.root, this.references, this.skills, { tempRoot: this.tempRoot });
     const password = randomBytes(32).toString('hex');
     this.auth = `Basic ${Buffer.from(`harness:${password}`).toString('base64')}`;
-    const permission = permissions(this.root, this.references, this.mode, { directory: this.directory, names: this.skills.map(skill => skill.name) });
+    const skillSet = { directory: this.directory, names: this.skills.map(skill => skill.name) };
+    const permission = permissions(this.root, this.references, 'plan', skillSet), buildPermission = permissions(this.root, this.references, 'build', skillSet);
     if (this.sandbox) {
       const trustedPattern = `*/${path.basename(path.dirname(this.sandbox.policyPath))}/*`;
-      permission.read[trustedPattern] = 'deny';
-      if (typeof permission.edit === 'object') permission.edit[trustedPattern] = 'deny';
-      permission.external_directory[trustedPattern] = 'deny';
+      for (const set of [permission, buildPermission]) {
+        set.read[trustedPattern] = 'deny';
+        if (typeof set.edit === 'object') set.edit[trustedPattern] = 'deny';
+        set.external_directory[trustedPattern] = 'deny';
+      }
     }
-    this.config = engineConfig(this.provider, this.model, permission);
+    this.config = engineConfig(this.provider, this.model, permission, buildPermission);
     // Værktøjet aura_preview lader AI'en starte forhåndsvisningen gennem Aura. Kun i arbejdsmåder, hvor der kan bygges.
     let previewURL = null;
-    if (this.preview && ['free', 'build'].includes(this.mode)) {
+    if (this.preview) {
       const file = path.join(this.directory, 'config', 'opencode', 'preview-tool.mjs');
       await fs.writeFile(file, require('./preview-bridge.cjs').pluginSource(this.preview), { mode: 0o600 }); previewURL = pathToFileURL(file).href;
     }
@@ -369,7 +374,7 @@ class OpenCodeEngine {
     if (compaction && event.type === 'session.idle') compaction.resolve();
     if (compaction && ['session.error', 'engine.error'].includes(event.type)) compaction.reject(new Error(event.message || props.error?.data?.message || 'Samtalen kunne ikke sammenfattes.'));
   }
-  async send(text, system) {
+  async send(text, system, mode = this.mode) {
     if (!this.active) throw new Error('Agenten er ikke startet.');
     this.cancelCompletionCheck(); ++this.promptEpoch;
     // OpenCode's IDs sort by their timestamp prefix. Supply an explicit ID so a
@@ -379,7 +384,7 @@ class OpenCodeEngine {
     this.currentReplySeen = false; this.currentMessageIDs = new Set([messageID]);
     const epoch = this.promptEpoch, signal = this.eventsAbort?.signal;
     try {
-      return await this.request(`/session/${this.session.id}/prompt_async`, 'POST', { messageID, model: { providerID: 'harness', modelID: this.model.id }, agent: ['chat', 'plan'].includes(this.mode) ? 'plan' : 'build', system, parts: [{ type: 'text', text }] });
+      return await this.request(`/session/${this.session.id}/prompt_async`, 'POST', { messageID, model: { providerID: 'harness', modelID: this.model.id }, agent: ['chat', 'plan'].includes(mode) ? 'plan' : 'build', system, parts: [{ type: 'text', text }] });
     } catch (error) {
       if (error.status && error.status < 500 || signal?.aborted) throw error;
       for (const wait of this.recovery.delays || [500, 1500, 3000]) {

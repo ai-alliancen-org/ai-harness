@@ -233,7 +233,8 @@ class ChatSession {
     disclosure.projectChoices = startup ? `Hostingønske: ${startup.hosting || 'beslut senere'}. Teststrategi: ${startup.tests}. Ønsker er ikke en deploymentgodkendelse.` : 'Ingen ekstra opstartsvalg.';
     disclosure.mode = mode;
     const previousMode = this.runMode || this.data.lastRunMode || this.data.mode;
-    const modeHandoff = Boolean(previousMode && previousMode !== mode && this.data.messages?.length);
+    const modelSwitch = Boolean(this.engine?.active && this.engineKey && this.engineKey !== `${selection.connection.id}|${selection.model.id}`);
+    const modeHandoff = handoffNeeded({ messages: this.data.messages, engineActive: Boolean(this.engine?.active), modelSwitch, previousMode, mode });
     const historyMessages = input.includeHistory === true || modeHandoff ? (this.data?.messages || []).filter(m => m.role !== 'system').slice(-16) : [];
     disclosure.conversation = historyMessages.map(m => `${m.role === 'user' ? 'Bruger' : 'AI'}: ${m.text}`).join('\n\n').slice(-60000);
     disclosure.historyIncluded = Boolean(disclosure.conversation);
@@ -412,7 +413,7 @@ class ChatSession {
         const resume = this.data.opencode?.fingerprint === (prepared.disclosure.sessionFingerprint || prepared.disclosure.fingerprint) ? this.data.opencode.session : null;
         this.engine = bench.engineFactory({ root: this.root, directory: path.join(bench.store.root, 'runtime', bench.store.projectKey(this.root)), provider, model: prepared.model, references: prepared.references, mode: prepared.mode, skills: prepared.context.skills, resume, sandbox: this.commandSandbox, tempRoot: path.join(this.root, '.aura', 'tmp'), preview: require('./preview-bridge.cjs').info(this.root), onEvent: event => { if (this.engine === instance) this.event(event); } });
         const instance = this.engine;
-        await this.engine.start(); checkStopped(); this.engineIdentity = (prepared.disclosure.sessionFingerprint || prepared.disclosure.fingerprint); this.engineSandbox = Boolean(prepared.commandIsolation);
+        await this.engine.start(); checkStopped(); this.engineIdentity = (prepared.disclosure.sessionFingerprint || prepared.disclosure.fingerprint); this.engineSandbox = Boolean(prepared.commandIsolation); this.engineKey = `${prepared.connection.id}|${prepared.model.id}`;
         this.engineConversation = this.engine.resumed ? this.data.opencode?.conversation || '' : prepared.disclosure.conversation || '';
         const opencode = { session: this.engine.session?.id || null, fingerprint: (prepared.disclosure.sessionFingerprint || prepared.disclosure.fingerprint), ...(this.engineConversation ? { conversation: this.engineConversation } : {}) };
         if (opencode.session) this.data = await bench.history.updateChat(projectRoot, this.id, data => { data.opencode = opencode; }).catch(() => this.data);
@@ -447,7 +448,7 @@ class ChatSession {
       if (prepared.guard) await this.checkContext(prepared, runPlan);
       await bench.chatMaterials?.assertPrepared(this, prepared.chatMaterials);
       this.gateway?.setImages?.(prepared.chatMaterials?.files.filter(file => file.kind === 'image') || []);
-      checkStopped(); await this.engine.send(text, system); checkStopped();
+      checkStopped(); await this.engine.send(text, system, prepared.mode); checkStopped();
       // Valget gælder én besked og ryddes, når beskeden er sendt.
       if (prepared.chatMaterials) bench.chatMaterials?.clear(this);
       // De senest accepterede vilkår huskes for projektet, så de samme oplysninger ikke vises igen ved hver opgave.
@@ -858,7 +859,7 @@ class ChatSession {
       await this.bench.history.queue;
     }
     const engine = this.engine, gateway = this.gateway;
-    this.engine = null; this.gateway = null; this.engineIdentity = null; this.engineSandbox = false; this.contextUsage.bind(null);
+    this.engine = null; this.gateway = null; this.engineIdentity = null; this.engineKey = null; this.engineSandbox = false; this.contextUsage.bind(null);
     await engine?.close(); await gateway?.close();
     if (reset) { this.running = false; this.prepared = null; }
   }
@@ -867,7 +868,8 @@ class ChatSession {
 // Sandkassen tændes af projektets automatiske kørsel eller af «Godkend alt i denne samtale». En husket kommando gør det ikke
 // for projektets øvrige opgaver (beslutning for beta 2). Uden understøttet sandkasse tændes den aldrig.
 // Motoren genstartes kun ved ændret identitet, ved en stoppet motor eller ved skift i sandkassens tilstand (årsag 4).
-function engineRestartNeeded({ identityChanged, engineActive, engineSandbox, sandboxNext }) { return identityChanged === true || engineActive !== true || (engineSandbox === true) !== (sandboxNext === true); }
+// En motor, der allerede har sandkassen, beholder den, også når næste besked ikke kræver den (fx Samtale): sandkassen omslutter kun kommandoer.
+function engineRestartNeeded({ identityChanged, engineActive, engineSandbox, sandboxNext }) { return identityChanged === true || engineActive !== true || (sandboxNext === true && engineSandbox !== true); }
 // AI'ens fælles arbejdsrod i projektet. Sandkassen og godkendelserne bruger den, så de ikke skifter mellem opgaver.
 function scratchAllowedRoot(root) { return path.join(root, '.aura', 'tmp'); }
 function commandIsolationFor({ support, autoCommandsSnapshot, approveAll }) { return Boolean(support?.available && (autoCommandsSnapshot || approveAll)); }
@@ -893,9 +895,14 @@ async function prepareScratch(root, scratchRoot) {
 // Motorens identitet er det, motoren er bundet til ved start. Designstatus, plan og beskedtekster følger med den enkelte besked og
 // må ikke genstarte motoren (årsag 4). Arbejdsmåden indgår, fordi tilladelserne er sat ved start.
 function engineIdentityOf(disclosure, extras) {
-  const recipient = Object.fromEntries(['connection', 'model', 'endpoint', 'protocol', 'recipients', 'region', 'mode'].map(key => [key, disclosure[key] ?? null]));
+  const recipient = Object.fromEntries(['connection', 'model', 'endpoint', 'protocol', 'recipients', 'region'].map(key => [key, disclosure[key] ?? null]));
   return crypto.createHash('sha256').update(JSON.stringify({ recipient, ...extras })).digest('hex');
+}
+// Den nye session har ikke samtalen ved et modelskift. Ved et skift af arbejdsmåde i den samme motor har den.
+function handoffNeeded({ messages, engineActive, modelSwitch, previousMode, mode }) {
+  if (!messages?.length) return false;
+  return engineActive ? modelSwitch === true : Boolean(previousMode && previousMode !== mode);
 }
 function scratchRootFor(root, taskId) { return path.join(root, '.aura', 'tmp', String(taskId)); }
 function scratchInstruction(taskId) { return '\nAI-filer til denne opgave ligger i .aura/tmp/' + taskId + ' i projektmappen. Brug kun den mappe; den hører til netop denne opgave.'; }
-module.exports = { composeAppContext, ChatSession, planningReply, sessionFailure, emptyUsage, addStep, scratchRootFor, engineIdentityOf, prepareScratch, scratchInstruction, commandIsolationFor, approveAllApplies, engineRestartNeeded, scratchAllowedRoot, agentsDuplicatesRules };
+module.exports = { composeAppContext, ChatSession, planningReply, sessionFailure, emptyUsage, addStep, scratchRootFor, handoffNeeded, engineIdentityOf, prepareScratch, scratchInstruction, commandIsolationFor, approveAllApplies, engineRestartNeeded, scratchAllowedRoot, agentsDuplicatesRules };

@@ -127,8 +127,6 @@ function cleanKey(raw, kind, { strict = false } = {}) {
     const quoted = QUOTED.exec(key);
     if (quoted) { key = quoted[2]; changes.add('anførselstegn'); }
   }
-  // En udbyder, der ikke kræver en nøgle (fx en lokal model), accepterer et tomt felt.
-  if (!key && definitions[kind]?.keyRequired === false) return { key: '', changes: [...changes] };
   if (!key) throw keyError('Feltet er tomt. Sæt nøglen ind fra udbyderens side.');
   if (/\s/.test(key)) throw keyError('Nøglen har mellemrum inde i sig. Kopiér den igen med kopiér-knappen hos udbyderen.');
   if (strict ? /[^\x21-\x7e]/.test(key) : /[\x00-\x1f\x7f]|[^\x00-\xff]/.test(key)) throw keyError('Nøglen indeholder tegn, der ikke hører til en API-nøgle, fx typografiske tegn. Kopiér den igen med kopiér-knappen hos udbyderen.');
@@ -157,7 +155,7 @@ const accountPages = {
 function normalize(input) {
   assertSupported(input);
   const def = definitions[input.kind];
-  const key = input.apiKey ? cleanKey(input.apiKey, input.kind).key : '';
+  const key = typeof input.apiKey === 'string' && input.apiKey.trim() ? cleanKey(input.apiKey, input.kind).key : '';
   const baseURL = input.kind === 'azure' ? azureEndpoint(input.baseURL) : input.kind === 'ollama' ? ollamaEndpoint(input.baseURL) : endpoint(['compatible', 'ollama'].includes(input.kind) ? input.baseURL : input.kind === 'corti' && key ? cortiEndpoint(key) : def.baseURL);
   if (typeof input.name !== 'string' || !input.name.trim() || input.name.length > 100) throw new Error('Angiv et forbindelsesnavn på højst 100 tegn.');
   const extra = {};
@@ -172,7 +170,8 @@ function ollamaEndpoint(value) { const url = endpoint(value); return new URL(url
 function azureEndpoint(value) {
   // En fuld adresse fra Azure (med sti og api-version) indeholder ressourcens adresse. Kun den bruges; login i adressen afvises stadig.
   let url; try { url = new URL(value); } catch { throw new Error('Brug ressourcens HTTPS-adresse fra Azure OpenAI eller Foundry, fx https://mit-projekt.openai.azure.com.'); }
-  if (url.username || url.password) throw new Error('Serveradressen må ikke indeholde login, parametre eller fragmenter.');
+  // Kun api-version må stå i forespørgslen; alt andet kunne være en hemmelighed, som ikke tavst må tages af adressen.
+  if (url.username || url.password || url.hash || [...url.searchParams.keys()].some(name => name !== 'api-version')) throw new Error('Serveradressen må ikke indeholde login, parametre eller fragmenter.');
   if (url.protocol !== 'https:' || url.port || !/^[a-z0-9-]+\.(openai\.azure\.com|services\.ai\.azure\.com)$/.test(url.hostname)) throw new Error('Brug ressourcens HTTPS-adresse fra Azure OpenAI eller Foundry, fx https://mit-projekt.openai.azure.com.');
   return `${url.origin}/openai/v1`;
 }

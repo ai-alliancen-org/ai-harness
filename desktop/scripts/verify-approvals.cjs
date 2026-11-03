@@ -63,7 +63,7 @@ const helpers = require('./ui-test-helpers.cjs');
     app = await electron.launch({ executablePath: require('electron'), args: [path.join(__dirname, '..'), '--user-data-dir=' + path.join(root, 'appdata')], env: { ...process.env, PATH: bin + path.delimiter + process.env.PATH, ELECTRON_RUN_AS_NODE: undefined } });
     page = await app.firstWindow(); page.on('pageerror', error => errors.push(error.message));
     await helpers.isolateDocuments(app, documents); await helpers.skipIntroduction(page); await helpers.toOnboarding(page);
-    await page.fill('#purpose', 'En side med mødelokaler.'); await page.click('#create'); await page.waitForSelector('#workspace:not([hidden])');
+    await page.fill('#purpose', 'En side med mødelokaler.'); await page.click('#create'); await page.waitForSelector('#workspace:not([hidden])'); await helpers.manualApprovals(page);
     project = path.join(documents, 'Aura', (await fs.readdir(path.join(documents, 'Aura')))[0]);
     await helpers.addConnection(page, { name: 'Kontrolleret', baseURL: `http://127.0.0.1:${server.address().port}/v1` });
     const connection = (await page.evaluate(() => window.harness.connectionState())).value.connections[0].id;
