@@ -231,3 +231,15 @@ test('uden sandkasse slås kun filændringer til, så en ny opgave ikke fejler p
   await policy.applyNewProjectDefaults(root, { commandsAvailable: false });
   assert.deepEqual([(await policy.settings(root)).autoProjectFiles, (await policy.settings(root)).autoCommands], [true, false]);
 });
+
+test('en husket kommando matcher uanset AI\'ens begrundelse og tidsgrænse, men ikke en anden kommando eller mappe (beta 3)', async t => {
+  const { root, policy, context } = await fixture(t);
+  const sandboxContext = { ...context, commandSandbox: true, commandSandboxSupported: true };
+  const bash = (command, input = {}, workdir) => ({ id: 'p', permission: 'bash', patterns: [command], metadata: { command }, toolInput: { tool: 'bash', command, ...(workdir ? { workdir } : {}), input: { command, ...input } } });
+  const a = await policy.describe(sandboxContext, bash('npm test', { description: 'Kører testene', timeout: 120000 }));
+  const b = await policy.describe(sandboxContext, bash('npm test', { description: 'Prøver igen', timeout: 30000 }));
+  assert.equal(a.key, b.key, 'begrundelse og timeout hører ikke til nøglen');
+  assert.notEqual(a.key, (await policy.describe(sandboxContext, bash('npm run build', { description: 'Kører testene' }))).key);
+  await fs.mkdir(path.join(root, 'sub'));
+  assert.notEqual(a.key, (await policy.describe(sandboxContext, bash('npm test', {}, path.join(root, 'sub')))).key, 'en anden mappe er en anden tilladelse');
+});

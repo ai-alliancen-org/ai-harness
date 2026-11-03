@@ -166,9 +166,9 @@ class ApprovalsPolicy {
         const command = p.toolInput?.command || p.metadata?.command;
         if (typeof command !== 'string' || !command.trim() || command.length > 32000 || command.includes('\0')) throw new Error('Kommandoen mangler.');
         const cwd = await directory(p.toolInput?.workdir || p.metadata?.workdir || workspace);
-        // Kommandoen matches byte for byte, sammen med arbejdsmappen og eventuelle
-        // ekstra argumenter. En tidligere tilladt npm-kommando tillader ikke npm *.
-        match = { kind, command, cwd, input: stable(p.toolInput?.input || null) };
+        // Kommandoen matches byte for byte, sammen med arbejdsmappen. En tidligere tilladt npm-kommando tillader ikke npm *.
+        // AI'ens begrundelse og tidsgrænse skifter fra gang til gang og hører ikke til nøglen: ellers ville en husket kommando aldrig matche.
+        match = { kind, command, cwd };
         descriptor.target = command; descriptor.label = `Kommando: ${command}`;
         descriptor.persistable = writable(context.mode) && context.commandSandboxSupported === true;
       } else if (kind === 'webfetch') {
