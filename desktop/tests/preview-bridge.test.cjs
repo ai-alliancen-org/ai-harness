@@ -1,35 +1,43 @@
-const test = require('node:test');
+// AI'en kan starte forhåndsvisningen gennem værktøjet aura_preview (beslutning for beta 2). Værktøjet taler med hovedprocessen gennem
+// en lokal bro med hemmelig nøgle. Broen kan kun starte og spørge til status for det projekt, pluginet blev skrevet til.
+const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const vm = require('node:vm');
-const fs = require('node:fs/promises');
-const path = require('node:path');
+const preview = require('../core/preview-bridge.cjs');
 
-async function bridge(name, api) {
-  const listeners = new Map(), calls = [], answers = [], old = { postMessage: message => answers.push(['old', message]) }, source = { postMessage: message => answers.push(['active', message]) };
-  const active = { contentWindow: source, src: 'aura-preview://project-a/' }, status = {};
-  const context = { current: { root: '/a' }, view: { id: 'chat-a' }, document: { querySelector: selector => selector === '#preview' ? active : status }, window: { addEventListener: (name, callback) => listeners.set(name, callback), harness: api(calls) }, setTimeout, matchMedia: () => ({ matches: false }), Blob, ArrayBuffer };
-  context.selectedOwner = () => ({ root: context.current.root, chat: context.view.id });
-  vm.runInNewContext(await fs.readFile(path.join(__dirname, '../ui', name), 'utf8'), context);
-  return { listeners, context, calls, answers, old, source, active };
-}
-
-test('gammel Promte-frame kan ikke bruge det valgte projekts proxy; afventende kald beholder sin ejer', async () => {
-  let resolveBody; const body = new Blob(['test']); body.arrayBuffer = () => new Promise(resolve => { resolveBody = resolve; });
-  const b = await bridge('promte-preview.js', calls => ({ promtePreviewFetch: async (input, owner) => { calls.push({ input, owner }); return { ok: true, value: { status: 200, body: 'privat A' } }; } }));
-  const payload = { type: 'promte-fetch-request', id: 'request-1', path: 'app-api/data', method: 'POST', body };
-  b.listeners.get('message')({ source: b.old, data: payload }); assert.equal(b.calls.length, 0); assert.equal(resolveBody, undefined);
-  b.listeners.get('message')({ source: b.source, data: payload });
-  b.context.current.root = '/b'; b.context.view.id = 'chat-b'; resolveBody(new ArrayBuffer(0));
-  await new Promise(resolve => setImmediate(resolve));
-  assert.equal(b.calls.length, 1); assert.equal(b.calls[0].owner.root, '/a'); assert.equal(b.calls[0].owner.chat, 'chat-a'); assert.equal(b.answers.length, 0);
+test('broen svarer kun med den rigtige nøgle og kun for det rigtige projekt', async t => {
+  const calls = [];
+  const bridge = await preview.listen({ start: async ({ root }) => { calls.push(['start', root]); return { state: 'running', url: 'http://localhost:5173/' }; }, status: async ({ root }) => ({ state: 'idle', root }) });
+  t.after(() => bridge.close());
+  const send = (headers, body) => fetch(bridge.url, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(body) });
+  assert.equal((await send({}, { action: 'status', root: '/p' })).status, 401);
+  assert.equal((await send({ authorization: 'Bearer forkert' }, { action: 'status', root: '/p' })).status, 401);
+  const ok = await send({ authorization: `Bearer ${bridge.token}` }, { action: 'start', root: '/p' });
+  assert.equal(ok.status, 200); assert.equal((await ok.json()).state, 'running'); assert.deepEqual(calls, [['start', '/p']]);
+  assert.equal((await send({ authorization: `Bearer ${bridge.token}` }, { action: 'slet-alt', root: '/p' })).status, 400, 'ukendt handling afvises');
+  assert.equal((await send({ authorization: `Bearer ${bridge.token}` }, { action: 'start' })).status, 400, 'rod mangler');
 });
 
-test('gammel Komplai-frame afvises og svaret fra A vises aldrig efter skift til B', async () => {
-  let resolveCall;
-  const b = await bridge('komplai-preview.js', calls => ({ komplaiPreviewCall: (input, owner) => { calls.push({ input, owner }); return new Promise(resolve => { resolveCall = resolve; }); } }));
-  const payload = { komplaiPreview: 1, kind: 'call', id: 1, path: '/_komplai/api/v1/identity/me', method: 'GET' };
-  await b.listeners.get('message')({ source: b.old, data: payload }); assert.equal(b.calls.length, 0);
-  const pending = b.listeners.get('message')({ source: b.source, data: payload });
-  b.context.current.root = '/b'; b.context.view.id = 'chat-b'; resolveCall({ ok: true, value: { status: 200, body: { name: 'Privat A' } } }); await pending;
-  assert.equal(b.calls[0].owner.root, '/a'); assert.equal(b.answers.length, 0);
+test('en fejl i håndteringen bliver til en dansk fejltekst, ikke en stakspor', async t => {
+  const bridge = await preview.listen({ start: async () => { throw new Error('Installér projektets pakker først.'); }, status: async () => ({}) });
+  t.after(() => bridge.close());
+  const response = await fetch(bridge.url, { method: 'POST', headers: { authorization: `Bearer ${bridge.token}`, 'content-type': 'application/json' }, body: JSON.stringify({ action: 'start', root: '/p' }) });
+  const body = await response.json();
+  assert.equal(response.status, 200); assert.equal(body.state, 'error'); assert.match(body.message, /Installér projektets pakker først/); assert.doesNotMatch(JSON.stringify(body), /at .*\.cjs/);
+});
+
+test('pluginkilden indeholder værktøjet og kun den nøgle og rod, den blev skrevet til', () => {
+  const source = preview.pluginSource({ url: 'http://127.0.0.1:1234/', token: 'hemmelig', root: '/projekt' });
+  assert.match(source, /aura_preview/); assert.match(source, /"hemmelig"/); assert.match(source, /"\/projekt"/);
+  assert.match(source, /enum\(\['start', 'status'\]\)/);
+});
+
+test('samtykket gælder kun, så længe projektets fingeraftryk er uændret', () => {
+  assert.equal(preview.consentValid({ fingerprint: 'a', scripts: false }, 'a'), true);
+  assert.equal(preview.consentValid({ fingerprint: 'a' }, 'b'), false);
+  assert.equal(preview.consentValid(null, 'a'), false);
+});
+
+test('prompten henviser AI\'en til værktøjet i stedet for at starte servere med kommandoer', () => {
+  const guidance = require('fs').readFileSync(require('path').join(__dirname, '..', 'core', 'project-guidance.cjs'), 'utf8');
+  assert.match(guidance, /aura_preview/); assert.match(guidance, /needs_consent/);
 });

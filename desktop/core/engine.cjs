@@ -224,7 +224,7 @@ async function writeReadGuard(directory, root, references, skills = [], { tempRo
 const ownsMessage = (info, promptID) => Boolean(info?.id) && (info.id === promptID || info.parentID === promptID || info.id > promptID);
 class OpenCodeEngine {
   // resume: en tidligere OpenCode-session for samme samtale. Findes den ikke længere, oprettes en ny.
-  constructor({ root, directory, provider, model, references = [], mode = 'free', skills = [], resume = null, sandbox = null, detached = false, recovery = {}, tempRoot = null, onEvent = () => {} }) { Object.assign(this, { tempRoot, root, directory, provider, model, references, mode, skills, resume, sandbox, detached, recovery, onEvent }); this.promptEpoch = 0; this.closedPermissions = new Set(); this.closedQuestions = new Set(); this.pendingQuestions = new Map(); this.pending = new Map(); this.active = false; this.resumed = false; }
+  constructor({ root, directory, provider, model, references = [], mode = 'free', skills = [], resume = null, sandbox = null, detached = false, recovery = {}, tempRoot = null, preview = null, onEvent = () => {} }) { Object.assign(this, { tempRoot, preview, root, directory, provider, model, references, mode, skills, resume, sandbox, detached, recovery, onEvent }); this.promptEpoch = 0; this.closedPermissions = new Set(); this.closedQuestions = new Set(); this.pendingQuestions = new Map(); this.pending = new Map(); this.active = false; this.resumed = false; }
   async request(url, method = 'GET', body, signal) {
     const response = await fetch(`${this.url}${url}`, { method, headers: { authorization: this.auth, 'content-type': 'application/json', 'x-opencode-directory': encodeURIComponent(this.root) }, body: body === undefined ? undefined : JSON.stringify(body), signal: signal || AbortSignal.timeout(15000), redirect: 'error' });
     if (!response.ok) throw Object.assign(new Error(`Agentmotoren afviste handlingen (HTTP ${response.status}).`), { status: response.status });
@@ -260,7 +260,13 @@ class OpenCodeEngine {
       permission.external_directory[trustedPattern] = 'deny';
     }
     this.config = engineConfig(this.provider, this.model, permission);
-    this.config.plugin = [readGuard.pluginURL, ...(this.sandbox ? [this.sandbox.pluginURL] : [])];
+    // Værktøjet aura_preview lader AI'en starte forhåndsvisningen gennem Aura. Kun i arbejdsmåder, hvor der kan bygges.
+    let previewURL = null;
+    if (this.preview && ['free', 'build'].includes(this.mode)) {
+      const file = path.join(this.directory, 'config', 'opencode', 'preview-tool.mjs');
+      await fs.writeFile(file, require('./preview-bridge.cjs').pluginSource(this.preview), { mode: 0o600 }); previewURL = pathToFileURL(file).href;
+    }
+    this.config.plugin = [readGuard.pluginURL, ...(previewURL ? [previewURL] : []), ...(this.sandbox ? [this.sandbox.pluginURL] : [])];
     if (/\{(?:env|file):/.test(JSON.stringify(this.config))) throw new Error('Konfigurationen indeholder en ikke tilladt variabelhenvisning.');
     // Terminalklienten styrer Stop via API'et; dens Ctrl+C må ikke også ramme motorens procesgruppe.
     const args = ['serve', '--hostname', '127.0.0.1', '--port', '0'], env = isolatedEnv(this.directory, this.config, password, { commandIsolation: Boolean(this.sandbox), tempRoot: this.tempRoot });

@@ -878,13 +878,23 @@ handle('preview:contains', async value => {
   try { return (await frame.executeJavaScript(`String(document.body ? document.body.textContent : '').replace(/\\s+/g, ' ').includes(${JSON.stringify(text)})`)) === true; } catch { return false; }
 });
 handle('preview:prepare', value => exclusive(async () => {
-  return currentSpace().devServer.prepare(value?.action, value?.scripts === true);
+  const review = await currentSpace().devServer.prepare(value?.action, value?.scripts === true);
+  // Brugerens gennemgang huskes, når brugeren trykker Start, så AI'en senere kan starte forhåndsvisningen uden en ny dialog.
+  currentSpace().pendingConsent = { token: review.token, fingerprint: review.project?.fingerprint || null, scripts: review.scripts === true };
+  return review;
 }));
 handle('preview:execute', token => exclusive(async () => {
   if (workbench.busyRoot(workspaceRoot())) throw new Error('Vent på opgaven i denne samtale.');
-  currentSpace().forceStatic = false;
-  return currentSpace().devServer.execute(token);
+  const space = currentSpace(), pending = space.pendingConsent; space.pendingConsent = null;
+  space.forceStatic = false;
+  const result = await space.devServer.execute(token);
+  if (pending?.token === token && pending.fingerprint) await space.owner.store.saveProject(space.owner.project.root, { previewConsent: { fingerprint: pending.fingerprint, scripts: pending.scripts, at: Date.now() } });
+  return result;
 }));
+// AI'ens værktøj aura_preview: starter forhåndsvisningen, hvis brugeren har godkendt netop dette projekts pakker og opstart.
+const previewBridge = require('./core/preview-bridge.cjs');
+const aiPreview = (root, action) => require('./core/ai-preview.cjs').aiPreview(spaceFor(root), action);
+
 handle('preview:stop', () => currentSpace().devServer.stop().then(() => currentSpace().devServer.snapshot()));
 
 app.whenReady().then(async () => {
@@ -916,6 +926,8 @@ app.whenReady().then(async () => {
       ...(process.platform === 'darwin' ? [{ type: 'separator' }, { label: 'Vis alle forrest', role: 'front' }] : [])
     ] }
   ]));
+  // Broen til AI'ens værktøj aura_preview lever, så længe appen kører. Den lytter kun på 127.0.0.1 og kræver en hemmelig nøgle.
+  previewBridge.install(await previewBridge.listen({ start: ({ root }) => aiPreview(root, 'start'), status: ({ root }) => aiPreview(root, 'status') }));
   registry = new WorkspaceRegistry({ directory: path.join(app.getPath('userData'), 'harness'), safeStorage, profiles: profileRoot,
     emit: event => { if (['session.error','engine.error'].includes(event.type)) recordFailure('agent', 'model'); sendEvent(event); },
     configure: bench => {
