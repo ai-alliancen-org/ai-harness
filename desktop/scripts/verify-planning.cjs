@@ -205,19 +205,17 @@ const questions = [
     assert.equal(await page.isVisible('#plan-restore'), false); assert.match(await page.locator('#plan-meta').textContent(), /^Fra AI’en/);
     passed('Bed AI’en rette giver en ny plan fra AI’en under Plan');
 
-    // Stop under en ny planlægning: den seneste plan kan læses, men ikke bygges, og kan bruges til en ny plan.
+    // Stop under en ny planlægning: den færdige plan bevares og kan stadig bygges, indtil en ny plan erstatter den (beslutning for beta 2).
     await page.fill('#prompt', 'STOP og lav en ny plan'); await sendPrompt();
     await page.locator('#messages .assistant').filter({ hasText: 'Jeg går i gang med en ny plan' }).waitFor({ timeout: 90000 });
-    await page.locator('#plan-notice').filter({ hasText: 'AI’en arbejder på en ny plan' }).waitFor();
+    assert.equal(await page.isVisible('#plan-card'), true, 'planen står, mens AI\u2019en laver en ny');
     await page.click('#stop'); await page.locator('#run-status').filter({ hasText: 'Stoppet' }).waitFor({ timeout: 30000 });
-    await page.locator('#plan-notice').filter({ hasText: 'Den seneste plan kan ikke bygges, fordi du bad om en ny plan. Bed AI’en om en ny plan ud fra den.' }).waitFor();
-    assert.equal(await page.isVisible('#plan-actions'), false); assert.equal(await page.isVisible('#plan-replan'), true);
+    await page.locator('#plan-actions').waitFor({ state: 'visible' });
     assert.match(await page.locator('#plan-text').innerText(), /Version 2/);
-    await page.fill('#prompt', ''); await page.click('#plan-replan');
-    assert.match(await page.inputValue('#prompt'), /^Lav en opdateret plan ud fra denne tidligere plan:\n\nJeg har læst briefen/);
-    await sendPrompt(); await page.locator('#plan-actions').waitFor({ state: 'visible', timeout: 90000 });
-    assert.match(await page.locator('#plan-text').innerText(), /Version 4/);
-    passed('Efter Stop kan den seneste plan læses, men ikke bygges, og den bliver udgangspunkt for en ny plan');
+    assert.equal(await page.locator('#plan-notice').filter({ hasText: 'kan ikke bygges' }).count(), 0, 'ingen besked om en tilbagetrukket plan');
+    await page.fill('#prompt', 'Lav en opdateret plan ud fra denne tidligere plan:\n\nJeg har læst briefen');
+    await sendPrompt(); await page.locator('#plan-text').filter({ hasText: 'Version 4' }).waitFor({ timeout: 90000 });
+    passed('Efter Stop bevares den seneste plan og kan bygges, og en ny plan erstatter den');
 
     // Spring over: AI'en får besked og bruger sine egne antagelser.
     await page.fill('#prompt', 'SPØRG IGEN om data'); await sendPrompt();
@@ -225,7 +223,7 @@ const questions = [
     assert.equal(await card.locator('.question-step').textContent(), 'Spørgsmål til dig · Data');
     await card.locator('.question-links button', { hasText: 'Spring over' }).click();
     await page.locator('#messages .answer-record').filter({ hasText: 'Du sprang AI’ens spørgsmål over. AI’en vælger selv.' }).waitFor();
-    await page.locator('#plan-actions').waitFor({ state: 'visible', timeout: 90000 }); assert.match(await page.locator('#plan-text').innerText(), /Version 3/);
+    await page.locator('#plan-text').filter({ hasText: 'Version 3' }).waitFor({ timeout: 90000 });
     const skipped = requests.find(body => body.messages.some(m => m.role === 'tool' && JSON.stringify(m.content).includes('Brugeren springer over')));
     assert.ok(skipped, 'modellen får at vide, at den selv skal vælge');
     passed('Spring over lader AI’en vælge selv, og opgaven fortsætter til en plan');
