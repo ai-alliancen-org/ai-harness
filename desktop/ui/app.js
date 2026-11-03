@@ -852,11 +852,14 @@ function renderStatus() {
   window.liveWork?.render();
   const progress = window.ChatDisplay.progress(v);
   $('#agent-progress').textContent = progress.text; $('#agent-progress').hidden = waiting;
+  $('#agent-retry').hidden = !progress.stalled;
   $('#agent-activity').classList.toggle('is-quiet', progress.quiet && !waiting);
   $('#chat-form').setAttribute('aria-busy', String(v.running));
   $('#chat-form').dataset.workState = window.ChatDisplay.workState(v);
   if (v.running) $('#run-status').textContent = waiting ? 'Venter på dig' : `${v.runLabel} ${elapsedText(Date.now() - v.runStartedAt)}`;
 }
+// Stop lægger beskeden tilbage i skrivefeltet, så brugeren kan sende den igen, når udbyderen har ro.
+$('#agent-retry').onclick = () => { if (view.running) $('#stop').click(); };
 $('#agent-activity-jump').onclick = () => { const item = view.waitingFor[0]; if (!item?.element?.isConnected) return; item.element.scrollIntoView({ block: 'nearest' }); item.element.querySelector('button, textarea, input')?.focus(); };
 function setRunning(value, status, v = view) {
   if (value && !v.running) { v.runStartedAt = Date.now(); v.lastSignalAt = v.runStartedAt; v.receivedChars = 0; v.modelProgress = null; v.todos = []; }

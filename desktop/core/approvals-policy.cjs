@@ -8,7 +8,7 @@ const { createHash } = require('node:crypto');
 const digest = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const within = (root, target) => { const relative = path.relative(root, target); return relative === '' || (relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative)); };
 const stable = value => Array.isArray(value) ? value.map(stable) : value && typeof value === 'object' ? Object.fromEntries(Object.keys(value).sort().map(key => [key, stable(value[key])])) : value;
-const { isProtected: protectedPath } = require('./protected-paths.cjs');
+const { isProtected: protectedPath, isProtectedIn } = require('./protected-paths.cjs');
 const writable = mode => ['free', 'build'].includes(mode);
 
 // realpath på den nærmeste eksisterende forælder dækker også nye filer. Et link
@@ -182,7 +182,7 @@ class ApprovalsPolicy {
         const targets = [];
         for (const item of requested) {
           const canonical = await canonicalPath(item.value);
-          if (protectedPath(item.value) || protectedPath(canonical)) throw new Error('Beskyttede filer kræver særskilt gennemgang.');
+          if (isProtectedIn(workspace, item.value) || isProtectedIn(workspace, canonical)) throw new Error('Beskyttede filer kræver særskilt gennemgang.');
           if (item.subtree) await directory(canonical);
           targets.push({ path: canonical, subtree: item.subtree });
         }

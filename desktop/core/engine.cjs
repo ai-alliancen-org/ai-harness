@@ -71,7 +71,7 @@ function permissions(root, references, mode = 'free', skills = null) {
   if (['chat', 'plan'].includes(mode)) return { '*': 'deny', read, glob: 'allow', list: 'allow', grep: 'ask', webfetch: 'ask', external_directory: external, skill, question: 'allow' };
   const edit = { '*': 'ask', ...denials };
   if (skills?.names.length) edit[skillPattern(skills.directory)] = 'deny';
-  return { '*': 'ask', read, glob: 'allow', grep: 'ask', list: 'allow', edit, bash: 'ask', external_directory: external, webfetch: 'ask', websearch: 'deny', task: 'deny', skill, lsp: 'deny', question: 'allow', todowrite: 'allow', todoread: 'allow' };
+  return { '*': 'ask', read, glob: 'allow', grep: 'ask', list: 'allow', edit, bash: 'ask', external_directory: external, webfetch: 'ask', websearch: 'deny', task: 'deny', skill, lsp: 'deny', question: 'deny', todowrite: 'allow', todoread: 'allow' };
 }
 // Motorens skillmappe skrives forfra ved hver start, så en fravalgt skill eller en gammel tilpasning ikke bliver liggende.
 async function writeSkills(directory, skills) {
@@ -170,7 +170,9 @@ async function writePluginRuntime(directory) {
 function createReadGuard({ fs, path, root, references = [], selectedFiles = [], classifyPath = classify }) {
   const selected = new Set([...references.map(file => path.resolve(root, file)), ...selectedFiles]);
   const protectedFile = file => {
-    const result = classifyPath(file);
+    // Kun stien inde i projektet tæller: mapperne over projektet (fx "secrets-app") gør ikke projektets filer beskyttede.
+    const rel = path.relative(root, file);
+    const result = classifyPath(rel && rel !== '..' && !rel.startsWith('..' + path.sep) && !path.isAbsolute(rel) ? rel : file);
     if (result.invalid || result.credentials || result.metadata) throw new Error('Aura beskytter denne fil.');
     return result.references;
   };

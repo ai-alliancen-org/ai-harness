@@ -27,12 +27,14 @@
   }
   function progress(view, now = Date.now()) {
     const silence = Math.max(0, Math.floor((now - (view.lastSignalAt || view.runStartedAt)) / 1000));
-    if (view.waitingFor?.length) return { quiet: false, text: '' };
+    if (view.waitingFor?.length) return { quiet: false, stalled: false, text: '' };
+    // Efter et minut uden signaler er opgaven reelt gået i stå. Keepalive tæller ikke som signal. Brugeren får en klar vej ud.
+    if (silence >= 60) return { quiet: true, stalled: true, text: `Ingen svar fra modellen i ${silence >= 120 ? Math.round(silence / 60) + ' min' : silence + ' s'}. Udbyderen kan have travlt. Vent, eller stop og prøv igen.` };
     const p = view.modelProgress;
-    if (p && silence < 15 && p.phase === 'reasoning') return { quiet: false, text: 'Der kommer fortsat signaler fra modellen. Intet nyt svar eller filindhold endnu.' };
+    if (p && silence < 15 && p.phase === 'reasoning') return { quiet: false, stalled: false, text: 'Der kommer fortsat signaler fra modellen. Intet nyt svar eller filindhold endnu.' };
     if (p && silence < 15 && p.phase === 'tool') return { quiet: false, text: p.draft ? (p.draft.hidden ? 'Indhold med mulige nøgler skjules.' : `${p.draft.lines} linjer modtaget · ikke gemt endnu`) : 'Handlingen vises, når modellen har sendt dens oplysninger.' };
     const received = view.receivedChars ? `${view.receivedChars.toLocaleString('da-DK')} tegn modtaget` : '';
-    return { quiet: silence >= 15, text: silence >= 15 ? `Ingen nye signaler i ${silence} s. Du kan vente eller stoppe.` : received || 'Venter på svar fra AI’en.' };
+    return { quiet: silence >= 15, stalled: false, text: silence >= 15 ? `Ingen nye signaler i ${silence} s. Du kan vente eller stoppe.` : received || 'Venter på svar fra AI’en.' };
   }
   // Lyskanten om skrivefeltet: den drejer, mens AI'en arbejder, og står stille, når der ikke kommer signaler.
   // Venter opgaven på brugeren, er der ingen kant, så kortet med valget står alene. Efter forslag i #18.

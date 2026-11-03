@@ -49,4 +49,10 @@ function toSandboxGlobs(options) {
   // sets are supported by its native macOS regex and Linux glob expansion.
   return [...new Set([...patterns(options).flatMap(pattern => [pattern, pattern + ':*']), '*.', '* ', '*.:*', '* :*'].map(pattern => '**/' + insensitive(pattern)))];
 }
-module.exports = { RULES, createPathClassifier, classify, isProtected, toOpenCodeGlobs, toOpenCodeAliasGlobs, toSandboxGlobs };
+// Som isProtected, men en fil inde i projektet bedømmes ud fra stien i projektet, ikke mapperne over det.
+function isProtectedIn(root, value, options) {
+  const path = require('node:path');
+  const rel = typeof value === 'string' && path.isAbsolute(value) && root ? path.relative(root, value) : null;
+  return isProtected(rel && rel !== '..' && !rel.startsWith('..' + path.sep) && !path.isAbsolute(rel) ? rel : value, options);
+}
+module.exports = { isProtectedIn, RULES, createPathClassifier, classify, isProtected, toOpenCodeGlobs, toOpenCodeAliasGlobs, toSandboxGlobs };
