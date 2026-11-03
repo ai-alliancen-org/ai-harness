@@ -16,8 +16,9 @@ test('AI-arbejdsfilerne ligger i projektets .aura/tmp under opgavens id', () => 
 
 test('systemprompten peger på den relative mappe og ikke på en absolut sti', () => {
   assert.equal(typeof chat.scratchInstruction, 'function', 'scratchInstruction skal være eksporteret');
-  const tekst = chat.scratchInstruction('op-1');
-  assert.match(tekst, /\.aura\/tmp\/op-1/);
+  const tekst = chat.scratchInstruction();
+  assert.match(tekst, /\.aura\/tmp/);
+  assert.equal(chat.scratchInstruction(), chat.scratchInstruction('op-2'), 'teksten er den samme for hver opgave, så cachen ikke brydes');
   assert.doesNotMatch(tekst, new RegExp(os.tmpdir().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), 'ingen systemtemp-sti');
   assert.doesNotMatch(tekst, /appdata|\/Users\//i, 'ingen appdata- eller brugersti');
 });

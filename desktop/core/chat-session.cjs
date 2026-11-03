@@ -433,7 +433,7 @@ class ChatSession {
       // Herefter følger de linjer, der først kendes her, og som derfor står uden for gennemgangen.
       let system = appContext.system;
       if (this.copy) system += '\nArbejd kun i denne samtales kopi: ' + this.root + '. Projektets oprindelige mappe er ikke dit arbejdsområde. Aura håndterer indfletning separat efter brugerens gennemgang.';
-      system += scratchInstruction(this.task.id);
+      system += scratchInstruction();
       if (this.commandSandbox) system += '\nAlle kommandoer kører med teknisk isolation. Du kan arbejde i arbejdsområdet og den midlertidige mappe. Hemmeligheder og øvrige mapper er spærret. Netadgang er afgrænset til registry.npmjs.org, pypi.org og files.pythonhosted.org. Forklar en afvist adgang; forsøg ikke at omgå den.';
       if (Object.hasOwn(prepared.context, 'projectInstructions') && JSON.stringify(await projectInstructions(this.root)) !== JSON.stringify(prepared.context.projectInstructions)) throw new Error('Projektets AGENTS.md har ændret sig under opstart. Gennemgå oplysningerne igen før afsendelse.');
       this.gateway?.setEffort?.(prepared.disclosure.effort);
@@ -905,5 +905,6 @@ function handoffNeeded({ messages, engineActive, modelSwitch, previousMode, mode
   return engineActive ? modelSwitch === true : Boolean(previousMode && previousMode !== mode);
 }
 function scratchRootFor(root, taskId) { return path.join(root, '.aura', 'tmp', String(taskId)); }
-function scratchInstruction(taskId) { return '\nAI-filer til denne opgave ligger i .aura/tmp/' + taskId + ' i projektmappen. Brug kun den mappe; den hører til netop denne opgave.'; }
+// Teksten er den samme i hver besked, så udbyderens cache af begyndelsen af samtalen ikke brydes af et skiftende id.
+function scratchInstruction() { return '\nMidlertidige filer og kladder lægger du i mappen .aura/tmp/ i projektmappen. Læg ikke midlertidige filer andre steder.'; }
 module.exports = { composeAppContext, ChatSession, planningReply, sessionFailure, emptyUsage, addStep, scratchRootFor, handoffNeeded, engineIdentityOf, prepareScratch, scratchInstruction, commandIsolationFor, approveAllApplies, engineRestartNeeded, scratchAllowedRoot, agentsDuplicatesRules };

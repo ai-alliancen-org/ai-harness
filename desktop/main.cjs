@@ -56,7 +56,8 @@ function spaceFor(root = workspaceRoot()) { return spaces.get(root); }
 function ownerFor(root) { return spaces.get(root)?.owner || [...registry.values()].find(bench => bench.project?.root === root || [...bench.chats.values()].some(chat => chat.root === root)); }
 function makeServer(ctx) {
   return new DevServer({ runner: app.isPackaged ? path.join(process.resourcesPath, 'app.asar.unpacked/core/dev-server-runner.cjs') : undefined, komplaiScript: komplaiScript(ctx.root),
-    getRuntimeConfig: async () => { return normalizeRuntimeConfig((await ctx.owner.store.project(ctx.owner.project.root)).runtime || {}); },
+    // Brugerens egen opstart går forud; uden den bruges .aura/preview.json, som AI'en kan skrive.
+    getRuntimeConfig: async () => require('./core/preview-config.cjs').effectiveRuntime(ctx.root, (await ctx.owner.store.project(ctx.owner.project.root)).runtime || {}),
     // Den sidste port huskes pr. arbejdsmappe, så en kopi og projektet ikke deler forhåndsvisningens lokale data.
     previewPort: {
       get: async () => { const port = (await ctx.owner.store.read()).previewPorts?.[ctx.owner.store.projectKey(ctx.root)]; return Number.isInteger(port) ? port : null; },
@@ -744,7 +745,7 @@ handle('preview:check', input => {
   if (!currentProject()) throw new Error('Åbn et projekt først.');
   const since = Number(input?.since) || 0, origin = previewOrigin();
   if (!origin) return { preview: false };
-  const documents = previewLog.documents.filter(item => item.at >= since && item.url?.startsWith(origin)), errors = previewLog.errors.filter(item => item.at >= since && item.url?.startsWith(origin));
+  const documents = previewLog.documents.filter(item => item.at >= since && item.url?.startsWith(origin)), errors = require('./core/preview-note.cjs').uniqueErrors(previewLog.errors.filter(item => item.at >= since && item.url?.startsWith(origin)));
   const last = documents.at(-1) || null;
   const result = { preview: true, loaded: Boolean(last), status: last?.status || null, errors: errors.slice(0, 5).map(({ message, source, line }) => ({ message, source, line })), errorCount: errors.length };
   const shown = !last ? 'siden svarede ikke' : last.status >= 400 ? `siden svarede med fejl ${last.status}` : 'siden blev vist';

@@ -25,6 +25,10 @@
     $('#server-reinstall').disabled = active() || running || Boolean(review);
     $('#server-scripts').disabled = active() || Boolean(review);
     $('#server-log').textContent = value.output || 'Ingen proceslog endnu.';
+    let repairButton = $('#server-repair');
+    if (!repairButton) { repairButton = node('button', 'Ret med AI', 'text-button'); repairButton.id = 'server-repair'; repairButton.type = 'button'; $('#server-log').closest('details, div, section')?.before(repairButton); }
+    repairButton.hidden = value.state !== 'error';
+    repairButton.onclick = () => { $('#preview-dialog').close(); window.draftMessage(window.ApprovalView.serverRepairDraft(status), 'Forslaget står i skrivefeltet. Gennemgå det, før du sender.', { mode: 'free' }); };
     $('#server-open').hidden = !framework && !diagnostics.length;
     $('#server-open').textContent = diagnostics.length ? 'Gennemgå forhåndsvisning' : active() ? 'Vis opstart' : 'error' === value.state ? 'Gennemgå fejlen' : 'Start forhåndsvisning';
     let problems = $('#server-diagnostics');

@@ -27,3 +27,10 @@ test('beskeden er kort, så en lang konsolfejl ikke fylder prompten', () => {
 test('uden kontrol er der ingen besked', () => {
   assert.equal(previewNoteFor(null), '');
 });
+
+test('den samme konsolfejl tælles kun én gang, selv om siden blev indlæst flere gange i kontrolvinduet', () => {
+  const { uniqueErrors } = require('../core/preview-note.cjs');
+  const fejl = { message: 'Kunne ikke hente lokalerne', source: 'aura-preview://p/', line: 1 };
+  assert.equal(uniqueErrors([fejl, { ...fejl }, { ...fejl, line: 2 }]).length, 2);
+  assert.deepEqual(uniqueErrors([]), []);
+});

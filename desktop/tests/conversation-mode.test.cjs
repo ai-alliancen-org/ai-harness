@@ -24,16 +24,17 @@ test('planoverskriften fra den faktiske Promte-samtale giver et byggekort', () =
   }
 });
 test('brugerens klare byggebesked kan starte bygning, men omtale og afvisning kan ikke', () => {
-  for (const text of ['byg', 'Byg planen', 'ja, byg den', 'go ahead and build', 'Build it!', 'gå i gang med at bygge']) assert.equal(mode.buildRequest(text), true, text);
-  for (const text of ['byg ikke endnu', 'nej, byg ikke', 'kan du bygge?', 'hvordan bygger man?', 'modellen sagde "byg"', 'for at fortsætte: byg', 'go ahead and build?']) assert.equal(mode.buildRequest(text), false, text);
+  for (const text of ['byg', 'Byg planen', 'ja, byg den', 'go ahead and build', 'Build it!', 'gå i gang med at bygge', 'Ja tak, byg den', 'Byg den, tak', 'ja tak byg planen nu', 'Lav den', 'lav den nu, tak', 'Gør det', 'ja, gør det', 'Implementér planen', 'implementer planen', 'Kør på']) assert.equal(mode.buildRequest(text), true, text);
+  for (const text of ['byg ikke endnu', 'nej, byg ikke', 'kan du bygge?', 'hvordan bygger man?', 'modellen sagde "byg"', 'for at fortsætte: byg', 'go ahead and build?', 'lav den ikke endnu', 'kan du lave den?', 'gør det ikke', 'hvad gør det?', 'lav en liste over lokaler']) assert.equal(mode.buildRequest(text), false, text);
 });
-test('Samtale bruger plan-agenten med forbud mod ændringer og kommandoer', async () => {
+test('Samtale bruger den skrivebeskyttede agent (ikke OpenCodes plan-agent, som indsætter en engelsk påmindelse) med forbud mod ændringer og kommandoer', async () => {
   const policy = permissions('/projekt', [], 'chat');
   for (const tool of ['write', 'edit', 'bash', 'task', 'apply_patch']) assert.equal(policy[tool] || policy['*'], 'deny');
   const engine = new OpenCodeEngine({ root: '/projekt', mode: 'chat', model: { id: 'test' } });
   engine.active = true; engine.session = { id: 'prøve' }; let sent;
   engine.request = async (_, __, body) => { sent = body; }; await engine.send('Hej', 'Regler');
-  assert.equal(sent.agent, 'plan');
+  assert.equal(sent.agent, 'laes');
+  await engine.send('Byg', 'Regler', 'build'); assert.equal(sent.agent, 'build');
 });
 test('rigtige samtalehændelser viser tilbud, husker afvisning og afviser et almindeligt plansvar', async t => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'aura-intent-')); t.after(() => fs.rm(root, { recursive: true, force: true }));

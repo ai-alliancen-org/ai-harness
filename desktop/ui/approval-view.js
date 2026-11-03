@@ -74,6 +74,12 @@
     const writing = ['write', 'edit', 'apply_patch'].includes(p?.toolInput?.tool || p?.tool?.name);
     return writing ? ['Må AI’en skrive i en mappe uden for projektet?', 'Mappen kan få filer, der ligger uden for dit projekt. Tillad kun, hvis du ved, hvad AI’en skriver.'] : ['Må AI’en se en mappe uden for projektet?', 'Mappen kan indeholde materiale, du ikke vil dele med din AI.'];
   }
-  const api = { directoryTitle, parseUnifiedDiff, commandHints, failureText, commandResult, groupKey, receiptText, diffPage };
+  // En fejlet forhåndsvisning sendt til AI'en: fejlbeskeden og de sidste linjer af den maskerede proceslog (nøgler er allerede skjult).
+  function serverRepairDraft(status) {
+    if (status?.state !== 'error') return '';
+    const tail = String(status.output || '').split('\n').slice(-25).join('\n').slice(-1500);
+    return `Forhåndsvisningen kunne ikke starte. Beskeden fra Aura: ${status.message || 'ukendt fejl'}\n\nSeneste del af proceslogen (nøgler er skjult):\n${tail || '(tom)'}\n\nFind årsagen, ret den, og start forhåndsvisningen igen med værktøjet aura_preview.`;
+  }
+  const api = { serverRepairDraft, directoryTitle, parseUnifiedDiff, commandHints, failureText, commandResult, groupKey, receiptText, diffPage };
   if (typeof module === 'object' && module.exports) module.exports = api; else root.ApprovalView = api;
 })(typeof window === 'object' ? window : globalThis);

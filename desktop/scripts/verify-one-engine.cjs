@@ -44,6 +44,8 @@ const { OpenCodeEngine } = require('../core/engine.cjs');
     assert.equal(await sendAs('SKRIV plan.txt', 'plan'), 'session.idle');
     assert.equal(await fs.access(path.join(root, 'plan.txt')).then(() => true, () => false), false, 'Planlæg kan ikke skrive');
     assert.equal(engine.session.id, session, 'samme session'); assert.equal(engine.child.pid, pid, 'samme motorproces');
+    const reminders = requests.map(r => JSON.stringify(r.messages).includes('Plan Mode') || JSON.stringify(r.messages).includes('CRITICAL: Plan mode'));
+    assert.equal(reminders.some(Boolean), false, 'OpenCodes engelske Plan Mode-påmindelse indsættes ikke: ' + JSON.stringify(reminders));
     const hasWrite = requests.map(r => r.tools?.some(t => t.function?.name === 'write'));
     console.log(JSON.stringify({ status: 'bestået', session, pid, skrivetilladelser: skrivning, kaldMedSkriveværktøj: hasWrite.filter(Boolean).length, kald: requests.length }, null, 1));
   } finally { await engine.close(); server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }

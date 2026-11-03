@@ -94,7 +94,7 @@ async function writeSkills(directory, skills) {
 // Én motor kan tjene alle arbejdsmåder: den skrivebeskyttede agent (plan) bruges til Samtale og Planlæg, den skrivbare (build) til Byg, og
 // agenten vælges for hver besked. Uden en skrivbar tilladelse er motoren som før skrivebeskyttet.
 function engineConfig(provider, model, permission, buildPermission = null) {
-  return { $schema: 'https://opencode.ai/config.json', model: `harness/${model.id}`, small_model: `harness/${model.id}`, enabled_providers: ['harness'], provider: { harness: provider }, permission, agent: { plan: { permission }, ...(buildPermission ? { build: { permission: buildPermission } } : {}) }, share: 'disabled', autoupdate: false, snapshot: false, plugin: [], mcp: {}, lsp: false, formatter: false };
+  return { $schema: 'https://opencode.ai/config.json', model: `harness/${model.id}`, small_model: `harness/${model.id}`, enabled_providers: ['harness'], provider: { harness: provider }, permission, agent: { plan: { permission }, laes: { mode: 'primary', description: 'Skrivebeskyttet: læser og svarer, men ændrer ikke noget.', permission }, ...(buildPermission ? { build: { permission: buildPermission } } : {}) }, share: 'disabled', autoupdate: false, snapshot: false, plugin: [], mcp: {}, lsp: false, formatter: false };
 }
 function isolatedEnv(directory, config, password, { commandIsolation = false, tempRoot = null } = {}) {
   const env = {};
@@ -386,7 +386,7 @@ class OpenCodeEngine {
     this.currentReplySeen = false; this.currentMessageIDs = new Set([messageID]);
     const epoch = this.promptEpoch, signal = this.eventsAbort?.signal;
     try {
-      return await this.request(`/session/${this.session.id}/prompt_async`, 'POST', { messageID, model: { providerID: 'harness', modelID: this.model.id }, agent: ['chat', 'plan'].includes(mode) ? 'plan' : 'build', system, parts: [{ type: 'text', text }] });
+      return await this.request(`/session/${this.session.id}/prompt_async`, 'POST', { messageID, model: { providerID: 'harness', modelID: this.model.id }, agent: ['chat', 'plan'].includes(mode) ? 'laes' : 'build', system, parts: [{ type: 'text', text }] });
     } catch (error) {
       if (error.status && error.status < 500 || signal?.aborted) throw error;
       for (const wait of this.recovery.delays || [500, 1500, 3000]) {

@@ -51,3 +51,12 @@ test('Ret med AI i forhåndsvisningen lægger rettelsen i Byg, hvor filer kan æ
   const call = /window\.draftMessage\([^;]*\);/.exec(source.slice(source.indexOf("'Ret med AI'")))[0];
   assert.match(call, /mode: 'free'/);
 });
+
+test('en serverfejl kan sendes til AI\'en med de sidste linjer af den maskerede log, og kun dem', () => {
+  const view = require('../ui/approval-view.js');
+  const lang = Array.from({ length: 400 }, (_, n) => `linje ${n}`).join('\n') + '\nSLUTNINGEN';
+  const kladde = view.serverRepairDraft({ state: 'error', message: 'De lokale tjenester blev ikke klar.', output: lang });
+  assert.match(kladde, /De lokale tjenester blev ikke klar/); assert.match(kladde, /SLUTNINGEN/); assert.doesNotMatch(kladde, /linje 0\n/);
+  assert.ok(kladde.length < 2200); assert.match(kladde, /aura_preview/);
+  assert.equal(view.serverRepairDraft({ state: 'running', output: 'x' }), '', 'ingen kladde, når der ikke er en fejl');
+});
