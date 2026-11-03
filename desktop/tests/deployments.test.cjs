@@ -63,3 +63,18 @@ test('udgivelse uden en gemt version siger, hvad der mangler', async t => {
   t.after(() => require('node:fs/promises').rm(root, { recursive: true, force: true }));
   await assert.rejects(deploymentArtifact(root, 'public'), /Gem en version af appen, før du udgiver/);
 });
+
+test('et "travlt"-svar fra udbyderen, hvor intet er uploadet, giver en klar besked og efterlader ingen kvittering om ukendt upload', async () => {
+  const f = fixture(); const previous = { state: 'READY', id: 'tidligere' }; f.state.deploymentLast = previous;
+  f.provider.deploy = async () => { throw Object.assign(Error('komplai har travlt lige nu. Intet er uploadet, så det er sikkert at prøve igen om lidt.'), { notUploaded: true }); };
+  const r = await f.deployments.review('/test', config);
+  await assert.rejects(f.deployments.deploy('/test', r.token), /travlt[\s\S]*sikkert at prøve igen/);
+  assert.deepEqual(f.state.deploymentLast, previous, 'den tidligere kvittering er bevaret');
+});
+
+test('en upload, hvor udfaldet er uvist, giver stadig en kvittering om ukendt upload', async () => {
+  const f = fixture(); f.provider.deploy = async () => { throw Error('netværksfejl'); };
+  const r = await f.deployments.review('/test', config);
+  await assert.rejects(f.deployments.deploy('/test', r.token), /ikke bekræftet/);
+  assert.equal(f.state.deploymentLast.state, 'UNKNOWN');
+});

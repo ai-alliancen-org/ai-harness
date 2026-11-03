@@ -52,6 +52,9 @@
       : failed ? { title: 'Status kunne ikke hentes', detail: 'Uploadsvaret er gemt. Prøv statuskontrollen igen.', tone: 'warning' }
       : legacy ? { title: 'Tidligere status: ' + (titles[r.state] || 'ukendt'), detail: 'Ældre kvittering. Kontrollér status igen.', tone: 'neutral' }
       : { title: titles[r.state] || 'Status er ukendt', detail: r.state === 'PREPARED' ? 'Versionen er oprettet. Kontrollér status, før du uploader igen.' : known ? 'Bekræftet af ' + provider(r.config.provider) + '.' : r.state === 'UPLOADED' ? 'Den aktive version er endnu ikke bekræftet.' : 'Fra udbyderens uploadsvar. Status kan kontrolleres igen.', tone: known && r.state === 'READY' ? 'positive' : ['ERROR', 'CANCELED', 'REMOVED', 'BLOCKED', 'REJECTED'].includes(r.state) ? 'warning' : 'neutral' };
+    // Udbyderen har modtaget versionen, men adressen svarer ikke endnu eller giver en fejlside. Så er appen ikke klar, og kortet må ikke se færdigt ud.
+    const notReady = known && r.state === 'READY' && (c.site?.status === 'unreachable' || (c.site?.status === 'answered' && (c.site.http === 404 || c.site.http >= 500)));
+    if (notReady) publication.title = 'Appen er ikke klar endnu', publication.detail = 'Udbyderen har modtaget din version, men adressen svarer ikke endnu. Prøv kontrollen igen om lidt, før du åbner appen.', publication.tone = 'warning';
     const visibility = known ? c.provider.visibility : null;
     const changed = visibility && visibility !== r.config.visibility;
     const exposed = visibility === 'private' && c?.site?.status === 'answered' && c.site.http >= 200 && c.site.http < 300 && c?.content?.status === 'matched';

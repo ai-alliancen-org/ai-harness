@@ -103,12 +103,15 @@ class Deployments {
     const a=await this.material(root,r.config), provider=this.providers[r.config.provider], target=await provider.inspect(r.config,a);
     if(a.head!==r.head||a.hash!==r.hash||hash(target)!==r.targetHash) throw Error('Version eller destination har ændret sig. Gennemgå udgivelsen igen.');
     const receipt={config:r.config,target,version:r.version,head:a.head,hash:a.hash,startedAt:new Date().toISOString(),state:'SUBMITTING',id:null,url:null,checks:null,indexHash:r.config.mode!=='source'?a.files.find(f=>f.file===(r.config.provider==='azure'&&r.config.frontend!=='.'?r.config.frontend+'/':'')+'index.html')?.sha256:null};
+    const before=(await this.store.project(root)).deploymentLast, trackingBefore=(await this.store.project(root)).deploymentTrackingSource;
     await this.store.saveProject(root,{deploymentLast:receipt,deploymentTrackingSource:'manual'});
     // En ny komplai-app gemmes straks, så et nyt forsøg opdaterer den samme app i stedet for at oprette endnu en.
     const onCreated=async appId=>{ receipt.appId=appId; await this.store.saveProject(root,{deploymentConfig:{...r.config,appId,name:undefined,slug:undefined},deploymentLast:receipt}); };
     const onUploaded=async result=>{ Object.assign(receipt,result); await this.store.saveProject(root,{deploymentLast:receipt}); };
     try { Object.assign(receipt,await provider.deploy(r.config,a,target,{onCreated,onUploaded})); }
-    catch {
+    catch(error) {
+      // Udbyderen sagde tydeligt, at intet er uploadet (fx komplai med travlt). Så er der ingen uvis upload, og den tidligere kvittering bevares.
+      if(!receipt.id&&error?.notUploaded===true){ await this.store.saveProject(root,{deploymentLast:before,deploymentTrackingSource:trackingBefore}); throw Error(error.message); }
       if(receipt.id) {
         if(r.config.provider==='promte'&&receipt.state==='PREPARED') receipt.verification='Versionen er oprettet hos Promte, men upload er ikke bekræftet. Kontrollér versionen i Promte før et nyt forsøg.';
         else if(r.config.provider==='promte'&&receipt.state==='UPLOADED') receipt.verification='Promte har modtaget filerne, men den videre behandling er ikke bekræftet. Kontrollér versionen i Promte.';

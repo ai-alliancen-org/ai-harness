@@ -23,6 +23,9 @@ const messages = {
   storage_limit: 'Organisationens plads til apps er brugt. Slet gamle versioner eller apps i komplai.',
   storage_headroom: 'Organisationens plads til apps er brugt. Slet gamle versioner eller apps i komplai.',
   metadata_capacity: 'Organisationen har nået grænsen for antal apps. Slet en app i komplai, eller udgiv til en eksisterende.',
+  busy: 'komplai har travlt lige nu. Intet er uploadet, så det er sikkert at prøve igen om lidt.',
+  transfer_limit: 'Appens trafikgrænse hos komplai er nået. Prøv igen senere, eller kontakt jeres administrator.',
+  not_published: 'Appen har ingen aktiv version hos komplai endnu. Udgiv en version først.',
   publication_uncertain: 'komplai bekræftede ikke udgivelsen. Kontrollér appen i komplai, før du prøver igen.',
   visibility_changed: 'Appens adgang er ændret. Gennemgå udgivelsen igen. Adgang til en eksisterende app ændres i komplai.',
   public_confirmation: 'Skriv appens navn præcis for at bekræfte, at appen bliver offentlig.',
@@ -81,7 +84,7 @@ class KomplaiDeployment {
   async call(route, options = {}) {
     const { key } = await this.account();
     try { return await json(this.hub + route, { ...options, key, fetcher: this.fetcher }); }
-    catch (error) { const e = Error(messages[error.code] || error.message); e.code = error.code; e.status = error.status; throw e; }
+    catch (error) { const e = Error(messages[error.code] || error.message); e.code = error.code; e.status = error.status; if (error.code === 'busy') e.notUploaded = true; throw e; }
   }
   /** Organisationens adresse og dine apps. Bruges også af Udgiv-dialogen. */
   async overview() {
@@ -141,7 +144,7 @@ class KomplaiDeployment {
     try { response = await this.fetcher(`${this.hub}/api/publish/${appId}/releases`, { method: 'POST', redirect: 'error', signal: AbortSignal.timeout(120000), headers: { Authorization: `Bearer ${key}`, 'Content-Type': type, Accept: 'application/json' }, body }); }
     catch { throw Error(messages.publication_uncertain); }
     let data = {}; try { data = await response.json(); } catch {}
-    if (!response.ok) throw Error(messages[data.error] || messages.publication_uncertain);
+    if (!response.ok) { const failure = Error(messages[data.error] || messages.publication_uncertain); if (data.error === 'busy') failure.notUploaded = true; throw failure; }
     return data;
   }
   /** En ny app til forhåndsvisningen. Den er kun for organisationen og udgives først med Udgiv. */

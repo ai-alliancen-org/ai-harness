@@ -73,3 +73,15 @@ test('Pages bevarer repository-stien, og Promte får ikke en opdigtet appadresse
  assert.notEqual(view.receiptSummary(promte).publication.tone, 'positive');
  for (const state of ['BLOCKED', 'REJECTED']) assert.equal(view.receiptSummary({ ...promte, state }).publication.tone, 'warning');
 });
+
+test('et kort er aldrig positivt, når adressen ikke svarer eller giver en fejlside (årsag 12)', () => {
+ const med = site => view.receiptSummary({ ...receipt, id: 'version-1', config: { provider: 'komplai', visibility: 'public' }, checks: { provider: { status: 'checked', visibility: 'public' }, site, content: { status: 'skipped' } } });
+ for (const site of [{ status: 'unreachable' }, { status: 'answered', http: 404 }, { status: 'answered', http: 502 }, { status: 'answered', http: 503 }]) {
+  const summary = med(site);
+  assert.equal(summary.publication.title, 'Appen er ikke klar endnu', JSON.stringify(site));
+  assert.equal(summary.publication.tone, 'warning'); assert.match(summary.publication.detail, /Prøv kontrollen igen/);
+ }
+ assert.equal(med({ status: 'answered', http: 200 }).publication.title, 'Udgivet');
+ assert.equal(med({ status: 'answered', http: 200 }).publication.tone, 'positive');
+ assert.equal(med({ status: 'answered', http: 403 }).publication.title, 'Udgivet', 'en adgangsbeskyttet app er ikke en fejl');
+});
