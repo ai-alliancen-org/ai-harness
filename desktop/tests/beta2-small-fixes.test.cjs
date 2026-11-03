@@ -65,3 +65,10 @@ test('.aura vises ikke i kodefanen eller filvalget (beta 3)', () => {
   const source = fs.readFileSync(path.join(__dirname, '..', 'core', 'project-files.cjs'), 'utf8');
   assert.match(source, /GENERATED = new Set\(\['\.aura'/);
 });
+
+test('en ukendt model får et højere svarloft end 4.096, men aldrig mere end halvdelen af konteksten (beta 3)', () => {
+  const { modelLimits } = require('../core/connections.cjs');
+  assert.equal(modelLimits({ kind: 'compatible' }, { id: 'ukendt-glm' }).output, 16384);
+  assert.equal(modelLimits({ kind: 'openrouter' }, { id: 'ukendt' }).output, 8192);
+  assert.equal(modelLimits({ kind: 'compatible' }, { id: 'lille', limits: { context: 8192 } }).output, 4096, 'højst halvdelen af en lille kontekst');
+});

@@ -363,7 +363,8 @@ function modelLimits(connection, model) {
   const context = documentedContext(connection, model) || 32768;
   // Ukendte modeller får et forsigtigt loft. En tænkende model har brug for plads til både tanker og svar, og en lokal
   // Ollama-model kan bruge op til halvdelen af sin kontekst.
-  const fallback = connection.kind === 'ollama' ? Math.floor(context / 2) : reasons(connection, model) ? 32000 : 4096;
+  // 4.096 skar store filer af; en egen server (fx med GLM eller Mistral) kan næsten altid mere, så den får 16.384 og andre ukendte 8.192.
+  const fallback = connection.kind === 'ollama' ? Math.floor(context / 2) : reasons(connection, model) ? 32000 : connection.kind === 'compatible' ? 16384 : 8192;
   // Et svar må aldrig kunne fylde hele konteksten.
   const output = Math.min(model.limits?.output || k?.output || fallback, OUTPUT_CEILING, Math.floor(context / 2));
   // OpenCode komprimerer ved limit.input minus en reserve; uden den ved konteksten minus svarloftet.

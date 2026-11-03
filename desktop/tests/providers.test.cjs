@@ -65,10 +65,11 @@ test('kendte modeller får deres dokumenterede tokengrænser; ukendte beholder d
  assert.deepEqual(modelLimits({ kind: 'openai' }, { id: 'gpt-5.5' }), { context: 400000, output: 128000, input: 200000 });
  // En lokal Ollama-model må bruge halvdelen af sin kontekst; tænkende qwen3-modeller kunne ellers stoppe ved 4.096.
  assert.deepEqual(modelLimits({ kind: 'ollama' }, { id: 'qwen3:8b' }), { context: 32768, output: 16384 });
- // En ukendt tænkende model får plads til både tanker og svar; en ukendt model uden tænkning beholder 4.096.
+ // En ukendt tænkende model får plads til både tanker og svar; en ukendt model uden tænkning får et højere loft end før.
  assert.deepEqual(modelLimits({ kind: 'compatible' }, { id: 'ukendt', capabilities: { reasoning: true } }), { context: 32768, output: 16384 });
  assert.deepEqual(modelLimits({ kind: 'compatible' }, { id: 'ukendt', limits: { context: 200000 }, capabilities: { reasoning: true } }), { context: 200000, output: 32000 });
- assert.deepEqual(modelLimits({ kind: 'compatible' }, { id: 'ukendt' }), { context: 32768, output: 4096 });
+ // En ukendt model uden tænkning får 16.384 på en egen server og 8.192 andre steder (beta 3); 4.096 skar store filer af.
+ assert.deepEqual(modelLimits({ kind: 'compatible' }, { id: 'ukendt' }), { context: 32768, output: 16384 });
  // Kataloget har forrang, men et svar kan aldrig fylde mere end halvdelen af konteksten.
  assert.deepEqual(modelLimits({ kind: 'compatible' }, { id: 'lille', limits: { context: 8192, output: 8192 } }), { context: 8192, output: 4096 });
  assert.equal(engineProvider({ kind: 'anthropic', name: 'a' }, { id: 'claude-opus-5-5' }, 'http://127.0.0.1:1/v1', 't').models['claude-opus-5-5'].limit.output, 128000);
