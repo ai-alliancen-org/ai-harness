@@ -1,12 +1,21 @@
 // Planen og AI'ens spørgsmål i en form, brugeren kan overskue. Rene funktioner uden DOM, så de kan afprøves i Node.
 (root => {
   // AI'en bliver bedt om at skrive planen under fire faste overskrifter. Andre overskrifter vises, som de er.
-  const known = [['bygger', /^det bygger vi$/i], ['design', /^sådan skal det se ud$/i], ['teknik', /^teknik og data$/i], ['proev', /^det skal du prøve(?:\s*\([^\n()]+\)|\s+i forhåndsvisningen)?$/i]];
+  const known = [['bygger', /^det bygger vi$/i], ['design', /^sådan skal det se ud$/i], ['teknik', /^teknik(?:\s+(?:og|&)\s+data)?$/i], ['proev', /^det skal du prøve(?:\s*\([^\n()]+\)|\s+i forhåndsvisningen)?$/i]];
+  // Modeller skriver overskrifterne lidt forskelligt: nummereret, med emoji, i fed skrift, med kolon, og nogle gange med
+  // brødteksten på samme linje. Normaliseringen fjerner pynten, så de fire faste afsnit stadig genkendes.
+  function clean(text) {
+    return String(text).trim().replace(/^(?:\d+[.)]\s*|[-*•]\s+)/, '').replace(/\p{Extended_Pictographic}️?\s*/gu, '').replace(/[*_`]+/g, '').replace(/[:：]\s*$/, '').replace(/\s+/g, ' ').trim();
+  }
   function headingOf(line) {
     const markdown = /^\s{0,3}#{1,6}\s+(.+?)\s*#*\s*$/.exec(line);
-    const text = (markdown ? markdown[1] : line).trim().replace(/^(\*\*|__)(.+)\1$/, '$2').replace(/[:：]\s*$/, '').trim();
+    const text = clean(markdown ? markdown[1] : line);
     const key = known.find(([, pattern]) => pattern.test(text))?.[0] || null;
-    return markdown || key ? { title: text, key } : null;
+    if (markdown || key) return { title: text, key };
+    // "**Det bygger vi**: en bookingside" - overskrift og brødtekst på samme linje.
+    const inline = /^\s*(?:\d+[.)]\s*)?(?:\*\*|__)?\s*([^:：*_]{3,40}?)\s*(?:\*\*|__)?\s*[:：]\s*(?:\*\*|__)?\s*(\S.*)$/u.exec(line);
+    if (inline) { const name = clean(inline[1]); const found = known.find(([, pattern]) => pattern.test(name))?.[0]; if (found) return { title: name, key: found, inline: inline[2] }; }
+    return null;
   }
   function parsePlan(text) {
     const lines = String(text || '').replace(/\r\n/g, '\n').split('\n');
@@ -14,7 +23,7 @@
     for (const line of lines) {
       if (/^\s*```/.test(line)) inCode = !inCode;
       const heading = !inCode && headingOf(line);
-      if (heading) { current = { title: heading.title, key: heading.key, body: [] }; sections.push(current); continue; }
+      if (heading) { current = { title: heading.title, key: heading.key, body: heading.inline ? [heading.inline] : [] }; sections.push(current); continue; }
       (current ? current.body : intro).push(line);
     }
     const trim = body => body.join('\n').replace(/^\n+|\n+$/g, '');

@@ -24,8 +24,15 @@ function environment(source = process.env) {
 function cleanOutput(value) {
   return stripVTControlCharacters(value).replace(/[\x00-\x08\x0b-\x1f\x7f]/g, '')
     .replace(/\b(?:sk-[\w-]{8,}|gh[pousr]_[\w]{10,}|github_pat_[\w]+)\b/g, '[skjult nøgle]')
-    .replace(/(https?:\/\/)[^\s/@]+:[^\s/@]+@/gi, '$1[skjult]@')
+    .replace(/(https?:\/\/)[^\s/@:]+:[^\s/@]+@/gi, '$1[skjult]@')
     .replace(/((?:api[_-]?key|token|password|secret|authorization)\s*[:=]\s*)[^\s,;]+/gi, '$1[skjult]');
+}
+// Mange servere (Vite, Next, Astro) vælger selv deres port og lytter kun på "localhost", som kan være ::1. Serverens egen
+// "Local: http://localhost:5173/"-linje er derfor den sikreste kilde. Kun lokale adresser tæller, og den sidste vinder.
+function announcedURL(text) {
+  const found = [...String(text || '').matchAll(/https?:\/\/(localhost|127\.0\.0\.1|\[::1\]):(\d{2,5})(?:\/[^\s'")\]]*)?/g)];
+  const last = found.at(-1);
+  return last ? `http://${last[1]}:${last[2]}/` : null;
 }
 async function regular(root, name, max = 5_000_000) {
   try {
@@ -311,8 +318,13 @@ class DevServer {
       }
       const deadline = Date.now() + 45000;
       while (Date.now() < deadline && generation === this.generation) {
+        const probe = async (url, i) => { try { const response = await fetch(url, { redirect: 'manual', signal: AbortSignal.timeout(500) }); await response.body?.cancel(); return response.status < (i === 0 ? 400 : 500); } catch { return false; } };
         const ready = await Promise.all(services.map(async (service, i) => {
-          try { const response = await fetch(service.url, { redirect: 'manual', signal: AbortSignal.timeout(500) }); await response.body?.cancel(); return response.status < (i === 0 ? 400 : 500); } catch { return false; }
+          if (await probe(service.url, i)) return true;
+          // Kun den første tjeneste (siden) kan følge serverens egen adresse, fordi loggen deles af alle tjenester.
+          const announced = i === 0 ? announcedURL(this.output) : null;
+          if (announced && announced !== service.url && await probe(announced, i)) { service.url = announced; service.port = Number(new URL(announced).port); return true; }
+          return false;
         }));
         if (generation !== this.generation) return;
         if (ready.every(Boolean)) {
@@ -337,4 +349,4 @@ class DevServer {
     return this.stopping;
   }
 }
-module.exports = { DevServer, inspect, environment, cleanOutput, nodeRuntime, terminate, findProgram };
+module.exports = { announcedURL, DevServer, inspect, environment, cleanOutput, nodeRuntime, terminate, findProgram };

@@ -828,7 +828,7 @@ async function sendNow(data, text) {
   v.activeModelBrand = { kind: state?.connections.find(c => c.id === v.runConnection)?.kind, modelID: $('#model-select').value };
   $('#model-options').open = false; $('#task-dialog').close(); $('#connection-warning').hidden = true; $('#data-dialog').close(); setRunning(true, 'Starter agent …');
   if ($('#work-mode').value === 'free') { activePlan = null; $('#plan-card').hidden = true; }
-  $('#run-review').hidden = true; if ($('#work-mode').value === 'build') $('#plan-card').hidden = true; if ($('#work-mode').value === 'plan') { activePlan = null; $('#plan-card').hidden = true; }
+  $('#run-review').hidden = true; if ($('#work-mode').value === 'build') $('#plan-card').hidden = true;
   Object.assign(v, { lastSentText: text, lastTarget: data.previewReference || '', lastTargetRef: window.workspace?.target() || null, lastCheckpoint: null, rejectedThisRun: false, lastRejection: null });
   appendMessage(text + (data.fileReferenceText || '') + (v.lastTarget ? `\n\nMål i forhåndsvisningen: ${v.lastTarget}` : ''), 'user', v); $('#prompt').value = ''; await saveChatDraft();
   const compact = v.compactNext === true; v.compactNext = false; v.effortLevels = data.effortLevels || [];

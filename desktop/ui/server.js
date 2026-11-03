@@ -33,7 +33,7 @@
     if (diagnostics.length) {
       problems.append(node('p', diagnostics[0].message));
       const repair = node('button', 'Ret med AI'); repair.type = 'button';
-      repair.onclick = () => { $('#preview-dialog').close(); window.draftMessage(diagnostics.map(item => item.message).join('\n') + '\n\n' + diagnostics[0].repair, 'Forslaget står i skrivefeltet. Gennemgå det, før du sender.'); };
+      repair.onclick = () => { $('#preview-dialog').close(); window.draftMessage(diagnostics.map(item => item.message).join('\n') + '\n\n' + diagnostics[0].repair, 'Forslaget står i skrivefeltet. Gennemgå det, før du sender.', { mode: 'free' }); };
       problems.append(repair);
       if (diagnostics.length > 1) { const details = node('details'), summary = node('summary', 'Se detaljer'); details.append(summary, ...diagnostics.slice(1).map(item => node('p', item.message))); problems.append(details); }
     }

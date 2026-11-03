@@ -149,3 +149,15 @@ test('rigtig Python-standardserver bruger sin gennemgåede port uden pakkeinstal
   assert.equal(manager.state, 'running', manager.output + manager.message);
   assert.match(await (await fetch(manager.url)).text(), /Python virker/);
 });
+
+test('en server, der vælger sin egen port og kun lytter på ::1, bliver klar ud fra sin egen Local-linje', async t => {
+  // Som Vite: ignorerer PORT, vælger selv en port, lytter kun på IPv6-loopback og skriver sin adresse. 45 sekunders tavshed var fejlen.
+  const root = await fixture(t, {
+    'vite-agtig.cjs': `const s=require('node:http').createServer((q,r)=>r.end('Egen port'));s.listen(0,'::1',()=>console.log('  ➜  Local:   http://localhost:'+s.address().port+'/'));`
+  });
+  const manager = new DevServer({ runtimeConfig: { services: [{ id: 'web', label: 'Webside', command: ['node', 'vite-agtig.cjs'] }] } }); t.after(() => manager.stop()); await manager.activate(root);
+  await manager.execute((await manager.prepare('start')).token); await until(() => manager.state === 'running' || manager.state === 'error', 20000);
+  assert.equal(manager.state, 'running', manager.output + manager.message);
+  assert.match(manager.url, /^http:\/\/(localhost|\[::1\]):\d+\/$/);
+  assert.equal(await (await fetch(manager.url)).text(), 'Egen port');
+});

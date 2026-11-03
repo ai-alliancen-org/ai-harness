@@ -62,8 +62,9 @@ async function startGateway(connection, model, key, route, onFailure = () => {},
         // Forbigående fejl (408, 429 og 5xx) videresendes, så OpenCode genforsøger (docs/decisions.md). Aura låser
         // ikke forbindelsen og viser ingen fejl, så et nyt forsøg kan lykkes. Retry-After følger med.
         if (response.status === 408 || response.status === 429 || response.status >= 500) {
-          const retryAfter = response.headers.get('retry-after');
-          res.writeHead(response.status, { 'content-type': 'application/json', ...(retryAfter ? { 'retry-after': retryAfter } : {}) });
+          // Et langt Retry-After ville holde opgaven i Arbejder i op til en time uden forklaring. Loft: 120 sekunder.
+          const wait = Number(response.headers.get('retry-after'));
+          res.writeHead(response.status, { 'content-type': 'application/json', ...(Number.isFinite(wait) && wait >= 0 && response.headers.get('retry-after') ? { 'retry-after': String(Math.min(Math.ceil(wait), 120)) } : {}) });
           return res.end(JSON.stringify({ error: { message: `Modelserveren svarede midlertidigt (HTTP ${response.status}).`, type: 'api_error' } }));
         }
         const advice = { 401: 'API-nøglen blev afvist. Kontrollér eller udskift den under AI-forbindelser.', 403: 'Din konto har ikke adgang til modellen. Kontrollér adgangen hos udbyderen.', 402: 'Udbyderen afviste kaldet på grund af saldo eller kvote. Kontrollér kontoen; appen vælger ikke en betalt erstatning.', 404: 'Modellen eller adressen blev ikke fundet. Hent modellisten igen, og kontrollér forbindelsen.', 429: 'Udbyderens forbrugsgrænse er nået. Prøv igen, når kvoten er tilgængelig.' }[response.status] || 'Kontrollér forbindelsen og modelvalget, og prøv igen.';

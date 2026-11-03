@@ -53,6 +53,10 @@ test('rigtige samtalehændelser viser tilbud, husker afvisning og afviser et alm
   assert.equal(events.some(e => e.type === 'plan.offer' && e.offered), false);
   await answer('Forstået! Vi bygger ikke noget.', 'plan'); assert.equal(chat.plan, null);
   await answer(plan, 'plan'); assert.ok(chat.plan);
+  // Markøren gælder kun i Samtale: i Planlæg og Byg trækker den ikke en plan tilbage og slår ikke planforslag fra (årsag 3).
+  chat.dismissedProbe = chat.data.planOffersDismissed;
+  await answer('Vi bliver i planlægningen.\n<!-- aura:stay -->', 'plan'); assert.ok(chat.plan, 'planen står stadig efter stay i Planlæg');
+  await answer('Vi bliver i byggeriet.\n<!-- aura:stay -->', 'build'); assert.ok(chat.plan, 'planen står stadig efter stay i Byg');
   await answer('Vi bliver i samtalen.\n<!-- aura:stay -->'); assert.equal(chat.plan, null);
   const saved = await bench.history.readChat(project, chat.id);
   assert.equal(saved.planOffersDismissed, true); assert.equal(saved.messages.some(m => m.text.includes('<!-- aura:')), false);

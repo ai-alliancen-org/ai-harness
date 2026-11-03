@@ -197,7 +197,7 @@ function networkFailure(error) {
   if (name === 'TimeoutError' || name === 'AbortError' || /TIMEOUT/.test(code)) return failure('Serveren svarede ikke inden for 15 sekunder. Kontrollér adresse, netværk og eventuelt Tailscale.', 'timeout', code || name);
   if (/redirect/i.test(String(error?.cause?.message || error?.message))) return failure('Serveren sendte appen videre til en anden adresse. Aura følger ikke en omdirigering med en nøgle. Brug den adresse, udbyderen oplyser.', 'rejected', 'omdirigering');
   // Adressen findes ikke. Det er stavningen, der skal rettes, ikke netværket (beslutning for beta 2).
-  if (/ENOTFOUND|EAI_AGAIN/.test(code)) return failure('Adressen kan ikke slås op. Kontrollér stavningen af servernavnet, fx at der ikke står et mellemrum eller et forkert domæne.', 'unreachable', code);
+  if (code === 'ENOTFOUND') return failure('Adressen kan ikke slås op. Kontrollér stavningen af servernavnet, fx at der ikke står et mellemrum eller et forkert domæne.', 'unreachable', code);
   if (/CERT|SELF_SIGNED|UNABLE_TO_VERIFY/.test(code)) return failure('Serverens certifikat kunne ikke godkendes. Kontrollér adressen.', 'unreachable', code);
   // Undici skriver headerens værdi i sin fejltekst. Den tekst vises derfor aldrig.
   if (/INVALID_ARG/.test(code) || /header/i.test(`${error?.message} ${error?.cause?.message || ''}`)) return failure('Nøglen indeholder tegn, der ikke kan sendes. Kopiér den igen med kopiér-knappen hos udbyderen.', 'invalid');
