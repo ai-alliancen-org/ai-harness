@@ -772,3 +772,10 @@ Brugeren har delegeret valgene og vil ændre dem, hvis betaen viser, at de er fo
 - **Motorens identitet** er forbindelse, model, arbejdsmåde, grundregler, skills, funktioner og sandkasse. Designstatus, plan-id og beskedtekster hører til den enkelte besked og genstarter ikke motoren. Én motor på tværs af arbejdsmåder (agent pr. besked) er ikke bygget.
 - **Kortet for en udgivelse siger «Appen er ikke klar endnu»**, når udbyderen har modtaget versionen, men adressen svarer 404, 5xx eller slet ikke. Et «travlt»-svar fra komplai bevarer den tidligere kvittering og siger, at det er sikkert at prøve igen. Hvem der kontrollerer adressen og hvor tit, er fortsat brugerens afgørelse.
 - **Godkend alt i denne samtale** vises, når sandkassen er understøttet. Det dækker aldrig søgning, og kommandoer kun mens sandkassen kører i motoren. Det nulstilles ved Stop.
+
+### Beta 3 · 3. november 2026
+
+- **#53 er overtaget** (arbejdsmåde og model ved skrivefeltet, kort planoverblik, eksplicit resultatgennemgang) med Partheds forfatter bevaret. Afvigelse fra PR'en: det egne svar på et spørgsmål ligger bag linket «Skriv dit eget svar» og vises ikke permanent, så spørgsmålskortet højst viser tre til fire valg og ikke har to konkurrerende primære knapper (AGENTS.md). PR'ens prøve forventede det modsatte og er ændret bevidst.
+- **Fanen Overblik** viser teknologier, eksterne tjenester med leverandørens hovedsæde, hosting og navnene på hemmeligheder, udledt af projektets filer. Den kalder ingen model og viser aldrig værdier. Arbejdsfladen har nu seks faner og lader dem rulle sidelæns, når fladen er smal.
+- **CLI'en** overtager en lås fra en proces, der ikke findes mere, behandler SIGHUP som afslutning og efterlader ingen forbindelse ved et mislykket login. Nøglering er ikke bygget: den kræver et native modul eller platformsspecifikke kald og tages i en senere version. Versionsspørgsmålet om den gamle CLI 0.2.0-beta.6 er fortsat brugerens afgørelse.
+- **Gatewayen** videresender en netfejl, før modellen har svaret, som 502 uden at låse forbindelsen, så OpenCode kan prøve igen. Valideringsfejl og afbrudte strømme er stadig endelige.

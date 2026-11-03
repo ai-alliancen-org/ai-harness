@@ -146,10 +146,10 @@
       if (options.length > 4 && !state.more) { const more = node('button', `Vis ${options.length - 4} svar mere`, 'text-button'); more.type = 'button'; more.onclick = () => { state.more = true; render(); }; card.append(more); }
       if (question.multiple) { const next = node('button', chosen.size ? `Fortsæt med ${chosen.size} ${chosen.size === 1 ? 'svar' : 'svar'}` : 'Vælg mindst ét svar', 'primary'); next.type = 'button'; next.disabled = !chosen.size; next.onclick = () => answer([...chosen]); card.append(next); }
       if (question.custom !== false) {
-        const form = node('form', undefined, 'answer-own'); const label = node('label', 'Eller skriv dit eget svar'); const input = node('textarea'); input.rows = 2; input.maxLength = 2000; input.required = true; input.id = `svar-${p.id}-${state.index}`; label.htmlFor = input.id; input.value = state.drafts[state.index] || ''; input.placeholder = 'Svar med dine egne ord …'; input.oninput = () => { state.drafts[state.index] = input.value; };
-        const send = node('button', 'Svar', 'primary'); send.type = 'submit'; form.append(label, input, send);
+        const own = node('details', undefined, 'answer-own'); own.open = Boolean(state.drafts[state.index]); own.append(node('summary', 'Skriv dit eget svar')); const form = node('form'); const label = node('label', 'Dit svar', 'visually-hidden'); const input = node('textarea'); input.rows = 2; input.maxLength = 2000; input.required = true; input.id = `svar-${p.id}-${state.index}`; label.htmlFor = input.id; input.value = state.drafts[state.index] || ''; input.placeholder = 'Svar med dine egne ord …'; input.oninput = () => { state.drafts[state.index] = input.value; };
+        const send = node('button', 'Svar', question.multiple ? '' : 'primary'); send.type = 'submit'; form.append(label, input, send); own.append(form);
         form.onsubmit = event => { event.preventDefault(); if (input.value.trim()) answer([input.value.trim()]); };
-        card.append(form);
+        card.append(own);
       }
       const links = node('p', undefined, 'question-links');
       const link = (text, onClick) => { const button = node('button', text, 'text-button'); button.type = 'button'; button.onclick = onClick; links.append(button); };

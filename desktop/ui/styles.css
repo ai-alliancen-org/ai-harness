@@ -529,6 +529,8 @@ body.sidebar-overlay .sidebar { width: 216px; z-index: 30; box-shadow: 0 12px 40
 .work-tab:hover:not([aria-selected="true"]):not(:disabled) { background: var(--control-hover); border-color: transparent; color: var(--ink); }
 .work-tab[aria-selected="true"] { background: var(--tint); border-color: var(--accent-line); color: var(--accent-text); }
 /* I et smalt panel rykker fanerne tættere, så alle fire står på én linje ved 980 px. Bliver der for lidt plads, brydes de. */
+/* Seks faner passer ikke i en smal arbejdsflade. De står på én linje og kan rulles sidelæns, så ingen fane forsvinder eller ombrydes. */
+@container work (max-width: 430px) { .work-tabs { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: thin; } .work-tab { flex: none; } }
 @container work (max-width: 430px) { .work-tabs { gap: 2px; padding: 6px 8px; } .work-tab { padding: 6px 6px; } .panel-bar { padding-left: 12px; padding-right: 8px; } .panel-scroll, .code-view { padding-left: 14px; padding-right: 14px; } }
 /* Mærket ligger oven på fanens hjørne, så fanerne ikke flytter sig, når det dukker op. */
 .tab-badge { position: absolute; top: -5px; right: -5px; display: inline-grid; place-items: center; min-width: 17px; height: 17px; padding: 0 4px; border: 2px solid var(--surface); border-radius: 999px; background: var(--accent); color: var(--on-accent); font-size: 9.5px; font-weight: 700; line-height: 1; box-sizing: border-box; }
