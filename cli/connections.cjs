@@ -41,7 +41,14 @@ async function login(app, kind) {
   const state = await bench.saveConnection({ kind, name, baseURL, apiKey, ...extra });
   const connection = state.connections.find(c => !before.has(c.id));
   ui.line('Forbindelsen er gemt. Henter modellisten; ingen beskeder eller projektfiler sendes.');
-  const models = await bench.models(connection.id);
+  let models;
+  try { models = await bench.models(connection.id); }
+  catch (error) {
+    // En forbindelse, der ikke kunne kontrolleres, fjernes igen, så et nyt forsøg ikke giver en dublet med samme navn.
+    await bench.removeConnection(connection.id).catch(() => {});
+    ui.line('Forbindelsen blev ikke gemt, fordi den ikke kunne kontrolleres.');
+    throw error;
+  }
   ui.line(`${models.length} modeller fundet. Det beviser ikke adgang til kodeværktøjer eller ledig kvote.`);
   return connection.id;
 }

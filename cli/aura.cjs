@@ -86,7 +86,7 @@ async function main(argv = process.argv.slice(2), ui = new Terminal()) {
     app.stop().catch(error => ui.line(error.message));
   };
   const terminate = () => { terminating = true; app.closing = true; ui.ended = true; interrupt(); };
-  process.on('SIGINT', interrupt); process.on('SIGTERM', terminate);
+  process.on('SIGINT', interrupt); process.on('SIGTERM', terminate); process.on('SIGHUP', terminate);
   try {
     if (options.command === 'login') { await login(app, options.provider); return; }
     if (options.command === 'logout') { await logout(app); return; }
@@ -99,7 +99,7 @@ async function main(argv = process.argv.slice(2), ui = new Terminal()) {
     if (['preview', 'save', 'deploy'].includes(options.command)) await app.command('/' + options.command);
     if (!terminating) await app.chat();
   } finally {
-    try { await app.close(); } finally { release(); process.off('SIGINT', interrupt); process.off('SIGTERM', terminate); }
+    try { await app.close(); } finally { release(); process.off('SIGINT', interrupt); process.off('SIGTERM', terminate); process.off('SIGHUP', terminate); }
   }
 }
 if (require.main === module) {

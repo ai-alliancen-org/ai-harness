@@ -239,3 +239,34 @@ test('en afvist opgave viser sit eget resultat, også når forrige opgave ændre
   assert.doesNotMatch(ui.output, /Der blev ikke ændret filer/);
 });
 module.exports = { UI };
+
+test('en lås fra en proces, der ikke findes mere, overtages automatisk, mens en levende proces stadig afviser (beta 3)', async t => {
+  const { state } = await fixture(t);
+  await fs.writeFile(path.join(state, 'cli.lock'), JSON.stringify({ pid: 2 ** 22 + 12345, token: 'gammel' }), { mode: 0o600 });
+  const release = await lock(state);
+  assert.equal(JSON.parse(await fs.readFile(path.join(state, 'cli.lock'), 'utf8')).pid, process.pid, 'låsen er overtaget af denne proces');
+  await assert.rejects(lock(state), /anden Aura-terminal/, 'en levende ejer afviser stadig');
+  release();
+});
+
+test('aura unlock uden en lås giver en venlig besked i stedet for en rå fejl (beta 3)', async t => {
+  const { state, ui } = await fixture(t);
+  const { unlockStale } = require('../storage.cjs');
+  await assert.doesNotReject(unlockStale(state, ui));
+  assert.match(ui.output, /Der er ingen lås/);
+});
+
+test('SIGHUP behandles som en afslutning, så en lukket terminal ikke efterlader en lås eller en motor (beta 3)', async () => {
+  const source = await fs.readFile(path.join(__dirname, '../aura.cjs'), 'utf8');
+  assert.match(source, /process\.on\('SIGHUP', terminate\)/); assert.match(source, /process\.off\('SIGHUP', terminate\)/);
+});
+
+test('et mislykket login efterlader ingen forbindelse, så et nyt forsøg ikke giver en dublet (beta 3)', async t => {
+  const { app, ui } = await fixture(t);
+  app.vault.unlock = async () => {};
+  ui.ask = async question => /adresse/i.test(question) ? 'http://127.0.0.1:9/v1' : /navn/i.test(question) ? 'Min server' : '';
+  app.bench.models = async () => { throw new Error('Serveren svarer ikke. Kontrollér adresse, port og netværk.'); };
+  for (let forsøg = 0; forsøg < 2; forsøg++) await assert.rejects(login(app, 'ollama'), /Serveren svarer ikke/);
+  assert.equal((await app.bench.store.read()).connections.length, 0, 'ingen dubletter eller halvt gemte forbindelser');
+  assert.match(ui.output, /ikke gemt/i);
+});

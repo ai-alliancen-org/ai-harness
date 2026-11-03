@@ -63,15 +63,27 @@ class Vault {
 }
 async function lock(root) {
   const file = path.join(root, 'cli.lock'), token = randomUUID();
-  try { await fs.writeFile(file, JSON.stringify({ pid: process.pid, token }), { flag: 'wx', mode: 0o600 }); }
+  const write = () => fs.writeFile(file, JSON.stringify({ pid: process.pid, token }), { flag: 'wx', mode: 0o600 });
+  try { await write(); }
   catch (error) {
+    // En lås fra en proces, der ikke findes mere (fx en lukket terminal), overtages automatisk. En levende ejer afviser stadig.
+    if (error.code === 'EEXIST') {
+      const record = await readPrivate(file).catch(() => null);
+      let alive = true;
+      if (record && Number.isSafeInteger(record.pid) && record.pid > 0) { try { process.kill(record.pid, 0); } catch (killError) { if (killError.code === 'ESRCH') alive = false; } }
+      if (!alive) {
+        const moved = file + '.' + randomUUID(); await fs.rename(file, moved).catch(() => {}); await fs.unlink(moved).catch(() => {});
+        try { await write(); return () => { try { if (JSON.parse(sync.readFileSync(file)).token === token) sync.unlinkSync(file); } catch {} }; } catch { /* en anden proces nåede først */ }
+      }
+    }
     if (error.code === 'EEXIST') throw new Error(`En anden Aura-terminal bruger datamappen, eller en tidligere proces blev afbrudt. Luk den først. Ved en gammel lås: aura unlock. (${file})`);
     throw error;
   }
   return () => { try { if (JSON.parse(sync.readFileSync(file)).token === token) sync.unlinkSync(file); } catch {} };
 }
 async function unlockStale(root, ui) {
-  const file = path.join(root, 'cli.lock'), record = await readPrivate(file);
+  const file = path.join(root, 'cli.lock'), record = await readPrivate(file).catch(error => error.code === 'ENOENT' ? null : Promise.reject(error));
+  if (!record) { ui.line('Der er ingen lås at fjerne.'); return; }
   if (!Number.isSafeInteger(record.pid) || record.pid < 1) throw new Error('Låsen kan ikke læses. Gennemgå den manuelt.');
   try { process.kill(record.pid, 0); throw new Error('Processen findes stadig. Luk den, før låsen fjernes.'); }
   catch (error) { if (error.code !== 'ESRCH') throw error; }
