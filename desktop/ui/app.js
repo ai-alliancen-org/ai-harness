@@ -2014,6 +2014,7 @@ function renderRunReview(result, v = view) {
   show();
   box.classList.toggle('is-reviewed', v.reviewedTask === result.task);
   box.append(node('p', result.files.length ? `${result.files.length} ${result.files.length === 1 ? 'fil ændret' : 'filer ændret'}${saved ? ' · Gemt' : ''}` : 'Opgaven er afsluttet uden filændringer.', 'result-receipt'));
+  targetLine(box, v); // Hvis brugeren pegede på et element i forhåndsvisningen, står målet også på resultatet (#47).
   if (result.skipped) box.append(node('p', 'Nogle filer er udeladt af oversigten på grund af filtype eller størrelse.', 'hint'));
   // Én kontrol pr. opgave: kortet tegnes om ved hver hændelse, og siden må kun genindlæses én gang.
   if (result.files.length && result.status !== 'error' && v.checkedTask !== result.task) { v.checkedTask = result.task; checkPreview(result); }
