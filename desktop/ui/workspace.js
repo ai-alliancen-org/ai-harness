@@ -2,7 +2,7 @@
 // Fanerne ligger oven på hinanden og skjules kun visuelt, så previewets formularer, rulning og andre fanes tilstand
 // bevares ved faneskift. Kun brugeren skifter fane; AI'ens hændelser markerer en fane, men skifter aldrig væk.
 (() => {
-  const tabs = ['preview', 'plan', 'changes', 'code', 'activity'];
+  const tabs = ['preview', 'plan', 'changes', 'overview', 'code', 'activity'];
   let active = 'preview';
   const tab = name => $(`#tab-${name}`), panel = name => $(`#panel-${name}`);
   const visuallyHidden = text => node('span', text, 'visually-hidden');
@@ -21,6 +21,7 @@
     if (focus) tab(name).focus();
     if (name === 'plan') { $('#plan-badge').hidden = true; window.planning?.render(); }
     if (name === 'changes') { badge('changes', 0); if (changes.mode === 'session' && (changes.stale || !changes.data)) action(() => loadChanges()); }
+    if (name === 'overview') window.systemOverview?.show();
     if (name === 'code') { if (!code.files || code.stale) action(loadCodeList); action(checkCodeFile); }
     if (name === 'activity') { activity.unseen = false; updateActivityBadge(); if (activity.toBottom) { activity.toBottom = false; requestAnimationFrame(() => { $('#activity-scroll').scrollTop = $('#activity-scroll').scrollHeight; }); } }
   }

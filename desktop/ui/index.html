@@ -22,6 +22,8 @@
 <script src="plan-view.js" defer></script>
 <script src="planning.js" defer></script>
 <script src="approval-view.js" defer></script>
+<script src="system-overview-view.js" defer></script>
+<script src="system-overview.js" defer></script>
 <script src="approvals.js" defer></script>
 <script src="preview-edit.js" defer></script>
 <script src="history.js" defer></script>
@@ -150,7 +152,7 @@
   </section>
   <div id="workspace-divider" role="separator" tabindex="0" aria-label="Bredde på samtalepanelet" aria-orientation="vertical" aria-controls="chat-panel" title="Træk for at ændre bredde. Brug også piletaster; dobbeltklik nulstiller."></div>
   <section class="work-surface panel" id="work-surface" aria-label="Arbejdsflade">
-    <div class="work-tabs" role="tablist" aria-label="Arbejdsflade"><button type="button" role="tab" class="work-tab" id="tab-preview" data-tab="preview" aria-controls="panel-preview" aria-selected="true">Forhåndsvisning</button><button type="button" role="tab" class="work-tab" id="tab-plan" data-tab="plan" aria-controls="panel-plan" aria-selected="false" tabindex="-1">Plan<span id="plan-badge" class="tab-badge dot" hidden></span></button><button type="button" role="tab" class="work-tab" id="tab-changes" data-tab="changes" aria-controls="panel-changes" aria-selected="false" tabindex="-1">Ændringer<span id="changes-badge" class="tab-badge" hidden></span></button><button type="button" role="tab" class="work-tab" id="tab-code" data-tab="code" aria-controls="panel-code" aria-selected="false" tabindex="-1">Kode</button><button type="button" role="tab" class="work-tab" id="tab-activity" data-tab="activity" aria-controls="panel-activity" aria-selected="false" tabindex="-1">Aktivitet<span id="activity-badge" class="tab-badge dot" hidden></span></button></div>
+    <div class="work-tabs" role="tablist" aria-label="Arbejdsflade"><button type="button" role="tab" class="work-tab" id="tab-preview" data-tab="preview" aria-controls="panel-preview" aria-selected="true">Forhåndsvisning</button><button type="button" role="tab" class="work-tab" id="tab-plan" data-tab="plan" aria-controls="panel-plan" aria-selected="false" tabindex="-1">Plan<span id="plan-badge" class="tab-badge dot" hidden></span></button><button type="button" role="tab" class="work-tab" id="tab-changes" data-tab="changes" aria-controls="panel-changes" aria-selected="false" tabindex="-1">Ændringer<span id="changes-badge" class="tab-badge" hidden></span></button><button type="button" role="tab" class="work-tab" id="tab-overview" data-tab="overview" aria-controls="panel-overview" aria-selected="false" tabindex="-1">Overblik</button><button type="button" role="tab" class="work-tab" id="tab-code" data-tab="code" aria-controls="panel-code" aria-selected="false" tabindex="-1">Kode</button><button type="button" role="tab" class="work-tab" id="tab-activity" data-tab="activity" aria-controls="panel-activity" aria-selected="false" tabindex="-1">Aktivitet<span id="activity-badge" class="tab-badge dot" hidden></span></button></div>
     <div class="work-panels">
     <section class="work-panel preview is-active" id="panel-preview" role="tabpanel" aria-labelledby="tab-preview"><div class="preview-toolbar"><span id="preview-status">Forhåndsvisning</span><button id="promte-preview" type="button" class="text-button" hidden></button><button id="komplai-preview" type="button" class="text-button" hidden></button><div class="preview-actions"><button type="button" id="preview-pick" class="pick-toggle" aria-pressed="false" hidden title="Vælg en tekst, et billede eller en knap i siden og ret den">Ret i siden</button><select id="viewport-preset" aria-label="Skærmstørrelse"><option value="fluid">Fleksibel</option><option value="desktop">Desktop · 1920 × 1080</option><option value="tablet">Tablet / iPad · 768 × 1024</option><option value="phone">Mobil / iPhone · 390 × 844</option><option value="custom">Egne mål</option></select>
 <button id="refresh" class="text-button" title="Genindlæs forhåndsvisning" aria-label="Genindlæs forhåndsvisning">↻</button><button id="preview-options" class="text-button" popovertarget="preview-menu" title="Indstillinger for forhåndsvisning" aria-label="Indstillinger for forhåndsvisning">•••</button></div></div><div id="preview-menu" popover aria-label="Indstillinger for forhåndsvisning"><button id="attach-preview">Server og opstart</button><div id="viewport-dimensions" hidden><input id="viewport-width" type="number" min="240" max="7680" step="1" aria-label="Bredde i CSS-pixels"><span>×</span><input id="viewport-height" type="number" min="240" max="7680" step="1" aria-label="Højde i CSS-pixels"><button id="viewport-rotate" title="Byt bredde og højde" aria-label="Rotér visningen">↔</button></div>
@@ -203,6 +205,12 @@
           <p id="changes-diff-note" class="hint"></p>
           <div id="changes-diff-lines" class="diff"></div>
         </section>
+      </div>
+    </section>
+    <section class="work-panel" id="panel-overview" role="tabpanel" aria-labelledby="tab-overview" inert>
+      <div class="panel-bar"><span id="overview-status" class="panel-status">Overblik over appen</span><button type="button" id="overview-refresh" class="text-button">Opdatér</button></div>
+      <div class="panel-scroll" id="overview-scroll">
+        <div id="overview-body" class="overview-body" aria-live="polite"></div>
       </div>
     </section>
     <section class="work-panel" id="panel-code" role="tabpanel" aria-labelledby="tab-code" inert>

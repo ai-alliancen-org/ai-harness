@@ -1283,3 +1283,16 @@ body.key-window { padding: 20px 22px; background: var(--surface); }
 .appearance-preview > i:last-child { margin: 9px; border: 1px solid var(--line); border-radius: 5px; background: linear-gradient(var(--line-strong) 0 0) 8px 8px / 55% 4px no-repeat, linear-gradient(var(--line) 0 0) 8px 16px / 38% 4px no-repeat, linear-gradient(var(--accent) 0 0) right 7px bottom 7px / 22px 8px no-repeat, var(--surface); }
 /* Cloudflares logo har sort skrift og står på en lys plade i mørkt tema. */
 @media (prefers-color-scheme: dark) { img[src$="provider-cloudflare.png"] { padding: 3px; border-radius: 6px; background: #fff; } }
+
+/* Fanen Overblik */
+.overview-body { padding: 20px 22px 32px; max-width: 760px; display: grid; gap: 18px; }
+.overview-lead p { font-size: 15px; line-height: 1.6; margin: 0 0 8px; color: var(--ink); }
+.overview-diagram { border: 1px solid var(--line); border-radius: 12px; padding: 10px; background: var(--surface, transparent); overflow-x: auto; }
+.overview-diagram svg { width: 100%; height: auto; min-width: 520px; }
+.so-box { fill: var(--surface, #fff); stroke: var(--line); stroke-width: 1.2; }
+.so-app { stroke: var(--accent, currentColor); } .so-ai { stroke: var(--warning, #b45309); stroke-width: 2; }
+.so-title { font: 600 13px system-ui, sans-serif; fill: var(--ink); } .so-sub { font: 11px system-ui, sans-serif; fill: var(--muted); }
+.so-line { stroke: var(--muted); stroke-width: 1.4; fill: none; }
+.overview-details > summary { cursor: pointer; font-weight: 600; margin-bottom: 10px; }
+.overview-section h3 { font-size: 13px; margin: 14px 0 6px; } .overview-list { margin: 0; padding-left: 18px; line-height: 1.6; }
+.overview-meta { color: var(--muted); font-size: 12px; }

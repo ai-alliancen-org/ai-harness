@@ -36,6 +36,8 @@ module.exports = new Set([
   'setup-status.js',
   'share-view.js',
   'styles.css',
+  'system-overview-view.js',
+  'system-overview.js',
   'updates.js',
   'viewport.js',
   'workspace.js',

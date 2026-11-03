@@ -686,6 +686,8 @@ async function projectSettings() {
   return { runtime: normalizeRuntimeConfig(config.runtime || {}), approvals: await workbench.approvalsPolicy.settings(root), commandSandbox: await require('./core/command-sandbox.cjs').support() };
 }
 handle('project:settings', projectSettings);
+// Systemoversigten udledes af projektets filer, aldrig af modelkald. Kun navne på hemmeligheder, aldrig værdier.
+handle('project:overview', async () => { requireProject(); return require('./core/system-overview.cjs').analyze(workspaceRoot()); });
 handle('project:settings-save', value => exclusive(async () => {
   const root = requireProject();
   if (!value || typeof value !== 'object') throw new Error('Vælg en projektindstilling.');

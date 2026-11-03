@@ -130,6 +130,7 @@ const methods = {
   supportFeedback: 'support:feedback',
   supportReport: 'support:report',
   supportSave: 'support:save',
+  systemOverview: 'project:overview',
   toolsCatalog: 'tools:catalog',
   toolsFolder: 'tools:folder',
   toolsInstall: 'tools:install',
