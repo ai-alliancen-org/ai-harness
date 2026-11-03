@@ -117,6 +117,8 @@ async function fileTargets(p, workspace) {
 async function broadDirectory(target) {
   const broad = [path.parse(target).root, os.homedir(), os.tmpdir()];
   for (const value of broad) { try { if (target === await canonicalPath(value)) return true; } catch {} }
+  // En mappe over hjemmemappen (fx /Users) er endnu bredere end hjemmemappen selv.
+  try { const home = await canonicalPath(os.homedir()); if (home.startsWith(target.endsWith(path.sep) ? target : target + path.sep)) return true; } catch {}
   return /^(?:opencode|\.opencode)$/i.test(path.basename(target));
 }
 

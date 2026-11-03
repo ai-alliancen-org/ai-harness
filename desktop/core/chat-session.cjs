@@ -892,6 +892,13 @@ async function prepareScratch(root, scratchRoot) {
   }
   await fs.writeFile(path.join(tmp, '.gitignore'), '*\n', { flag: 'w', mode: 0o600 });
   await fs.mkdir(scratchRoot, { recursive: true, mode: 0o700 });
+  // Opgavemapper, der er mere end tre dage gamle, ryddes væk, så AI'ens kladder ikke hober sig op i projektmappen (OneDrive, diskplads).
+  const limit = Date.now() - 3 * 24 * 3600 * 1000;
+  for (const entry of await fs.readdir(tmp, { withFileTypes: true }).catch(() => [])) {
+    if (!entry.isDirectory() || entry.isSymbolicLink() || path.join(tmp, entry.name) === scratchRoot) continue;
+    const stat = await fs.stat(path.join(tmp, entry.name)).catch(() => null);
+    if (stat && stat.mtimeMs < limit) await fs.rm(path.join(tmp, entry.name), { recursive: true, force: true }).catch(() => {});
+  }
 }
 // Motorens identitet er det, motoren er bundet til ved start. Designstatus, plan og beskedtekster følger med den enkelte besked og
 // må ikke genstarte motoren (årsag 4). Arbejdsmåden indgår, fordi tilladelserne er sat ved start.

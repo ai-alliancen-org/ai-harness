@@ -7,7 +7,7 @@ const { protectedPath, secretContent } = require('./git.cjs');
 
 const TEXT_LIMIT = 1024 * 1024, IMAGE_LIMIT = 2 * 1024 * 1024;
 // Genererede mapper og værktøjsmapper, der ikke hjælper brugeren med at forstå sit projekt.
-const GENERATED = new Set(['.git', 'node_modules', '.next', 'dist', 'build', '.venv', 'venv', '__pycache__', '.cache', '.turbo', '.parcel-cache', '.svelte-kit', '.astro', 'coverage', '.idea', '.vscode']);
+const GENERATED = new Set(['.aura', '.git', 'node_modules', '.next', 'dist', 'build', '.venv', 'venv', '__pycache__', '.cache', '.turbo', '.parcel-cache', '.svelte-kit', '.astro', 'coverage', '.idea', '.vscode']);
 const NOISE = /^(\.DS_Store|Thumbs\.db|desktop\.ini)$/i;
 const IMAGES = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp', '.ico': 'image/x-icon' };
 

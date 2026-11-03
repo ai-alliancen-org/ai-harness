@@ -49,3 +49,16 @@ for (const [status, art] of [[402, 'quota'], [403, 'access'], [404, 'notfound'],
     assert.equal((await send()).status, 409, 'forbindelsen er låst');
   });
 }
+
+test('en netfejl før modellen har svaret (forbindelse nægtet) låser ikke forbindelsen, så OpenCode kan prøve igen (beta 3)', async t => {
+  // Port uden lytter: fetch fejler med ECONNREFUSED, før der er et svar.
+  const dead = http.createServer(); await new Promise(resolve => dead.listen(0, '127.0.0.1', resolve)); const port = dead.address().port; await new Promise(resolve => dead.close(resolve));
+  const events = [];
+  const gateway = await startGateway({ kind: 'compatible', baseURL: `http://127.0.0.1:${port}/v1` }, { id: 'm' }, '', null, text => events.push(text));
+  t.after(() => gateway.close());
+  const send = () => fetch(gateway.url + '/chat/completions', { method: 'POST', headers: { authorization: `Bearer ${gateway.token}` }, body: JSON.stringify({ model: 'm' }) });
+  const første = await send(); await første.text();
+  assert.equal(første.status, 502); assert.equal(events.length, 0, 'ingen fejl kaldt, ingen lås');
+  const anden = await send(); await anden.text();
+  assert.equal(anden.status, 502, 'næste forsøg bliver også sendt videre og ikke afvist med 409');
+});

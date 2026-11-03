@@ -80,6 +80,9 @@ async function startGateway(connection, model, key, route, onFailure = () => {},
       res.end();
     } catch {
       if (idle.signal.aborted) fail(`Modellen svarede ikke i ${idleLimit >= 60_000 ? `${Math.round(idleLimit / 60_000)} min` : `${Math.max(1, Math.round(idleLimit / 1000))} s`}, så forbindelsen blev afbrudt. Din besked er bevaret.`, 'idle');
+      // En netfejl, før modellen har svaret (forbindelse nægtet, DNS, afbrudt), er forbigående: den sendes videre som 502, så OpenCode kan
+      // prøve igen, og forbindelsen låses ikke. En strøm, der afbrydes midt i svaret, er stadig endelig, fordi svaret er ufuldstændigt.
+      else if (!res.headersSent && !controller.signal.aborted) { /* videresendes som 502 nedenfor */ }
       else fail('Modelforbindelsen blev afbrudt. Din besked er bevaret. Kontrollér forbindelsen, og prøv igen.', 'network');
       // En afbrudt strøm må ikke ligne et færdigt modelsvar for agentmotoren.
       if (res.headersSent) { res.destroy(); return; }

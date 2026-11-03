@@ -243,3 +243,11 @@ test('en husket kommando matcher uanset AI\'ens begrundelse og tidsgrænse, men 
   await fs.mkdir(path.join(root, 'sub'));
   assert.notEqual(a.key, (await policy.describe(sandboxContext, bash('npm test', {}, path.join(root, 'sub')))).key, 'en anden mappe er en anden tilladelse');
 });
+
+test('en mappe over hjemmemappen er for bred til at blive husket (beta 3)', async t => {
+  const { policy, context } = await fixture(t);
+  const home = require('node:os').homedir();
+  const over = path.dirname(home);
+  const d = await policy.describe({ ...context, mode: 'build' }, { id: 'p', permission: 'external_directory', patterns: [over + '/*'], metadata: { filepath: over, parentDir: over } });
+  assert.equal(d.persistable, false, 'mappen over hjemmemappen kan ikke huskes');
+});

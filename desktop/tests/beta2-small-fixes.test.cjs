@@ -60,3 +60,8 @@ test('en serverfejl kan sendes til AI\'en med de sidste linjer af den maskerede 
   assert.ok(kladde.length < 2200); assert.match(kladde, /aura_preview/);
   assert.equal(view.serverRepairDraft({ state: 'running', output: 'x' }), '', 'ingen kladde, når der ikke er en fejl');
 });
+
+test('.aura vises ikke i kodefanen eller filvalget (beta 3)', () => {
+  const source = fs.readFileSync(path.join(__dirname, '..', 'core', 'project-files.cjs'), 'utf8');
+  assert.match(source, /GENERATED = new Set\(\['\.aura'/);
+});

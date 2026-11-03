@@ -187,3 +187,15 @@ test('exhausted event reconnects stop once without sending another prompt or too
   assert.equal(f.events.filter(e => e.type === 'engine.error').length, 1);
   assert.deepEqual(f.calls.filter(c => c.method !== 'GET'), [{ method: 'POST', url: '/session/session-a/abort' }]);
 });
+
+test('hver forbindelse, der har virket, får sit eget budget: den fjerde afbrydelse efter tre genoprettelser stopper ikke opgaven (#58)', async t => {
+  const f = await fixture(t, { delays: [2, 4, 6], idleLimit: 5000 });
+  for (let n = 1; n <= 5; n++) {
+    const before = f.events.filter(e => e.type === 'engine.recovery' && e.recovery.phase === 'recovered').length;
+    f.streams.at(-1).destroy();
+    await waitFor(() => f.events.filter(e => e.type === 'engine.recovery' && e.recovery.phase === 'recovered').length > before);
+    f.emit({ type: 'server.heartbeat', properties: {} }); await new Promise(resolve => setTimeout(resolve, 30)); // en levende strøm leverer hændelser
+  }
+  assert.equal(f.events.some(e => e.type === 'engine.error'), false, 'opgaven må ikke stoppes af en forbindelse, der er genoprettet hver gang');
+  assert.equal(f.engine.active, true);
+});

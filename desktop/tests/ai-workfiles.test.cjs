@@ -51,3 +51,15 @@ test('kortet siger skrive, når AI\'en skriver i en mappe uden for projektet, og
   assert.equal(view.directoryTitle({ permission: 'external_directory', toolInput: { tool: 'read' } })[0], 'Må AI’en se en mappe uden for projektet?');
   assert.equal(view.directoryTitle({ permission: 'external_directory' })[0], 'Må AI’en se en mappe uden for projektet?');
 });
+
+test('opgavestart rydder gamle opgavemapper i .aura/tmp, men ikke nye og ikke .gitignore (beta 3)', async t => {
+  const rod = await fs.mkdtemp(path.join(os.tmpdir(), 'aura-oprydning-'));
+  t.after(() => fs.rm(rod, { recursive: true, force: true }));
+  const tmp = path.join(rod, '.aura', 'tmp');
+  await fs.mkdir(path.join(tmp, 'gammel'), { recursive: true }); await fs.mkdir(path.join(tmp, 'ny'), { recursive: true });
+  await fs.writeFile(path.join(tmp, 'gammel', 'x.txt'), 'x'); await fs.writeFile(path.join(tmp, '.gitignore'), '*\n');
+  const gammel = new Date(Date.now() - 5 * 24 * 3600 * 1000); await fs.utimes(path.join(tmp, 'gammel'), gammel, gammel);
+  await chat.prepareScratch(rod, chat.scratchRootFor(rod, 'op-nu'));
+  const navne = (await fs.readdir(tmp)).sort();
+  assert.deepEqual(navne, ['.gitignore', 'ny', 'op-nu'], 'den gamle mappe er væk, den nye og gitignore er bevaret');
+});

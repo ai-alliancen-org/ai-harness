@@ -33,3 +33,10 @@ test('et eksisterende projekt uden standarden får ikke Tailwind af sig selv', (
   const eksisterende = policyFor({ origin: 'aura-preview://gammelt/', network: {} });
   assert.equal(allowedRequest({ url: 'https://cdn.tailwindcss.com/3.4.0', resourceType: 'script' }, eksisterende), false);
 });
+
+test('den statiske forhåndsvisning tillader unsafe-eval, så Vue og Alpine fra en godkendt CDN virker, uden at åbne for andre kilder (beta 3)', () => {
+  const { contentSecurityPolicy } = require('../core/preview-policy.cjs');
+  const csp = contentSecurityPolicy({ origin: 'aura-preview://p/', network: DESIGN_PREVIEW_NETWORK, static: true });
+  const script = csp.split(';').find(part => part.trim().startsWith('script-src'));
+  assert.match(script, /'unsafe-eval'/); assert.match(script, /https:\/\/cdn\.jsdelivr\.net/); assert.doesNotMatch(script, /\bhttps:(\s|$)/, 'ingen jokertegn for hele internettet');
+});
