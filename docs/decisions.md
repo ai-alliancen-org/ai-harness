@@ -735,7 +735,7 @@ Valg i implementeringen, som kan ændres:
 - Temaet (#46) sættes i Electrons `nativeTheme`. Vinduesramme, felter, menuer og udbyderlogoer følger derfor med, og forhåndsvisningen og skærmbilleder af projektets side bruger samme valg, når siden har et lyst og et mørkt udseende. Valget ligger under Indstillinger › Udseende og i ⌘K. #46's smalle layout ned til 320 px tages ikke med, fordi appvinduet er mindst 980 px bredt.
 - #23 er foldet ind i `harness-design-og-tilgaengelighed` som to nye referencer, `designmetode.md` og `moenstre-og-tilstande.md`, med kilden nævnt i kataloget. Kataloget med 43 stilretninger fra SkillsUI, kodeskabelonerne, tokengeneratoren i Python og Atlas' rolletabel og panelmønstre er ikke med: rettighederne er ikke afklaret, eller materialet hører til startskabelonerne i M3 og de senere stilskills. Skillens beskrivelse er uændret, så M2 kan skrive den endelige. En tilpasset SKILL.md fra før en ny referencefil stopper ikke længere afsendelsen; motoren lister alle referencer. Pakkerne er bygget om under 0.2.1, fordi installationer sammenligner filernes indhold.
 
-## Beslutninger for 0.8.0-beta.2 · 2. november 2026
+## Beslutninger for beta 2 (0.7.0-beta.2) · 2. november 2026
 
 Brugeren har delegeret disse valg til Claude og vil have dem ændret, hvis de viser sig forkerte i beta-testen.
 
@@ -759,3 +759,16 @@ Brugeren har delegeret disse valg til Claude og vil have dem ændret, hvis de vi
 - **En husket kommando matcher præcis kommando og mappe** som i dag. Kategorier og præfikser kommer ikke i beta-2.
 - **Den delte npm-cache er ikke med i beta-2**; den hører til en senere runde.
 - **/Library/Developer/CommandLineTools må læses i sandkassen**, fordi git uden det ikke kan køre. Det er kun læsning, og skrivning dertil er fortsat forbudt.
+
+### Tilføjet under bygningen, 3. november 2026
+
+Brugeren har delegeret valgene og vil ændre dem, hvis betaen viser, at de er forkerte.
+
+- **Projektmappen er grænsen for nye projekter.** Filændringer i projektet sker uden kort (versioner og fortryd er sikkerhedsnettet), og kommandoer kører automatisk i sandkassen, hvor den findes. Eksisterende projekter ændres ikke. Søgning (grep) spørger fortsat, fordi resultatet kan indeholde beskyttede filer.
+- **Skrivevagten ligger i motoren** (plugin, `tool.execute.before`), ikke i godkendelsesflowet. En skrivning uden for projektet giver en almindelig værktøjsfejl uden kort og lukker ikke andre ventende kort. Den nægter kun ved positivt bevis for en sti uden for projektet. Det erstatter den første udgave, der nægtede alt, som ikke var bevist inde i projektet.
+- **En færdig plan bevares** ved nye beskeder i Planlæg, ved fejl og ved Stop, i alle arbejdsmåder, indtil en ny plan erstatter den. Det erstatter `Afbrudte planer`-linjen ovenfor. Markørerne `aura:stay` og `aura:offer-plan` virker kun i Samtale.
+- **AI'ens arbejdsfiler** ligger i `<projekt>/.aura/tmp`, som får en `.gitignore`, der ignorerer alt. Motorprocessen har sin egen temp-mappe i appdata. AI'ens kommandoer får `.aura/tmp` som TMPDIR gennem motorens `shell.env`. Sandkassens HOME og pakkecaches ligger i appdata, ikke i projektet.
+- **AI'en starter forhåndsvisningen med værktøjet `aura_preview`**, gennem en lokal bro med hemmelig nøgle. Brugerens Start i forhåndsvisningens dialog huskes som samtykke til netop det fingeraftryk af package.json, lockfiler og opstartsfiler. Ændres de, spørges igen.
+- **Motorens identitet** er forbindelse, model, arbejdsmåde, grundregler, skills, funktioner og sandkasse. Designstatus, plan-id og beskedtekster hører til den enkelte besked og genstarter ikke motoren. Én motor på tværs af arbejdsmåder (agent pr. besked) er ikke bygget.
+- **Kortet for en udgivelse siger «Appen er ikke klar endnu»**, når udbyderen har modtaget versionen, men adressen svarer 404, 5xx eller slet ikke. Et «travlt»-svar fra komplai bevarer den tidligere kvittering og siger, at det er sikkert at prøve igen. Hvem der kontrollerer adressen og hvor tit, er fortsat brugerens afgørelse.
+- **Godkend alt i denne samtale** vises, når sandkassen er understøttet. Det dækker aldrig søgning, og kommandoer kun mens sandkassen kører i motoren. Det nulstilles ved Stop.

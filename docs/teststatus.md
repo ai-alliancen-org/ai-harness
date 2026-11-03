@@ -1430,3 +1430,16 @@ Apple-notarisation er endnu ikke gennemført. Validering af loginprofilen for te
 Evidens: `/tmp/aura-milepael-desktop-final.log`, `/tmp/aura-milepael-cli-final.log`, `/tmp/aura-milepael-loading-final.log`, `/tmp/aura-milepael-app-skills.log`, `/tmp/aura-milepael-export-opencode.log`, `/tmp/aura-milepael-cli-live-new.log`, `/tmp/aura-milepael-cli-samlet-build.log`, `/tmp/aura-milepael-cli-samlet-live.log`, `/tmp/aura-milepael-electron.log`, `/tmp/aura-milepael-packed-electron-rules.log` og `/tmp/aura-milepael-mac-source.log`. Midlertidige filer kan senere blive ryddet af systemet.
 
 Der er ikke oprettet commits, push, branches, tags, PR'er eller GitHub-kørsler i dette repository fra denne chat. Git-versioner i prøverne hører kun til syntetiske, midlertidige projekter. De eksisterende Komplai-ændringer er bevaret, og delte filer og sidste generering er koordineret med den anden chat.
+
+
+## Beta 2: bygning og gennemgang · 3. november 2026
+
+Niveauer: *skrevet* · *enhedsprøvet* · *kørt mod rigtigt materiale* · *udgivet og set*. Intet i dette afsnit er udgivet.
+
+- **Enhedsprøver:** 825 af 825 består (Node 22, `--test-concurrency=1`).
+- **Kørt mod den rigtige OpenCode 1.18.33 med en falsk model, ikke i Electron:** `scripts/verify-write-guard.cjs` (skrivevagt med write og apply_patch, [klammer] i stier, tre parallelle afvisninger uden kaskade, TMPDIR for kommandoer, motorens egne filer uden for projektet, godkendt læsning uden for et Git-projekt) og `scripts/verify-preview-tool.cjs` (modellen ser og kalder `aura_preview`, og svaret når tilbage).
+- **Kørt i Electron:** `test:approvals` (8 kontrolpunkter), `test:planning` (12, efter at prøven blev opdateret til at bevare planen) og `test:chat` (15) består. Det dækker ikke de nye standarder for nye projekter, knappen «Godkend alt i denne samtale» eller værktøjet `aura_preview` i appen.
+- **Kortgrænsen** er målt på politikniveau med syv optagne forespørgsler fra OpenCode 1.18.33: 0 kort med standarderne for nye projekter, 7 uden. Det er ikke en ende-til-ende-måling med en rigtig model.
+- **Fundet ved gennemgangen:** en skeptiker-runde fandt fire kritiske og otte høje fejl i det, der blev bygget 2. november (blandt andet at `.aura/tmp` kom i Git og spærrede Udgiv og Gem version, at motorens TMPDIR fyldte projektet med 4,8 MB pr. start, og at nægtelsen i Byg også afviste filer inde i projektet). De er rettet og dækket af prøver, der fejler uden rettelsen.
+- **Ikke gjort:** opgraderingsprøven 0.6 til 0.7 er ikke kørt igen. Windows er ikke afprøvet. Intet er kørt med en rigtig udbyder eller en rigtig model. `test:preview-edit` er stadig rød (Playwright 1.64.1).
+- **Modsatte prøver ændret bevidst:** `verify-planning.cjs` forventede, at en ny plan-besked trækker den gamle plan tilbage. Den forventer nu, at planen bevares.

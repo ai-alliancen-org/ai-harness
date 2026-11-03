@@ -817,3 +817,25 @@ Det her er den faktiske status. Hvert trin er bygget med prøver, der fejlede f�
 **Åbne beslutninger, der er din:** komplais adressekontrol og interval (trin 12). Alt andet er valgt og ligger i docs/decisions.md under «Beslutninger for 0.8.0-beta.2».
 
 **Før beta-2 kan udgives:** trin 7 og 13 skal være bygget, trin 12 besluttet af dig, og hele løbet skal køres i Electron mod en rigtig OpenCode-motor. Udgivelsen kræver derefter en ny version, pakning, signering, notarisation og to Actions-kørsler, som du godkender selv.
+
+## Status 3. november 2026, korrigeret efter gennemgangen
+
+Tabellen fra 2. november gav indtryk af, at trin var færdige, som kun var delvist bygget, og to trin var forkerte (se `teststatus.md`). Denne tabel er målt mod retningspunkterne i `hackathon-aarsager.md`, ikke mod trinnene. **Ingen af de tretten årsager er lukket.** Alt er kun set som enhedsprøve, kørt mod den rigtige motor med en falsk model, eller (godkendelser, planlægning, samtale) i Electron. Intet er kørt med en rigtig model eller udgivet.
+
+| # | Årsag | Bygget | Mangler |
+|---|---|---|---|
+| 1 | Spørger om alt | Projektmappen er grænsen for nye projekter: 0 kort for en typisk opgave på politikniveau (7 uden). Gentagelsesvagt og søgning er uændret | Søgning med beskyttelse; gentagelsesvagten besvares automatisk; «Før du sender» pr. udbyder; CLI og Windows; måling med en rigtig model |
+| 2 | Ud af projektmappen | `.aura/tmp` med `.gitignore`, TMPDIR via `shell.env`, skrivevagt i motoren, mappefix for OpenCodes former, korttitler, link-kontrol | Oprydning efter opgaver; AI'en må ikke læse motorens data; projektdata nøglet på id; flytning af tool-output |
+| 3 | Planer | Planen bevares (nye beskeder, fejl, Stop); tolerant genkendelse; markører kun i Samtale; «Ret med AI» i Byg | Egne agenter til Samtale og Planlæg; kort regelsæt for Byg uden plan; «Byg nu»-knap; to etiketter for Byg og valg ved skrivefeltet (PR #53) |
+| 4 | Motoren glemmer | Motorens identitet adskilt fra designstatus, plan-id og tekster | Agent pr. besked i samme session; historik ved modelskift; start ved åbning af projektet |
+| 5 | Udbyderfejl | 408, 429 og 5xx videresendes til OpenCode; Retry-After højst 120 s | Vagt pr. opgave med «Vent»/«Stop»; forklaring ved langsom motorstart; udbyderens fejltekst bag «Se detaljer»; 409-risikoen er ikke målt |
+| 6 | Forhåndsvisning | Værktøjet `aura_preview` med samtykke, der huskes; klar ud fra serverens egen adresse; «Ret med AI» sender i Byg | Opstartsfil i projektet; «Ret med AI» med maskeret log til serverfejl; CDN-diagnosen til AI'en; dialogen med 3 til 6 klik |
+| 7 | Bygger i blinde | Resultatet af kontrollen går til modellen som data; værn bevaret i prompten | Designskill med skala og tokens; startskabeloner; højere grænser for ukendte modeller |
+| 8 | Prompten | `AGENTS.md` gentages ikke, når den er en kopi af grundreglerne | Opgavens id står stadig tidligt i prompten (cache); planen flere gange; snævrere skills |
+| 9 | Sandkasse | En husket kommando tænder ikke sandkassen; «Godkend alt i denne samtale»; Command Line Tools læses; HOME uden for projektet; ingen compile-cache | Regelnøglen med input; localhost i sandkassen; original kommando i historik; Windows |
+| 10 | Nøgler | Fejlbesked for adresser, der ikke findes | `token=`-præfiks; kontrol før gem; region i navnet; Azure-adresse |
+| 11 | CLI | Intet | Alt (nøglering, region, SIGHUP, låse, Ctrl+C, version) |
+| 12 | komplai | Kortet er ikke positivt, når adressen ikke svarer eller giver en fejlside; «travlt» bevarer tidligere kvittering | Ventetilstand og overvågning (hvem og hvor tit er brugerens afgørelse); komplais øvrige fejlkoder i alle stier |
+| 13 | Ende til ende | Kortgrænse på politikniveau med optagne forespørgsler; Electron-prøverne for godkendelser, planer og samtale grønne | Ende-til-ende med en rigtig model; pakkeprøve mod tarballen; «Godkend alt»-knappen og de nye standarder i appen |
+
+**Taget ind:** PR #58 og #56 (forfatter bevaret) og Dependabot #59 (`node-forge` 1.4.2, `undici` 7.30.1). **Ikke taget ind:** #53 (arbejdsflow ved skrivefeltet, konfliktfri mod main, men bryder reglen om højst tre til fire valg på spørgsmålskortet), #54, #55 og #57, samt Dependabot #11 og #52 (OpenCode 1.19.x).
