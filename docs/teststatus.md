@@ -1443,3 +1443,16 @@ Niveauer: *skrevet* · *enhedsprøvet* · *kørt mod rigtigt materiale* · *udgi
 - **Fundet ved gennemgangen:** en skeptiker-runde fandt fire kritiske og otte høje fejl i det, der blev bygget 2. november (blandt andet at `.aura/tmp` kom i Git og spærrede Udgiv og Gem version, at motorens TMPDIR fyldte projektet med 4,8 MB pr. start, og at nægtelsen i Byg også afviste filer inde i projektet). De er rettet og dækket af prøver, der fejler uden rettelsen.
 - **Ikke gjort:** opgraderingsprøven 0.6 til 0.7 er ikke kørt igen. Windows er ikke afprøvet. Intet er kørt med en rigtig udbyder eller en rigtig model. `test:preview-edit` er stadig rød (Playwright 1.64.1).
 - **Modsatte prøver ændret bevidst:** `verify-planning.cjs` forventede, at en ny plan-besked trækker den gamle plan tilbage. Den forventer nu, at planen bevares.
+
+
+## 0.7.0-beta.2 · pakker, signering og notarisation · 4. november 2026
+
+Pakkerne er bygget fra commit `f314634` i en separat arbejdskopi, så udviklingen til beta 3 ikke rørte kildetræet. Niveau: *kørt mod rigtigt materiale* for Mac Apple Silicon, ellers lavere som angivet. Intet er udgivet endnu.
+
+- **Kildekontrol:** `verify-package-source.cjs` består for `darwin-arm64`, `darwin-x64` og `win32-x64`: 199 produktfiler matcher commit og arbejdsmappe, og OpenCode 1.18.33, Git 2.53.0 og Node 22.23.3 er de låste versioner. De to ZIP-arkiver er udpakket og kontrolleret for sig.
+- **Pakkeprøve:** `test:package` er kørt mod Apple Silicon-appen (7 kontrolpunkter). Den er ikke kørt mod Intel-appen. Windows-pakken er krydsbygget på Mac og er ikke kørt på Windows.
+- **Signering:** begge Mac-apps er signeret med Developer ID (`mekbas IVS`). `codesign --verify --deep --strict` og `syspolicy_check distribution` består, og `stapler validate` består på selve appen i begge arkiver. Windows-pakken er usigneret.
+- **Notarisation:** seks indsendelser til Apple, alle `Accepted`. De to første DMG'er blev sendt før billetten blev hæftet på appen, og de fire endelige filer efter. Kvitteringer: Aura-0.7.0-beta.2-mac-arm64.dmg 513fa477-c4d0-401c-9d1d-d8690253d527; Aura-0.7.0-beta.2-mac-arm64.zip 551c89d8-c529-415a-bb26-0a1ec6381b4f; Aura-0.7.0-beta.2-mac-x64.dmg de8ea158-221c-413c-a580-2b01e2ca462b; Aura-0.7.0-beta.2-mac-x64.zip d4717f4b-7d9f-475b-a2bb-4468ac65ce26.
+- **Filoversigt:** `release-site.cjs` dannede `release.json` og `SHA256SUMS.txt` for de fem programfiler, og `verify-download.cjs` består (tre installationsfiler hentet gennem en lokal browser).
+- **Prøver forud for pakningen:** 847 af 847 enhedsprøver og Electron-prøverne for godkendelser, planlægning og samtale består på commit'et. Opgraderingsprøven fra 0.7.0-beta.1 til beta.2 er ikke kørt.
+- **Notarisationen blev afbrudt to gange**, første gang af ustabilt net og anden gang af en låst skærm, som gjorde nøgleringen utilgængelig. Begge gange blev scriptet genoptaget fra de gemte indsendelses-id'er, og ingen fil blev sendt igen.
