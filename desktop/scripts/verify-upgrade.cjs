@@ -19,7 +19,7 @@ const helpers = require('./ui-test-helpers.cjs');
   console.log('Testmateriale: ' + root);
   let installed = path.join(programs, path.basename(oldBundle));
   await fs.mkdir(programs);
-  let app, page, requests = 0, downloadCount = 0, updateInfo, usesBundledController = false;
+  let app, page, requests = 0, requestsBeforeUpdate = 0, downloadCount = 0, updateInfo, usesBundledController = false;
   const key = 'SYNTHETISK_TESTNOEGLE_KUN_LOKALT';
   const server = http.createServer((req, res) => {
     if (nativeZIP && req.url === '/feed') { res.setHeader('content-type', 'application/json'); return res.end(JSON.stringify(updateInfo)); }
@@ -52,10 +52,11 @@ const helpers = require('./ui-test-helpers.cjs');
     await page.frameLocator('#preview').getByRole('heading', { name: 'Bevaret indhold' }).waitFor();
     let id;
     if (!installationOnly) {
-      const connection = await page.evaluate(value => window.harness.saveConnection(value), { kind: 'compatible', name: 'Bevaret forbindelse', baseURL: serverURL + '/v1', apiKey: key });
-      assert.equal(connection.ok, true); assert.equal(JSON.stringify(connection).includes(key), false);
-      id = connection.value.connections[0].id;
-      assert.equal((await page.evaluate(id => window.harness.models(id), id)).ok, true); assert.equal(requests, 1);
+      // Siden 0.7 kan en nøgle kun indtastes i det isolerede nøglevindue, så forbindelsen gemmes den vej (og kun den vej).
+      const connection = await helpers.addConnection(page, { name: 'Bevaret forbindelse', baseURL: serverURL + '/v1', apiKey: key, app });
+      assert.equal(JSON.stringify(connection).includes(key), false); id = connection.id;
+      const before = requests; requestsBeforeUpdate = null;
+      assert.equal((await page.evaluate(id => window.harness.models(id), id)).ok, true); assert.ok(requests > before, 'modellisten hentes med den gemte nøgle'); requestsBeforeUpdate = requests;
     }
     assert.equal((await page.evaluate(() => window.harness.saveDesign({ name: 'Bevaret design', color: '#0052cc', links: ['https://design.gentofte.dk/'] }))).ok, true);
     await page.fill('#prompt', 'Bevar kladden gennem opdatering');
@@ -140,10 +141,10 @@ const helpers = require('./ui-test-helpers.cjs');
     await launch();
     const newVersion = await app.evaluate(({ app }) => app.getVersion()); assert.equal(newVersion, targetVersion); assert.notEqual(newVersion, oldVersion);
     await helpers.assertNoGitWrites(app);
-    assert.equal(requests, installationOnly ? 0 : 1, 'Opdatering må ikke selv sende til en forbindelse');
+    assert.equal(requests, installationOnly ? 0 : requestsBeforeUpdate, 'Opdatering må ikke selv sende til en forbindelse');
     if (!installationOnly) {
       const state = await page.evaluate(() => window.harness.connectionState()); assert.ok(state.value.connections.some(c => c.id === id)); assert.equal(JSON.stringify(state).includes(key), false);
-      assert.equal((await page.evaluate(id => window.harness.models(id), id)).ok, true, 'Den gemte krypterede nøgle kan stadig bruges'); assert.equal(requests, 2);
+      assert.equal((await page.evaluate(id => window.harness.models(id), id)).ok, true, 'Den gemte krypterede nøgle kan stadig bruges'); assert.equal(requests, requestsBeforeUpdate + 1);
     }
     assert.equal(await fs.readFile(path.join(project, 'public/index.html'), 'utf8'), original);
     await page.waitForSelector('#workspace:not([hidden])');
