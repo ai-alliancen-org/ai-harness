@@ -1457,3 +1457,13 @@ Pakkerne er bygget fra commit `f314634` i en separat arbejdskopi, så udviklinge
 - **Prøver forud for pakningen:** 847 af 847 enhedsprøver og Electron-prøverne for godkendelser, planlægning og samtale består på commit'et.
 - **Opgraderingsprøve 4. november:** `verify-upgrade.cjs` er kørt på Mac Apple Silicon mellem den signerede 0.7.0-beta.1 og den signerede 0.7.0-beta.2 med det notariserede ZIP-arkiv. Squirrel.Mac installerede opdateringen, projektfiler, design og kladde var uændrede, den krypterede nøgle og forbindelsen blev bevaret og kunne bruges efter opdateringen, og der blev ikke sendt noget til en model eller skrevet til Git. Automatisk genstart og Intel er ikke afprøvet, og Windows kræver en egen prøve. Prøven var forældet og blev rettet på beta-3-grenen: den gemte forbindelsen med en nøgle fra hovedvinduet, hvilket siden 0.7 kun kan ske i nøglevinduet.
 - **Notarisationen blev afbrudt to gange**, første gang af ustabilt net og anden gang af en låst skærm, som gjorde nøgleringen utilgængelig. Begge gange blev scriptet genoptaget fra de gemte indsendelses-id'er, og ingen fil blev sendt igen.
+
+## 0.7.0-beta.2 · offentliggjort og hentet fra det offentlige link · 4. november 2026
+
+Niveau: *udgivet og observeret* for hentning og Mac-notarisation. Windows er kun checksum-tjekket.
+
+- **Offentliggørelse:** første kørsel af "Offentliggør gennemgået desktopbeta" (`41894353797`) fejlede i versionskontrollen, fordi `main` var rykket til `81db7f9` (kun en docs-ændring i denne fil), mens taggen `v0.7.0-beta.2` pegede på `d63a16c`. Taggen blev flyttet til `81db7f9`, kladden beholdt sine 7 filer, og anden kørsel (`41908917792`) lykkedes. Udgivelsen er en prerelease. Pakkerne er stadig bygget og notariseret fra `d63a16c`; forskellen til `81db7f9` er kun denne fil.
+- **Downloadside:** "Udgiv downloadside" (`41909304759`) lykkedes, og siden svarer 200 på <https://ai-alliancen-org.github.io/ai-harness/> uden login.
+- **Hentning:** alle fem programfiler og `SHA256SUMS.txt` blev hentet fra udgivelsens offentlige adresse (200). `shasum -c` giver OK for alle fem, og den offentlige `SHA256SUMS.txt` er identisk med den lokale fra notariseringen.
+- **Mac:** `stapler validate` består på begge DMG'er. Appen i begge DMG'er vurderes af `spctl` som "accepted, Notarized Developer ID" (mekbas IVS), og `codesign --verify --deep --strict` giver ingen fejl. `spctl` afviser selve DMG-filerne som "no usable signature", fordi DMG'en ikke er signeret for sig.
+- **Ikke gjort:** Windows-filen er ikke hentet og kørt på en Windows-maskine og er ikke signeret. Der er ikke kørt en installation fra det offentlige link; opgraderingsprøven er kun kørt på Mac Apple Silicon mod den lokale kandidat.
