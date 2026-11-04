@@ -141,7 +141,7 @@ const questions = [
     await card.locator('.question-links button', { hasText: 'Tilbage' }).click();
     assert.equal(await card.locator('.answer-choice[aria-pressed="true"]').count(), 2, 'tilbage bevarer de valgte svar');
     await card.locator('.primary').click();
-    await card.locator('.question-links button', { hasText: 'Skriv dit eget svar' }).click();
+    assert.equal(await card.locator('textarea').isVisible(), true, 'eget svar er synligt uden ekstra klik');
     await card.locator('textarea').fill('I kommunens bookingsystem senere');
     await card.locator('button[type="submit"]').click();
     await card.waitFor({ state: 'detached' });

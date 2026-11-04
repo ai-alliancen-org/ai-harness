@@ -73,7 +73,7 @@ async function main() {
     await page.waitForFunction(() => document.querySelector('#setup').dataset.step === 'saved' && !document.querySelector('#setup-continue').disabled);
     await page.click('#setup-continue'); await page.waitForSelector('#workspace:not([hidden])');
     await page.waitForFunction(() => document.querySelector('#model-select').value === 'mistral-medium-latest');
-    await page.click('#model-chip');
+    await helpers.taskOptions(page);
     assert.equal(await page.locator('#model-shortlist .model-choice').count(), 3);
     await page.screenshot({ path: path.join(root, 'modelvalg.png'), animations: 'disabled' });
     await page.locator('#model-shortlist [data-model="mistral-large-4"]').focus(); await page.keyboard.press('Enter');
@@ -121,7 +121,7 @@ async function main() {
     assert.equal(usage.calls, 4); assert.equal(usage.input, 400); assert.equal(usage.output + usage.reasoning, 200); assert.ok(Math.abs(usage.cost - 0.00138) < 1e-10); assert.equal(usage.unpriced, 0);
     await page.screenshot({ path: path.join(root, 'kode-og-preview.png'), animations: 'disabled' });
     await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(window => window.webContents.getURL().startsWith('harness://')).setSize(980, 720));
-    await page.click('#model-chip'); await page.screenshot({ path: path.join(root, 'modelvalg-lille.png'), animations: 'disabled' }); await helpers.closeTaskOptions(page);
+    await helpers.taskOptions(page); await page.screenshot({ path: path.join(root, 'modelvalg-lille.png'), animations: 'disabled' }); await helpers.closeTaskOptions(page);
     assert.equal(await page.locator('#send').evaluate(button => { const range = document.createRange(); range.selectNodeContents(button); return range.getClientRects().length; }), 1, 'Send og pilen bliver på én linje, også med en lang modelbetegnelse');
 
     phase = 'reject'; calls = 0;
@@ -145,7 +145,7 @@ async function main() {
     await app.evaluate(({ dialog }, folder) => { dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [folder] }); }, another);
     await page.click('#open'); await page.waitForFunction(() => document.querySelector('#project-name').textContent === 'Uden standardmodel' && !document.querySelector('#open').disabled && document.querySelector('#model-select').options.length === 3);
     assert.equal(await page.inputValue('#model-select'), '');
-    await page.click('#model-chip');
+    await helpers.taskOptions(page);
     assert.doesNotMatch(await page.locator('#model-shortlist').textContent(), /Den første er udbyderens eget/);
     assert.equal(await page.locator('#model-shortlist .model-choice').count(), 2);
     await page.screenshot({ path: path.join(root, 'uden-standardmodel.png'), animations: 'disabled' });

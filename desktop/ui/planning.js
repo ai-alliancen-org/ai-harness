@@ -74,6 +74,7 @@
     for (const id of ['#plan-build', '#plan-edit', '#plan-revise', '#plan-restore', '#plan-replan']) $(id).disabled = running;
     $('#plan-status').textContent = planningNow ? 'AI’en arbejder på planen' : plan ? (plan.builtAt ? 'Planen er bygget' : 'Planen er klar til at blive bygget') : lastPlan ? 'Ingen gyldig plan' : 'Ingen plan endnu';
     $('#plan-summary').textContent = plan ? view.planSummary(plan.text) : '';
+    $('#plan-outline').replaceChildren(...(plan ? view.planOutline(plan.text).flatMap(item => [node('dt', item.title), node('dd', item.text)]) : []));
     // Fanen vises, når planlægning er slået til, eller når der findes en plan.
     $('#tab-plan').hidden = !featureOn('planlaegning') && !shown;
   }
@@ -104,18 +105,23 @@
   // v er samtalens visning. Spørgsmålet står i den samtale, hvis AI stillede det, også når en anden er åben.
   function questionCard(p, v) {
     const card = node('section', undefined, 'approval question-card'); card.dataset.id = p.id;
-    const state = { index: 0, answers: [], more: false, own: false };
+    const state = { index: 0, answers: [], drafts: [], more: false, submitting: false };
     const total = p.questions.length;
     const finish = record => { card.remove(); doneWaiting(p.id, v); if (record) { const line = node('p', record, 'chat-message answer-record'); v.log.append(line); } };
     async function submit() {
+      if (state.submitting || !card.isConnected) return;
+      state.submitting = true;
+      for (const control of card.querySelectorAll('button, textarea')) control.disabled = true;
       const answers = p.questions.map((_, index) => state.answers[index] || []);
-      await call('question', { id: p.id, answers, chat: v.id });
+      try { await call('question', { id: p.id, answers, chat: v.id }); }
+      catch (error) { state.submitting = false; if (card.isConnected) render(); throw error; }
       setStatusDetail('Dit svar er sendt. AI’en fortsætter …', v);
       finish(`Du svarede: ${p.questions.map((question, index) => `${question.header || question.question}: ${answers[index].map(label => label.replace(/\s*[([]\s*(anbefalet|anbefales|recommended)\s*[)\]]\s*$/i, '')).join(', ') || 'intet svar'}`).join(' · ')}`);
     }
     function answer(values) {
+      if (state.submitting || !card.isConnected) return;
       state.answers[state.index] = values;
-      if (state.index < total - 1) { state.index++; state.more = false; state.own = false; render(); card.querySelector('.question-title').focus(); }
+      if (state.index < total - 1) { state.index++; state.more = false; render(); card.querySelector('.question-title').focus(); }
       else action(submit);
     }
     function render() {
@@ -139,16 +145,15 @@
       card.append(list);
       if (options.length > 4 && !state.more) { const more = node('button', `Vis ${options.length - 4} svar mere`, 'text-button'); more.type = 'button'; more.onclick = () => { state.more = true; render(); }; card.append(more); }
       if (question.multiple) { const next = node('button', chosen.size ? `Fortsæt med ${chosen.size} ${chosen.size === 1 ? 'svar' : 'svar'}` : 'Vælg mindst ét svar', 'primary'); next.type = 'button'; next.disabled = !chosen.size; next.onclick = () => answer([...chosen]); card.append(next); }
-      if (state.own) {
-        const form = node('form', undefined, 'answer-own'); const label = node('label', 'Dit svar'); const input = node('textarea'); input.rows = 2; input.maxLength = 2000; input.required = true; input.id = `svar-${p.id}-${state.index}`; label.htmlFor = input.id;
+      if (question.custom !== false) {
+        const form = node('form', undefined, 'answer-own'); const label = node('label', 'Eller skriv dit eget svar'); const input = node('textarea'); input.rows = 2; input.maxLength = 2000; input.required = true; input.id = `svar-${p.id}-${state.index}`; label.htmlFor = input.id; input.value = state.drafts[state.index] || ''; input.placeholder = 'Svar med dine egne ord …'; input.oninput = () => { state.drafts[state.index] = input.value; };
         const send = node('button', 'Svar', 'primary'); send.type = 'submit'; form.append(label, input, send);
         form.onsubmit = event => { event.preventDefault(); if (input.value.trim()) answer([input.value.trim()]); };
-        card.append(form); requestAnimationFrame(() => input.focus());
+        card.append(form);
       }
       const links = node('p', undefined, 'question-links');
       const link = (text, onClick) => { const button = node('button', text, 'text-button'); button.type = 'button'; button.onclick = onClick; links.append(button); };
-      if (question.custom !== false && !state.own) link('Skriv dit eget svar', () => { state.own = true; render(); });
-      if (state.index > 0) link('Tilbage', () => { state.index--; state.more = false; state.own = false; render(); card.querySelector('.question-title').focus(); });
+      if (state.index > 0) link('Tilbage', () => { state.index--; state.more = false; render(); card.querySelector('.question-title').focus(); });
       link(total > 1 ? 'Spring spørgsmålene over' : 'Spring over', () => action(async () => { await call('question', { id: p.id, skip: true, chat: v.id }); setStatusDetail('Du sprang over. AI’en vælger selv og skriver antagelserne i planen.', v); finish('Du sprang AI’ens spørgsmål over. AI’en vælger selv.'); }));
       card.append(links);
     }

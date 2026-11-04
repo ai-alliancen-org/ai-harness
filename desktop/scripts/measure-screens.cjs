@@ -109,7 +109,7 @@ const server = http.createServer(async (req, res) => {
     await click('#create'); await win.waitForSelector('#workspace:not([hidden])');
     state.project = path.join(documents, 'Aura', (await fs.readdir(path.join(documents, 'Aura')))[0]);
     await measure('arbejdsomraade', '#workspace', 'Arbejdsområde: tomt projekt');
-    task = null; await win.click('#model-chip'); await measure('din-ai', '#task-dialog', 'Din AI'); await win.click('[data-close="task-dialog"]'); task = 'Fra idé til første udkast';
+    task = null; await helpers.taskOptions(win); await measure('din-ai', '#task-dialog', 'Din AI'); await win.click('[data-close="task-dialog"]'); task = 'Fra idé til første udkast';
     await helpers.selectMode(win, 'plan');
     await click('#send'); await win.waitForSelector('#data-dialog[open]'); await measure('foer-du-sender', '#data-dialog', 'Før du sender');
     task = null; await win.locator('#data-dialog details > summary').first().click(); await measure('foer-du-sender-alt', '#data-dialog', 'Før du sender · Se alle oplysninger'); await win.locator('#data-dialog details > summary').first().click(); task = 'Fra idé til første udkast';

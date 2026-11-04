@@ -115,7 +115,7 @@ const helpers = require('./ui-test-helpers.cjs');
     await page.keyboard.press('Escape');
     // Et nyt projekt starter i Byg; se DESIGN.md. Prøven arbejder direkte, som uden planlægning.
     assert.equal(await page.inputValue('#work-mode'), 'free');
-    await page.click('#composer-mode'); await page.selectOption('#work-mode', 'free'); await page.click('[data-close="task-dialog"]');
+    await helpers.selectMode(page, 'free');
     assert.match(await page.inputValue('#prompt'), /tre fiktive mødelokaler/);
     // 3. Første opgave: kun Git-skillen kan hentes, og appens regler følger funktionerne.
     await helpers.addConnection(page, { name: 'Kontrolleret model', baseURL: `http://127.0.0.1:${server.address().port}/v1` });
@@ -147,7 +147,7 @@ const helpers = require('./ui-test-helpers.cjs');
     assert.equal(await page.inputValue('#work-mode'), 'free', 'et tilvalg ændrer ikke arbejdsmåden');
     // Men slås Planlægning fra, mens man står i Planlæg, falder arbejdsmåden tilbage til standarden, Samtale.
     await page.click('[data-close="features-dialog"]');
-    await page.click('#composer-mode'); await page.selectOption('#work-mode', 'plan'); await page.click('[data-close="task-dialog"]');
+    await helpers.selectMode(page, 'plan');
     await helpers.menuClick(page, '#features-button'); await page.waitForSelector('#features-dialog[open]');
     await page.locator('#features-scope label').filter({ hasText: 'Kun' }).click();
     await page.locator('#features-list .feature-row[data-feature="planlaegning"] button').filter({ hasText: 'Brug standarden' }).click();
@@ -170,7 +170,7 @@ const helpers = require('./ui-test-helpers.cjs');
     await page.locator('#features-always > summary, .features-always > summary').first().click();
     await shot('funktioner-panel');
     await page.click('[data-close="features-dialog"]');
-    await page.click('#composer-mode'); await page.selectOption('#work-mode', 'free'); await page.click('[data-close="task-dialog"]');
+    await helpers.selectMode(page, 'free');
     // 5. Næste opgave starter en ny modelsession med de nye skills og regler.
     const second = await sendTask('Gør overskriften tydeligere.', true);
     assert.deepEqual(second.skills, ['harness-afproevning-og-fejlretning', 'harness-git-og-samarbejde', 'harness-integration-adresser', 'harness-kodestil', 'harness-overdragelse-og-drift', 'harness-udgivelse-og-gendannelse']);
@@ -189,7 +189,7 @@ const helpers = require('./ui-test-helpers.cjs');
     await assert.rejects(fs.access(path.join(project, '.git')), 'intet Git-repository uden versioner');
     await page.click('#project-menu-toggle'); assert.equal(await page.isVisible('#git-button'), false); await page.keyboard.press('Escape');
     await chooseModel();
-    await page.click('#composer-mode'); await page.selectOption('#work-mode', 'free'); await page.click('[data-close="task-dialog"]');
+    await helpers.selectMode(page, 'free');
     const third = await sendTask('', false);
     assert.equal(await page.locator('#run-review button').filter({ hasText: 'Gem version' }).count(), 0);
     assert.ok(third.system.includes('slået versioner fra')); assert.ok(!third.skills.includes('harness-git-og-samarbejde'));

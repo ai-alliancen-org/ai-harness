@@ -61,7 +61,6 @@ async function answerApprovals() {
   for (const box of await page.locator('#approvals .approval').all()) {
     if (await box.locator('.question-title').count()) {
       approvals.push({ stage, kind: 'spørgsmål', answer: 'den afgrænsede prøve' });
-      await box.getByRole('button', { name: 'Skriv dit eget svar', exact: true }).click();
       await box.locator('textarea').fill('Følg den konkrete idé: lokal HTML/CSS/JavaScript, de tre fiktive lokaler og filteret. Ingen installation eller deling.');
       await box.getByRole('button', { name: 'Svar', exact: true }).click(); continue;
     }
