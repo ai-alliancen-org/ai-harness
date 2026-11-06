@@ -66,8 +66,14 @@ test('gateway error, partial stream, Stop and timeout keep existing transport be
       assert.equal(row.status, scenario === 'stop' ? 'cancelled' : 'failed');
       if (scenario.startsWith('timeout')) assert.equal(row.errorCategory, 'timeout');
       assert.equal(server.requests.length, 1, 'observation must never retry');
-      assert.equal((await send()).status, 409, 'the original gateway failure/Stop latch remains unchanged');
-      assert.equal(server.requests.length, 1);
+      // En forbigående udbyderfejl (429) låser ikke gatewayen, så OpenCode kan genforsøge. Alle andre scenarier er stadig endelige.
+      if (scenario === 'http') {
+        const again = await send(); assert.equal(again.status, 429, 'a transient provider error is passed through again, not latched'); await again.text();
+        assert.equal(server.requests.length, 2);
+      } else {
+        assert.equal((await send()).status, 409, 'the original gateway failure/Stop latch remains unchanged');
+        assert.equal(server.requests.length, 1);
+      }
     });
   }
 });

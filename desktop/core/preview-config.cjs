@@ -11,7 +11,9 @@ async function readStartupFile(root) {
   try {
     const stat = await fs.lstat(file);
     if (!stat.isFile() || stat.size > MAX_BYTES) return null;
-    const config = normalizeRuntimeConfig(JSON.parse(await fs.readFile(file, 'utf8')));
+    // Netadgang læses aldrig fra filen: den kan skrives af AI'en, og brugeren ser kun kommandoerne og pakkerne i startdialogen.
+    const { network, ...raw } = JSON.parse(await fs.readFile(file, 'utf8'));
+    const config = normalizeRuntimeConfig(raw);
     return config.services?.length ? config : null;
   } catch { return null; }
 }
@@ -21,7 +23,8 @@ async function effectiveRuntime(root, stored) {
   const own = normalizeRuntimeConfig(stored || {});
   if (own.mode === 'static' || own.services?.length) return own;
   const fromFile = await readStartupFile(root);
-  return fromFile ? { ...own, ...fromFile, network: own.network || fromFile.network } : own;
+  // Netlisten kommer kun fra brugerens egne gemte indstillinger, aldrig fra .aura/preview.json.
+  return fromFile ? { ...own, ...fromFile, ...(own.network ? { network: own.network } : {}) } : own;
 }
 
 module.exports = { readStartupFile, effectiveRuntime };

@@ -280,7 +280,7 @@
     }
     function statusText(value) {
       if (value?.automatic) return `Vercel · ${value.latest ? stateLabels[value.latest.state] || 'Kontrollér status' : 'Følger Git'}`;
-      const r = value?.last; if (r?.checks?.provider?.status === 'unknown') return `${names[r.config.provider] || 'Udgivelse'} · Status kunne ikke hentes`; return r ? `${names[r.config.provider] || 'Udgivelse'} · ${stateLabels[r.state] || 'Kontrollér status'}` : '';
+      const r = value?.last; if (r?.checks?.provider?.status === 'unknown') return `${names[r.config.provider] || 'Udgivelse'} · Status kunne ikke hentes`; return r ? `${names[r.config.provider] || 'Udgivelse'} · ${r.state === 'READY' && window.ShareView.addressUnchecked(r) ? window.ShareView.UNCHECKED : stateLabels[r.state] || 'Kontrollér status'}` : '';
     }
     function renderHeader(error = trackingError) {
       const button = $('#deployment-status'), has = Boolean(tracking?.automatic || tracking?.last);
@@ -325,7 +325,7 @@
     window.addEventListener('aura:project', event => projectChanged(event.detail?.root));
     new MutationObserver(() => renderHeader()).observe($('#deploy-button'), { attributes: true, attributeFilter: ['hidden', 'disabled'] });
     window.addEventListener('aura:features', () => renderHeader());
-    setInterval(() => { if (trackingRoot && !document.hidden && !$('#workspace').hidden && window.sharingOn?.() && (tracking?.automatic || tracking?.last?.id)) refresh(true).catch(() => {}); }, 30000);
+    setInterval(() => { if (trackingRoot && !document.hidden && !$('#workspace').hidden && window.sharingOn?.() && (tracking?.automatic || (tracking?.last?.id && tracking.last.config?.provider !== 'komplai'))) refresh(true).catch(() => {}); }, 30000);
     dialog.addEventListener('close', () => { void cancelPromteLogin(); ++epoch; clearTimeout(polling); if (loginID) api('hostingCancel').catch(() => {}); loginID = null; configReview = null; });
     providerList();
     return { choose, config, restore, opened, refresh, configurationStep, pages, panel: step => choices.has(step) ? 'setupChoice' : step, render(step) { if (step !== 'setupConnection' && loginID) { clearTimeout(polling); loginID = null; api('hostingCancel').catch(() => {}); } if (step === 'options') $('#deployment-save-settings').hidden = provider() === 'komplai'; if (step === 'providers') providerList(); if (choices.has(step)) renderChoice(choices.get(step)); }, title: step => choices.get(step)?.title || titles[step], reset() { ++epoch; choices.clear(); choice = null; promteSaved = ''; promteHost = ''; promteNames.clear(); $('#deploy-promte-workspace').replaceChildren(); $('#deploy-promte-workspace-id').value = ''; providerList(); } };

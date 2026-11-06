@@ -50,7 +50,7 @@ Rapporten er fælles for appens projekter og gemmer højst 2.000 registreringer 
 
 ## Start fra kildekoden
 
-Kræver Node.js 22.12 eller nyere og npm. Kør `npm run runtime:prepare` én gang; det henter og kontrollerer den OpenCode-version, som står i `runtime-lock.json` (i dag 1.18.33), til `desktop/.runtime`. Appen søger i `HARNESS_OPENCODE_PATH`, i `desktop/.runtime`, i `~/.opencode/bin/` og på PATH og bruger kun den låste version. Den installerer eller opgraderer ikke OpenCode. Kør fra `desktop/`:
+Kræver Node.js 22.12 eller nyere og npm. Kør `npm run runtime:prepare` én gang; det henter og kontrollerer den OpenCode-version, som står i `runtime-lock.json` (i dag 1.19.5), til `desktop/.runtime`. Appen søger i `HARNESS_OPENCODE_PATH`, i `desktop/.runtime`, i `~/.opencode/bin/` og på PATH og bruger kun den låste version. Den installerer eller opgraderer ikke OpenCode. Kør fra `desktop/`:
 
 ```bash
 npm ci
@@ -619,7 +619,7 @@ Team `2UX98897JW` tilhører Progressify ApS; det eksisterende signeringscertifik
 
 Mistrals katalog hentes, når forbindelsen åbnes. Når kontoen har `mistral-large-4` eller `mistral-large-4-0`, vises modellen blandt højst tre modelkort som **offentlig prøveversion**. Et gemt modelvalg bevares. Mistral Medium er fortsat Mistrals hidtidige udgangspunkt til kode; mangler den i kataloget, vælger brugeren selv. Large 4 overtager ikke automatisk pladsen.
 
-Mistral-forbindelser bruger nu `@ai-sdk/mistral`, som følger med den fastlåste OpenCode 1.18.33. Adapteren læser både almindelig tekst og strukturerede tænkeafsnit, adskiller dem under streaming og bevarer tænkeafsnittene i samtalehistorikken efter værktøjskald. Aura sender ikke et valg af indsats; modellens niveau er derfor ikke angivet som verificeret i appen. Andre kompatible servere beholder deres eksisterende adapter.
+Mistral-forbindelser bruger nu `@ai-sdk/mistral`, som følger med den fastlåste OpenCode 1.19.5. Adapteren læser både almindelig tekst og strukturerede tænkeafsnit, adskiller dem under streaming og bevarer tænkeafsnittene i samtalehistorikken efter værktøjskald. Aura sender ikke et valg af indsats; modellens niveau er derfor ikke angivet som verificeret i appen. Andre kompatible servere beholder deres eksisterende adapter.
 
 Katalogets tokengrænser har forrang. Uden en oplyst grænse bruges modelkortets 1M kontekst for Large 4. Appens loft på 32.000 svartokens pr. kald er ikke en påstand om modellens maksimale svarlængde. Prisen følger kataloget, hvis det oplyser en; ellers bruges normal listepris på 1,36 USD ind, 4,18 USD ud og 0,14 USD for cachelæst input pr. million tokens. Mistrals lanceringsrabat er ikke trukket fra dette overslag. Det står i gennemgangen før afsendelse. Det bevægelige `mistral-large-latest` får ikke længere en gammel Large 3-pris uden dokumentation for aliasets indhold.
 

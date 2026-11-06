@@ -456,8 +456,10 @@ function fillChat(next, fresh) {
   try { const draft = JSON.parse(localStorage.getItem(`harness.chatDraft.${current.root}.${v.id}`)); if (draft && typeof draft.text === 'string' && (draft.text || !['working','interrupted'].includes(history?.status))) { $('#prompt').value = draft.text; if (['chat','plan','free'].includes(draft.mode)) { $('#work-mode').value = draft.mode; v.modeChosen = true; } } } catch {}
   if (v.draft) { $('#prompt').value = v.draft.text; if (['chat','plan','free','build'].includes(v.draft.mode)) $('#work-mode').value = v.draft.mode; }
   v.contextUsage = next.contextUsage || null;
+  v.approveAll = next.approveAll === true;
+  v.approveAllUnisolated = next.approveAllUnisolated === true;
   window.chatMaterials?.sync();
-  renderUsage(v.usage || next.usage);
+  renderUsage(v.usage || next.usage); renderApproveAll();
   updateWorkMode(); $('#draft-status').textContent = history?.draft ? 'Kladde hentet fra denne computer' : '';
   updateStartIdea(); applyRunning();
   window.planning?.onProject(next);
@@ -940,6 +942,7 @@ window.harness.onEvent(event => {
   const v = viewFor(event.chat), active = v === view;
   if (event.root) v.root ||= event.root;
   if (v.running && ['message.part.updated', 'message.part.delta', 'permission.asked', 'question.asked', 'permission.replied', 'question.replied', 'usage'].includes(event.type)) v.lastSignalAt = Date.now();
+  if (event.type === 'approve-all') { v.approveAll = event.enabled === true; if (active) renderApproveAll(); return; }
   if (event.type === 'run.todos') { v.todos = event.todos; if (active) renderStatus(); return; }
   if (event.type === 'files.written') { if (v.modelProgress) v.modelProgress.draft = null; if (active) renderStatus(); }
   if (event.type === 'model.progress') { if (v.running) { v.modelProgress = event.progress; v.lastSignalAt = event.progress.lastContentAt; if (active) renderStatus(); } return; }
@@ -965,7 +968,7 @@ window.harness.onEvent(event => {
         if (v.lastTargetRef && !window.workspace?.target()) window.workspace?.setTarget(v.lastTargetRef);
         if (!keepPlan) { activePlan = null; $('#plan-card').hidden = true; }
         if (!keepPlan && $('#work-mode').value === 'build') { $('#work-mode').value = 'plan'; updateWorkMode(); }
-      } else v.draft = { text: v.lastSentText, mode: keepPlan ? 'build' : v.draft?.mode === 'build' ? 'plan' : v.draft?.mode || 'chat' };
+      } else v.draft = { text: v.lastSentText, mode: keepPlan ? (['plan', 'chat'].includes(event.mode) ? event.mode : 'build') : v.draft?.mode === 'build' ? 'plan' : v.draft?.mode || 'chat' };
     }
     if (!working) { v.approvals.replaceChildren(); if (active) saveChatDraft(); }
   }
@@ -1210,6 +1213,13 @@ function updateModelSummary() {
 }
 // Forbruget i samtalen: tokens ind og ud og en anslået pris ud fra udbyderens prisliste. Det faktiske forbrug står hos udbyderen.
 const tokenCount = value => Math.round(value).toLocaleString('da-DK');
+// «Godkend alt» skal kunne ses og slås fra, så længe det gælder. Tilstanden hører til samtalen og følger med, når man skifter.
+function renderApproveAll() { $('#approve-all-status').hidden = view?.approveAll !== true; window.approvals?.refresh?.(); }
+$('#approve-all-off').onclick = async () => {
+  const v = view; if (!v) return;
+  try { await call('approveAllOff', { chat: v.id }, { root: v.root || current?.root, chat: v.id }); v.approveAll = false; } catch { /* hændelsen fra kernen opdaterer visningen */ }
+  renderApproveAll();
+};
 function renderUsage(usage) {
   const target = $('#usage-status');
   if (!usage || !usage.calls) { target.textContent = 'Intet forbrug i denne samtale endnu'; target.dataset.usageTitle = ''; renderContextUsage(); return; }
@@ -1937,6 +1947,13 @@ async function checkPreview(result) {
   try { await call('previewCheck', { since }); } catch { /* Kontrollen er en oplysning, ikke en betingelse for resultatet. */ }
 }
 const targetLine = (box, v = view) => { if (v.lastTarget) box.append(node('p', `Mål: ${v.lastTarget}`, 'review-target')); };
+// Svaret ramte grænsen for svarets længde. Teksten nævner kun tænkning, når modellen oplyser en indsats, og er ens for tomme og delvise svar.
+function lengthStopText(partial, reasons) {
+  if (!partial) return reasons
+    ? 'Modellen brugte hele svaret på at tænke og nåede ikke at skrive noget. Det sker oftest ved store opgaver og lange samtaler.'
+    : 'Modellen nåede grænsen for svarets længde, før den nåede at skrive noget. Det sker oftest ved store opgaver og lange samtaler.';
+  return `Svaret blev afskåret, fordi modellen nåede grænsen for svarets længde.${reasons ? ' Noget af pladsen kan være brugt på at tænke.' : ''} Det, der står, kan være ufuldstændigt. Bed om resten i en ny besked.`;
+}
 function renderRunReview(result, v = view) {
   const box = v.review; box.replaceChildren(); delete box.dataset.task;
   const { lastCheckpoint, lastSentText, rejectedThisRun, lastRejection } = v;
@@ -1988,7 +2005,7 @@ function renderRunReview(result, v = view) {
   if (!result.files.length && result.answered === false) {
     const long = result.finish === 'length';
     show(); box.append(node('h3', 'AI’en stoppede uden et resultat'), node('p', long
-      ? 'Modellen brugte hele svaret på at tænke og nåede ikke at skrive noget. Det sker oftest ved store opgaver og lange samtaler.'
+      ? lengthStopText(false, Boolean(v.effortLevels?.length))
       : 'AI’en stoppede uden at svare eller ændre filer. Prøv igen. Virker det stadig ikke, så vælg en anden model.'));
     const actions = node('div', undefined, 'review-actions'), again = () => { $('#prompt').value = lastSentText; retrySend(); };
     // Lav indsats får modellen til at tænke kortere. Den vises kun, når modellen tager imod den og ikke allerede bruger den.
@@ -2002,6 +2019,7 @@ function renderRunReview(result, v = view) {
   }
   if (v.buildOffer) {
     show(); box.append(node('h3', 'Næste skridt'));
+    if (result.finish === 'length') box.append(node('p', lengthStopText(true, Boolean(v.effortLevels?.length)), 'hint'));
     const build = reviewButton('Byg videre', () => {
       if (v !== view || running || v.submitting) return;
       if ($('#prompt').value.trim()) { message('Send eller ryd din beskedkladde først.'); $('#prompt').focus(); return; }
@@ -2010,11 +2028,16 @@ function renderRunReview(result, v = view) {
     }, true);
     box.append(build); return;
   }
-  if (['chat', 'plan'].includes(result.mode) && !result.files.length) { box.hidden = true; return; }
+  if (['chat', 'plan'].includes(result.mode) && !result.files.length) {
+    // Et afskåret svar i samtalen meldes, så det ikke læses som et fuldt svar.
+    if (result.finish === 'length') { show(); box.append(node('p', lengthStopText(true, Boolean(v.effortLevels?.length)), 'hint')); } else box.hidden = true;
+    return;
+  }
   show();
   box.classList.toggle('is-reviewed', v.reviewedTask === result.task);
   box.append(node('p', result.files.length ? `${result.files.length} ${result.files.length === 1 ? 'fil ændret' : 'filer ændret'}${saved ? ' · Gemt' : ''}` : 'Opgaven er afsluttet uden filændringer.', 'result-receipt'));
   targetLine(box, v); // Hvis brugeren pegede på et element i forhåndsvisningen, står målet også på resultatet (#47).
+  if (result.finish === 'length') box.append(node('p', lengthStopText(true, Boolean(v.effortLevels?.length)), 'hint'));
   if (result.skipped) box.append(node('p', 'Nogle filer er udeladt af oversigten på grund af filtype eller størrelse.', 'hint'));
   // Én kontrol pr. opgave: kortet tegnes om ved hver hændelse, og siden må kun genindlæses én gang.
   if (result.files.length && result.status !== 'error' && v.checkedTask !== result.task) { v.checkedTask = result.task; checkPreview(result); }

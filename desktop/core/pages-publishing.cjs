@@ -94,6 +94,16 @@ async function verifyMaterial(env = process.env) {
   if (!/^[a-f0-9]{64}$/.test(env.REVIEWED_HASH || '')) throw Error('Udgivelsen mangler det gennemgåede fingeraftryk.');
   const workspace = await fs.realpath(env.GITHUB_WORKSPACE), root = path.resolve(workspace, env.AURA_DIRECTORY);
   if (!root.startsWith(workspace + path.sep) || await fs.realpath(root) !== root) throw Error('Frontendmappen skal ligge direkte i projektet uden links.');
+  // Samme slags fund som Git-tjekket: JWT, Authorization-hoved og NAVN=værdi uden citationstegn. Indlejret her, fordi funktionen kører alene i workflowet.
+  const looksSecret = text => {
+    if (/(?<![A-Za-z0-9_-])eyJ[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]*/.test(text) || /authorization["']?\s*[:=]\s*["']?(?:Bearer|Basic|Token)[ \t]+[A-Za-z0-9._~+\/=-]{12,}/i.test(text)) return true;
+    for (const m of text.matchAll(/(?<![\w.-])([\w.-]{0,60}?(?:token|secret|password|passwd|passphrase|[_.-]key|apikey|accesskey))[ \t]*(=)[ \t]*([^\s,;&"'})\]\\]+)/gi)) {
+      const value = m[3];
+      if (/^(?:process\.|os\.|import\.meta|\$|<|%|\{\{|\[skjult)/i.test(value) || value.includes('(') || /^(?:true|false|null|undefined|none|nil|string|number|boolean|any|unknown|await|async|new|function)$/i.test(value)) continue;
+      if (value.length >= 12 || /[0-9]/.test(value)) return true;
+    }
+    return false;
+  };
   const out = path.join(env.RUNNER_TEMP, 'aura-pages');
   const entries = []; let bytes = 0;
   async function visit(dir, prefix = '') {
@@ -106,7 +116,7 @@ async function verifyMaterial(env = process.env) {
       const stat = await fs.stat(full); bytes += stat.size;
       if (entries.length >= 2000 || stat.size > 2 * 1024 * 1024 || bytes > 20 * 1024 * 1024) throw Error('Udgivelsen overstiger filgrænsen.');
       const data = await fs.readFile(full), text = data.toString();
-      if (/-----BEGIN (?:[A-Z ]+ )?PRIVATE KEY-----|\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|sk-(?:ant-|or-v1-)?[A-Za-z0-9_-]{20,}|AKIA[A-Z0-9]{16}|kp_live_[A-Za-z0-9_-]{43})\b/i.test(text) || /(?:api[_-]?key|secret|password|access[_-]?token)\s*["']?\s*[:=]\s*["'][^"'\r\n]{12,}["']/i.test(text) || /^version https:\/\/git-lfs.github.com\/spec\/v1/.test(text)) throw Error('Mulig hemmelighed eller Git LFS-pointer i udgivelsen.');
+      if (/-----BEGIN (?:[A-Z ]+ )?PRIVATE KEY-----|\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|sk-(?:ant-|or-v1-)?[A-Za-z0-9_-]{20,}|AKIA[A-Z0-9]{16}|kp_live_[A-Za-z0-9_-]{43}|komp_publish_(?:grant_)?[a-f0-9]{64})\b/i.test(text) || /(?:api[_-]?key|secret|password|access[_-]?token)\s*["']?\s*[:=]\s*["'][^"'\r\n]{12,}["']/i.test(text) || /^version https:\/\/git-lfs.github.com\/spec\/v1/.test(text) || looksSecret(text)) throw Error('Mulig hemmelighed eller Git LFS-pointer i udgivelsen.');
       entries.push({ file, data, hash: createHash('sha256').update(data).digest('hex') });
     }
   }

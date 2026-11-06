@@ -1,0 +1,99 @@
+{
+ "opencode": "1.19.5",
+ "aura": "d0c3fca+ændringer",
+ "scenario": "free-git-filer",
+ "outcome": "idle",
+ "case": "read-ude-absolut",
+ "askIndex": 1,
+ "asksInStep": 1,
+ "layout": {
+  "mode": "free",
+  "git": true,
+  "copy": false,
+  "model": "kontraktmodel",
+  "worktree": "${ROOT}",
+  "directory": "${ROOT}"
+ },
+ "sequence": [
+  "del:pending",
+  "del:running",
+  "spørg:external_directory",
+  "svar:once",
+  "del:completed"
+ ],
+ "request": {
+  "id": "per_1abd299f6001nStYuRV29mGDxt",
+  "sessionID": "ses_e542d6ae5ffe185BWdh2RDQ0Pg",
+  "permission": "external_directory",
+  "patterns": [
+   "${OUTSIDE}/*"
+  ],
+  "metadata": {
+   "filepath": "${OUTSIDE}/fil.txt",
+   "parentDir": "${OUTSIDE}"
+  },
+  "always": [
+   "${OUTSIDE}/*"
+  ],
+  "tool": {
+   "messageID": "msg_1abd299e8001CmOqEYPJ5ZqZts",
+   "callID": "kald-5-0"
+  }
+ },
+ "toolPartAtAsk": {
+  "status": "running",
+  "tool": "read",
+  "input": {
+   "filePath": "${OUTSIDE}/fil.txt"
+  }
+ },
+ "policyInput": {
+  "id": "per_1abd299f6001nStYuRV29mGDxt",
+  "sessionID": "ses_e542d6ae5ffe185BWdh2RDQ0Pg",
+  "permission": "external_directory",
+  "patterns": [
+   "${OUTSIDE}/*"
+  ],
+  "metadata": {
+   "filepath": "${OUTSIDE}/fil.txt",
+   "parentDir": "${OUTSIDE}"
+  },
+  "always": [
+   "${OUTSIDE}/*"
+  ],
+  "tool": {
+   "messageID": "msg_1abd299e8001CmOqEYPJ5ZqZts",
+   "callID": "kald-5-0"
+  },
+  "toolInput": {
+   "filePath": "${OUTSIDE}/fil.txt",
+   "tool": "read",
+   "input": {
+    "filePath": "${OUTSIDE}/fil.txt"
+   }
+  }
+ },
+ "recordedAura": {
+  "allowed": false,
+  "source": null,
+  "label": "Mappeadgang: ${OUTSIDE}/*",
+  "target": "${OUTSIDE}/*",
+  "match": {
+   "kind": "external_directory",
+   "targets": [
+    {
+     "path": "${OUTSIDE}",
+     "subtree": true
+    }
+   ]
+  },
+  "persistable": true,
+  "projectFile": false,
+  "scratch": false,
+  "folder": "${OUTSIDE}",
+  "blockedMode": false
+ },
+ "toolResult": [
+  "<path>${OUTSIDE}/fil.txt</path>\n<type>file</type>\n<content>\n1: Ekstern fil\n\n(End of file - total 1 lines)\n</content>"
+ ]
+}

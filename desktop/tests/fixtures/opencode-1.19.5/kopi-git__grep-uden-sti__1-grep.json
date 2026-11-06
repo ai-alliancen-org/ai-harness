@@ -1,0 +1,92 @@
+{
+ "opencode": "1.19.5",
+ "aura": "d0c3fca+ændringer",
+ "scenario": "kopi-git",
+ "outcome": "idle",
+ "case": "grep-uden-sti",
+ "askIndex": 1,
+ "asksInStep": 1,
+ "layout": {
+  "mode": "build",
+  "git": true,
+  "copy": true,
+  "model": "kontraktmodel",
+  "worktree": "/",
+  "directory": "${WORKSPACE}"
+ },
+ "sequence": [
+  "del:pending",
+  "spørg:grep",
+  "del:running",
+  "svar:once",
+  "del:completed"
+ ],
+ "request": {
+  "id": "per_1abd2c7b8001RGuv8MeppvEwth",
+  "sessionID": "ses_e542d4a0bffe7NTEjfK0zKs54H",
+  "permission": "grep",
+  "patterns": [
+   "NEEDLE"
+  ],
+  "metadata": {
+   "pattern": "NEEDLE"
+  },
+  "always": [
+   "*"
+  ],
+  "tool": {
+   "messageID": "msg_1abd2c7a2001hLn1IY078HSG5P",
+   "callID": "kald-7-0"
+  }
+ },
+ "toolPartAtAsk": {
+  "status": "pending",
+  "tool": "grep",
+  "input": {}
+ },
+ "policyInput": {
+  "id": "per_1abd2c7b8001RGuv8MeppvEwth",
+  "sessionID": "ses_e542d4a0bffe7NTEjfK0zKs54H",
+  "permission": "grep",
+  "patterns": [
+   "NEEDLE"
+  ],
+  "metadata": {
+   "pattern": "NEEDLE"
+  },
+  "always": [
+   "*"
+  ],
+  "tool": {
+   "messageID": "msg_1abd2c7a2001hLn1IY078HSG5P",
+   "callID": "kald-7-0"
+  },
+  "toolInput": {
+   "tool": "grep",
+   "input": {}
+  }
+ },
+ "recordedAura": {
+  "allowed": false,
+  "source": null,
+  "label": "Læsning: ${WORKSPACE}/*",
+  "target": "${WORKSPACE}/*",
+  "match": {
+   "kind": "grep",
+   "targets": [
+    {
+     "path": "${WORKSPACE}",
+     "subtree": true
+    }
+   ]
+  },
+  "persistable": false,
+  "projectFile": false,
+  "scratch": false,
+  "folder": "${WORKSPACE}",
+  "blockedMode": false
+ },
+ "toolResult": [
+  "Found 2 matches\n${WORKSPACE}/src/app.js:\n  Line 1: const [a] = useState(0); // NEEDLE\n\n\n${WORKSPACE}/notes.txt:\n  Line 1: Hej kopi NEEDLE\n"
+ ]
+}

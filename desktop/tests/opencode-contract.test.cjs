@@ -1,10 +1,11 @@
 // Kontrakten mellem OpenCode og Auras godkendelser. Fixtures er rigtige forespørgsler fra den låste OpenCode, optaget med
 // scripts/record-opencode-contract.cjs; README.md i fixturemappen forklarer sæt, pladsholdere og de målte fakta.
 // Del 1 læser kun fixtures og VERSION og består derfor på enhver Aura-kode, indtil der optages igen. Den beskriver, hvad
-// motoren sender og gør. Tre påstande beskriver desuden Auras egen opsætning på optagetidspunktet (d816a9e) og skrives om,
-// når de sæt optages igen: HEADs sandkasse (trin 6a), gentagelsesvagten i Planlæg (trin 3c) og politikforløbet uden
-// experimental-flaget (trin 3d). README.md siger hvordan. En ny OpenCode-version kræver nye optagelser: testen fejler,
-// indtil fixtures passer til VERSION i core/engine.cjs.
+// motoren sender og gør, men fixtures er optaget gennem Auras egen opsætning (skrivevagt, beskyttede stier, regler), så nogle
+// påstande beskriver Auras opsætning på optagetidspunktet, og skrives om, når der optages igen. 1.19.5-sættet er optaget på
+// Aura d0c3fca med ucommittede ændringer; README.md i mappen forklarer, hvad der adskiller det fra 1.18.33-sættet, og at
+// forskellen er målt som Auras og ikke motorens. En ny OpenCode-version kræver nye optagelser: testen fejler, indtil
+// fixtures passer til VERSION i core/engine.cjs.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -35,7 +36,7 @@ function filler(fx) {
   if (fx.layout.git === 'parent') T.REPO = T.DOCUMENTS + '/repo';
   T.ROOT = (T.REPO || T.DOCUMENTS) + '/projekt'; T.OUTSIDE = T.DOCUMENTS + '/ekstern';
   T.WORKSPACE = fx.layout.copy ? `${T.STORE}/copies/${T.COPYID}/project` : T.ROOT;
-  T.SCRATCH = `${T.STORE}/scratch/${T.PROJECTKEY}/${T.TASK}`; T.RUNTIME = `${T.STORE}/runtime/${T.WORKSPACEKEY}`;
+  T.SCRATCH = `${T.WORKSPACE}/.aura/tmp/${T.TASK}`; T.RUNTIME = `${T.STORE}/runtime/${T.WORKSPACEKEY}`;
   return text => text.replace(/\$\{([A-Z]+)(:rel\/)?\}/g, (all, key, rel) => { assert.equal(typeof T[key], 'string', `${fx.file}: ukendt pladsholder ${all}`); return rel ? T[key].slice(1) : T[key]; });
 }
 
@@ -49,13 +50,48 @@ test('optagelserne er lavet med den OpenCode-version, Aura starter', () => {
 
 test('alle sæt er optaget, og INDEX.json passer til filerne', () => {
   assert.deepEqual(Object.keys(index.scenarios).sort(), ['apply-patch-git', 'apply-patch-uden-git', 'byg-git-filer', 'byg-git-soeg', 'byg-uden-git-filer', 'byg-uden-git-soeg', 'free-git-filer', 'git-foraelder', 'kopi-git', 'plan-git', 'samtale-git'], RECORD);
-  assert.deepEqual(Object.keys(direkte), ['mapper', 'regler-git', 'regler-uden-git', 'skills-sti', 'spoerg-alt', 'symlink'], RECORD);
+  assert.deepEqual(Object.keys(direkte), ['mapper', 'regler-git', 'regler-uden-git', 'skills-sti', 'skriv-ude-uden-vagt-patch', 'skriv-ude-uden-vagt', 'spoerg-alt', 'symlink'], RECORD);
   assert.deepEqual(Object.keys(politik), ['sandkasse', 'uden-sandkasse'], RECORD);
   assert.deepEqual(Object.keys(skal), ['config-shell', 'uden-skal'], RECORD);
   assert.deepEqual(Object.keys(gentagelse), ['afvist-med-besked', 'once', 'uden-flag'], RECORD);
-  assert.ok(forloeb.length >= 150, `for få forløbsoptagelser: ${forloeb.length}`);
+  // 1.18.33-sættet havde 156. Auras skrivevagt svarer nu på skrivninger uden for projektet, før OpenCode spørger (se testen
+  // nedenfor), så de forespørgsler findes ikke længere. Samme Aura med 1.18.33 gav samme antal (målt som A/B, README.md).
+  assert.ok(forloeb.length >= 100, `for få forløbsoptagelser: ${forloeb.length}`);
   assert.deepEqual(index.entries.filter(entry => entry.file).map(entry => entry.file).sort(), forloeb.map(fx => fx.file));
   for (const fx of forloeb) assert.ok(index.scenarios[fx.scenario], fx.file);
+});
+
+test('Auras skrivevagt svarer på skrivninger uden for projektet, før OpenCode spørger', () => {
+  // I 1.18.33-sættet (optaget før vagten) spurgte OpenCode først om mappen og så om filen. Her når skrivningen aldrig så langt.
+  // Er vagten væk, eller spørger OpenCode igen, fejler denne påstand, og optagelsen skal gennemgås.
+  const outside = index.entries.filter(entry => /(^|-)ude-|^write-uden-for-repo$|^write-original-projekt$|^write-soeskende-i-repo$|^patch-to-filer$/.test(entry.case) && /^(write|edit|patch)/.test(entry.case) && !['plan-git', 'samtale-git'].includes(entry.scenario));
+  assert.ok(outside.length >= 15, `for få skrivninger uden for projektet: ${outside.length}`);
+  for (const entry of outside) {
+    assert.equal(entry.file, null, `${entry.scenario}/${entry.case}: OpenCode spurgte, vagten svarede ikke først`);
+    assert.match(entry.toolResult[0], /^Skriv ikke uden for projektmappen\./, `${entry.scenario}/${entry.case}`);
+  }
+  assert.equal(forloeb.filter(fx => fx.request.permission === 'edit' && fx.askIndex === 2).length, 0, 'en filændring spurgte efter mappen');
+});
+
+test('uden Auras skrivevagt spørger OpenCode selv om mappen før filen, og skrivningen sker først efter svar', () => {
+  // Forløbssættet kan ikke vise OpenCodes egen mappekontrol for skrivning uden for projektet, fordi vagten svarer først. Disse to
+  // direkte forsøg er optaget uden plugin og viser den, så et svigtende eller ikke indlæst plugin ikke skjuler, hvad OpenCode gør.
+  for (const name of ['skriv-ude-uden-vagt-patch', 'skriv-ude-uden-vagt']) {
+    const run = direkte[name];
+    assert.equal(run.outcome, 'idle', name);
+    const steps = [...new Set(run.asked.map(r => r.step))];
+    assert.ok(steps.length >= 2, name);
+    for (const step of steps) {
+      const own = run.asked.filter(r => r.step === step);
+      assert.deepEqual(own.map(r => r.permission), ['external_directory', 'edit'], `${name}/${step}: mappen skal spørges før filen`);
+      assert.deepEqual(own[0].patterns, ['${BASE}/Dokumenter/ekstern/*'], `${name}/${step}`);
+      assert.equal(own[0].metadata.parentDir, '${BASE}/Dokumenter/ekstern', `${name}/${step}`);
+      assert.match(own[1].patterns.at(-1), /^\.\.\/ekstern\//, `${name}/${step}: filens mønster er relativt til worktree`);
+      assert.equal(run.results.find(r => r.step === step)?.status, 'completed', `${name}/${step}`);
+    }
+  }
+  // Uden vagt går skrivningen igennem, når spørgsmålene besvares: vagten er altså det eneste, der stopper den i Aura.
+  assert.deepEqual(direkte['skriv-ude-uden-vagt'].results.map(r => r.step), ['write-ude-absolut', 'write-ude-relativ', 'edit-ude-absolut']);
 });
 
 test('OpenCode sender kun former, kontrakten kender', () => {
@@ -67,7 +103,7 @@ test('OpenCode sender kun former, kontrakten kender', () => {
 
 test('mappeadgang er "<mappe>/*" med filepath og parentDir, eller kommandoformen med directories', () => {
   const folders = requests.filter(item => item.permission === 'external_directory');
-  assert.ok(folders.length >= 50, `for få mappeforespørgsler: ${folders.length}`);
+  assert.ok(folders.length >= 40, `for få mappeforespørgsler: ${folders.length}`);
   for (const r of folders) {
     assert.deepEqual(r.always, r.patterns, r.kilde);
     if (r.metadata.directories) {
@@ -85,7 +121,7 @@ test('mappeadgang er "<mappe>/*" med filepath og parentDir, eller kommandoformen
 
 test('filændringens mønster er relativt til worktree, og målet står kun i metadata', () => {
   const edits = forloeb.filter(fx => fx.request.permission === 'edit');
-  assert.ok(edits.length >= 40);
+  assert.ok(edits.length >= 25, `for få filændringer: ${edits.length}`);
   for (const fx of edits) {
     const fill = filler(fx), worktree = fill(fx.layout.worktree), { patterns, always, metadata } = fx.request;
     assert.deepEqual(always, ['*'], fx.file);
@@ -106,7 +142,7 @@ test('filændringens mønster er relativt til worktree, og målet står kun i me
   assert.ok(edits.some(fx => fx.layout.copy && fx.request.patterns[0].startsWith('${WORKSPACE:rel/}')));
 });
 
-test('søgningens mønster er søgeordet, og værktøjets input er endnu ukendt, når der spørges', () => {
+test('søgningens mønster er søgeordet, og værktøjets input står i metadata', () => {
   const searches = requests.filter(r => r.permission === 'grep');
   assert.ok(searches.length >= 20);
   for (const r of searches) {
@@ -114,7 +150,12 @@ test('søgningens mønster er søgeordet, og værktøjets input er endnu ukendt,
     assert.deepEqual(r.always, ['*'], r.kilde);
     assert.ok(keys(r.metadata).every(key => ['include', 'path', 'pattern'].includes(key)), r.kilde);
   }
-  for (const fx of forloeb.filter(item => item.request.permission === 'grep')) assert.equal(fx.toolPartAtAsk?.status, 'pending', fx.file);
+  // I 1.18.33-sættet var værktøjets input altid 'pending' og tomt, når der blev spurgt. Samme Aura med 1.18.33 gav 'running' med
+  // input, så det følger Auras opsætning og ikke motoren (README.md). Aura læser derfor kun metadata, aldrig værktøjets input.
+  for (const fx of forloeb.filter(item => item.request.permission === 'grep')) {
+    assert.ok(['pending', 'running'].includes(fx.toolPartAtAsk?.status), fx.file);
+    if (fx.toolPartAtAsk.status === 'running') assert.equal(fx.toolPartAtAsk.input.pattern, fx.request.metadata.pattern, fx.file);
+  }
 });
 
 test('kommandoer sendes som tekst alene; mønstrene er delt pr. delkommando, og always er præfikser', () => {
@@ -152,16 +193,9 @@ test('webfetch, gentagelsesvagten, skill og huskeliste har hver deres faste form
 });
 
 test('rækkefølgen: mappen før filen og kommandoen, søgningen før mappen, og samme callID', () => {
-  // Filændring uden for projektet: først mappen, mens værktøjets input endnu er tomt, så filen.
-  const edits = forloeb.filter(fx => fx.request.permission === 'edit' && fx.askIndex === 2);
-  assert.ok(edits.length >= 20);
-  for (const fx of edits) {
-    const folder = sibling(fx, 'external_directory');
-    assert.equal(folder?.askIndex, 1, fx.file);
-    assert.equal(folder.request.tool.callID, fx.request.tool.callID, fx.file);
-    assert.ok(fx.sequence.indexOf('spørg:external_directory') < fx.sequence.indexOf('spørg:edit'), fx.file);
-    assert.deepEqual([folder.toolPartAtAsk?.status, folder.toolPartAtAsk?.input], ['pending', {}], folder.file);
-  }
+  // Filændring uden for projektet: først mappen, så filen, målt i 1.18.33-sættet. Her svarer Auras skrivevagt først (se testen
+  // om skrivevagten), så rækkefølgen kan ikke aflæses i 1.19.5-sættet. Kildekoden til write og edit er urørt mellem versionerne.
+  assert.equal(forloeb.filter(fx => fx.request.permission === 'edit' && fx.askIndex === 2).length, 0);
   // Søgning uden for projektet: først søgningen, så mappen.
   const searches = forloeb.filter(fx => fx.request.permission === 'external_directory' && fx.toolPartAtAsk?.tool === 'grep');
   assert.ok(searches.length >= 4);
@@ -182,10 +216,13 @@ test('rækkefølgen: mappen før filen og kommandoen, søgningen før mappen, og
 
 test('et projekt inde i en større Git-rod: OpenCode spørger aldrig om mappeadgang inden for roden', () => {
   const parent = forloeb.filter(fx => fx.scenario === 'git-foraelder');
-  assert.deepEqual([...new Set(parent.filter(fx => fx.request.permission === 'external_directory').map(fx => fx.case))], ['write-uden-for-repo']);
-  // Læsning og kommandoer i søskendemappen går igennem uden forespørgsel; filændringen er relativ til repo-roden.
+  // Ingen mappeforespørgsler i forløbet. 1.18.33-sættet havde én for write-uden-for-repo og en filændring i søskendemappen med
+  // mønsteret andet-projekt/fil.txt; begge stoppes nu af Auras skrivevagt, før OpenCode spørger.
+  assert.deepEqual([...new Set(parent.filter(fx => fx.request.permission === 'external_directory').map(fx => fx.case))], []);
+  // Læsning og kommandoer i søskendemappen går igennem uden forespørgsel.
   for (const step of ['read-soeskende-i-repo']) assert.equal(index.entries.find(entry => entry.scenario === 'git-foraelder' && entry.case === step)?.file, null, step);
-  assert.deepEqual(parent.find(fx => fx.case === 'write-soeskende-i-repo').request.patterns, ['andet-projekt/fil.txt']);
+  assert.ok(parent.some(fx => fx.case === 'bash-cat-soeskende' && fx.request.permission === 'bash'));
+  assert.equal(parent.find(fx => fx.case === 'write-soeskende-i-repo'), undefined);
 });
 
 test('OpenCode opdager ikke omdirigeringer, og ~ er motorens HOME', () => {
@@ -201,7 +238,12 @@ test('OpenCode opdager ikke omdirigeringer, og ~ er motorens HOME', () => {
   assert.equal(politik['uden-sandkasse'].results.find(r => r.callID === outside.tool.callID)?.status, 'completed');
   // cat ~/.ssh/id_rsa: OpenCode udvider ~ med motorens HOME (RUNTIME/home og APPDATA/runtime/noegle/home), ikke brugerens.
   assert.deepEqual(skal['config-shell'].requests.find(r => r.metadata.command?.startsWith('cat ~') && r.permission === 'external_directory').metadata.directories, ['${RUNTIME}/home/.ssh']);
-  assert.deepEqual(politik['uden-sandkasse'].requests.find(r => r.metadata.command?.startsWith('cat ~') && r.permission === 'external_directory').metadata.directories, ['${APPDATA}/runtime/noegle/home/.ssh']);
+  // I politiksættet afviser Auras egen regel nu cat ~/.ssh/id_rsa, før OpenCode spørger (1.18.33-sættet fik en forespørgsel med
+  // ${APPDATA}/runtime/noegle/home/.ssh). Samme Aura med 1.18.33 gav den samme afvisning.
+  const ssh = politik['uden-sandkasse'].results.find(r => r.inputCommand === 'cat ~/.ssh/id_rsa');
+  assert.equal(ssh?.status, 'error');
+  assert.match(ssh.error, /specified a rule which prevents you/);
+  assert.equal(politik['uden-sandkasse'].requests.find(r => r.metadata.command?.startsWith('cat ~')), undefined);
 });
 
 test('med en indpakningsskal i config.shell ser forespørgslerne ud som uden', () => {
@@ -244,8 +286,10 @@ test('afvisninger: gentagelsesvagten stopper opgaven, en enkelt afvisning med be
   assert.equal(rejected.modelCalls, 1);
   assert.ok(rejected.results.every(result => !result.endsWith(':completed')), rejected.results.join(', '));
   const policyRun = politik['uden-sandkasse'];
-  // Politiksættet bruger Auras egen konfiguration. Efter trin 3d har den flaget, og påstandene om "uden flaget" skrives om.
-  assert.equal(policyRun.experimental, null, 'politik/uden-sandkasse.json er optaget med Auras experimental-flag. Efter trin 3d er det forventet: skriv påstandene om afvisning uden flaget om (README.md, "Når Workbench, ChatSession eller godkendelserne ændres").');
+  // Politiksættet bruger Auras egen konfiguration. Aura sender ikke experimental.continue_loop_on_deny: gentagelsesvagten afvises aldrig
+  // (en afvisning stopper opgaven, også med flaget, målt i gentagelse/afvist-med-besked.json), så Aura besvarer den med "én gang" (spor M, trin 1a).
+  // Flaget ville desuden ændre, hvad en almindelig afvisning gør. Optages sættet igen, og er flaget kommet med, er det en bevidst ændring.
+  assert.equal(policyRun.experimental, null, 'politik/uden-sandkasse.json er optaget med et experimental-flag. Aura sender det ikke i dag (se tests/m1-gentagelsesvagt.test.cjs): er det kommet med, er det en bevidst ændring, og påstandene om afvisning uden flaget skrives om (README.md, "Når Workbench, ChatSession eller godkendelserne ændres").');
   assert.deepEqual(policyRun.requests.filter(r => r.permission === 'doom_loop').map(r => r.sendt), ['reject+besked']);
   assert.match(policyRun.status, /^session\.error .*Du gentager samme kald/);
   // Med "once" fortsætter opgaven.
@@ -274,8 +318,9 @@ test('afvisninger: gentagelsesvagten stopper opgaven, en enkelt afvisning med be
   assert.equal(without.results.at(-1), 'bash:error The user rejected permission to use this specific tool call.');
   assert.ok(!without.results.includes('bash:completed'), without.results.join(', '));
   // Uden experimental.continue_loop_on_deny: en enkelt kommando afvist med besked giver en fejl med beskeden, og opgaven fortsætter.
+  // 1.18.33-sættet havde to (npm i -g serve og cat ~/.ssh/id_rsa); den sidste afvises nu af Auras regel, før OpenCode spørger.
   const singles = policyRun.requests.filter(r => r.permission === 'bash' && r.sendt === 'reject+besked');
-  assert.ok(singles.length >= 2);
+  assert.ok(singles.length >= 1);
   for (const r of singles) {
     const position = policyRun.results.findIndex(result => result.callID === r.tool.callID);
     assert.match(policyRun.results[position].error, /following feedback/);
@@ -283,14 +328,13 @@ test('afvisninger: gentagelsesvagten stopper opgaven, en enkelt afvisning med be
   }
 });
 
-test('Auras opsætning på d816a9e: gentagelsesvagten i Planlæg rammer Auras "*": "deny" og stopper opgaven uden at spørge', () => {
-  // Trin 3c giver Planlæg doom_loop: 'ask' (core/engine.cjs, permissions() for chat og plan). Så ender plan-git i idle ved
-  // næste optagelse med en doom_loop-forespørgsel, og denne påstand skrives om.
-  const THREE_C = 'plan-git stopper ikke længere ved gentagelsesvagten. Efter trin 3c (Auras doom_loop: "ask" i Planlæg) er det forventet: skriv påstanden om (README.md, punkt 10).';
-  assert.equal(index.scenarios['plan-git'].outcome, 'error', THREE_C);
-  assert.match(index.scenarios['plan-git'].error, /"permission":"doom_loop","action":"ask"/, THREE_C);
-  assert.match(index.scenarios['plan-git'].error, /"permission":"\*","action":"deny"/, THREE_C);
-  assert.equal(index.entries.find(entry => entry.scenario === 'plan-git' && entry.case === 'doom-loop')?.file, null, THREE_C);
+test('Auras opsætning på d0c3fca: gentagelsesvagten i Planlæg spørger (doom_loop: ask) og opgaven slutter i idle', () => {
+  // Trin 3c er gjort: Planlæg og Samtale har doom_loop: 'ask' (core/engine.cjs, permissions(); prøvet i tests/m1-gentagelsesvagt.test.cjs og mod den
+  // rigtige motor). 1.18.33-sættet er optaget før det og endte i session.error uden at spørge. 1.19.5-sættet ender i idle med en forespørgsel.
+  assert.equal(index.scenarios['plan-git'].outcome, 'idle');
+  assert.equal(index.scenarios['plan-git'].error, null);
+  const planLoop = forloeb.find(fx => fx.scenario === 'plan-git' && fx.case === 'doom-loop');
+  assert.equal(planLoop?.request.permission, 'doom_loop');
   for (const scenario of ['byg-git-soeg', 'byg-uden-git-soeg']) {
     assert.equal(index.scenarios[scenario].outcome, 'idle');
     assert.ok(forloeb.some(fx => fx.scenario === scenario && fx.request.permission === 'doom_loop'), scenario);

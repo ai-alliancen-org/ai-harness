@@ -1,4 +1,4 @@
-// Kontraktprøve del 2 for mappeadgang: Auras fortolkning af de optagne OpenCode 1.18.33-forespørgsler.
+// Kontraktprøve del 2 for mappeadgang: Auras fortolkning af de optagne OpenCode-forespørgsler (mappen opencode-VERSION).
 // tests/opencode-contract.test.cjs kontrollerer, hvad motoren sender. Denne prøve kontrollerer, at Aura kan
 // bruge det: en mappe uden for projektet skal få et navn og kunne huskes, ikke stå som "Denne handling".
 const { test } = require('node:test');
@@ -8,8 +8,9 @@ const fsSync = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { ApprovalsPolicy } = require('../core/approvals-policy.cjs');
+const { VERSION } = require('../core/engine.cjs');
 
-const FIXTURES = path.join(__dirname, 'fixtures', 'opencode-1.18.33');
+const FIXTURES = path.join(__dirname, 'fixtures', `opencode-${VERSION}`);
 const UNDTAGET = new Set([
   'byg-git-filer__write-ude-ny-mappe__1-external_directory.json',
   'byg-uden-git-filer__write-ude-ny-mappe__1-external_directory.json',

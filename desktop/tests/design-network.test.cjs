@@ -12,8 +12,8 @@ test('nye projekter får Tailwind og webskrifter som standard', () => {
   assert.ok(DESIGN_PREVIEW_NETWORK.styles.includes('https://fonts.gstatic.com'));
 });
 
-test('billeder fra https er tilladt som standard', () => {
-  assert.ok(DESIGN_PREVIEW_NETWORK.images.includes('https:'));
+test('eksterne billeder er ikke tilladt som standard, men kræver brugerens samtykke pr. adresse (brugerens valg 5. november)', () => {
+  assert.deepEqual(DESIGN_PREVIEW_NETWORK.images, []);
 });
 
 test('https: accepteres kun for billeder, aldrig for kode eller stilarter', () => {
@@ -25,7 +25,7 @@ test('https: accepteres kun for billeder, aldrig for kode eller stilarter', () =
 test('et nyt projekt med standarden kan hente Tailwind, og et tilfældigt script fra internettet kan ikke', () => {
   const projekt = policyFor({ origin: 'aura-preview://nyt/', network: DESIGN_PREVIEW_NETWORK });
   assert.equal(allowedRequest({ url: 'https://cdn.tailwindcss.com/3.4.0', resourceType: 'script' }, projekt), true);
-  assert.equal(allowedRequest({ url: 'https://billeder.example.com/a.png', resourceType: 'image' }, projekt), true);
+  assert.equal(allowedRequest({ url: 'https://billeder.example.com/a.png', resourceType: 'image' }, projekt), false, 'et eksternt billede kræver samtykke');
   assert.equal(allowedRequest({ url: 'https://ondt.example.com/x.js', resourceType: 'script' }, projekt), false);
 });
 
@@ -34,9 +34,9 @@ test('et eksisterende projekt uden standarden får ikke Tailwind af sig selv', (
   assert.equal(allowedRequest({ url: 'https://cdn.tailwindcss.com/3.4.0', resourceType: 'script' }, eksisterende), false);
 });
 
-test('den statiske forhåndsvisning tillader unsafe-eval, så Vue og Alpine fra en godkendt CDN virker, uden at åbne for andre kilder (beta 3)', () => {
+test('den statiske forhåndsvisning tillader unsafe-eval, så Vue og Alpine fra en CDN, brugeren har tilladt, virker, uden at åbne for andre kilder (beta 3)', () => {
   const { contentSecurityPolicy } = require('../core/preview-policy.cjs');
   const csp = contentSecurityPolicy({ origin: 'aura-preview://p/', network: DESIGN_PREVIEW_NETWORK, static: true });
   const script = csp.split(';').find(part => part.trim().startsWith('script-src'));
-  assert.match(script, /'unsafe-eval'/); assert.match(script, /https:\/\/cdn\.jsdelivr\.net/); assert.doesNotMatch(script, /\bhttps:(\s|$)/, 'ingen jokertegn for hele internettet');
+  assert.match(script, /'unsafe-eval'/); assert.match(script, /https:\/\/cdn\.tailwindcss\.com/); assert.doesNotMatch(script, /cdn\.jsdelivr\.net/, 'kun den faste liste er tilladt'); assert.doesNotMatch(script, /\bhttps:(\s|$)/, 'ingen jokertegn for hele internettet');
 });

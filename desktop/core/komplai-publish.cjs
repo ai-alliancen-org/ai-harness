@@ -35,6 +35,10 @@ const messages = {
   invalid_manifest: 'Appens komplai.json kan ikke bruges. Ret manifestet, og prøv igen.',
 };
 
+// En afvisning, hvor komplai tydeligt har sagt nej, og intet er uploadet: alt undtagen publication_uncertain.
+function refusal(message, code) { const e = Error(message); if (code) e.code = code; e.notUploaded = true; return e; }
+const finalRefusal = code => typeof code === 'string' && code in messages && code !== 'publication_uncertain';
+
 function suggestLabel(name) {
   let label = String(name || '').toLowerCase().replace(/æ/g, 'ae').replace(/ø/g, 'oe').replace(/å/g, 'aa').normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
   if (label.length > 40) { const cut = label.slice(0, 41), boundary = cut.lastIndexOf('-'); label = (boundary >= 3 ? cut.slice(0, boundary) : cut.slice(0, 40)).replace(/-+$/, ''); }
@@ -84,7 +88,7 @@ class KomplaiDeployment {
   async call(route, options = {}) {
     const { key } = await this.account();
     try { return await json(this.hub + route, { ...options, key, fetcher: this.fetcher }); }
-    catch (error) { const e = Error(messages[error.code] || error.message); e.code = error.code; e.status = error.status; if (error.code === 'busy') e.notUploaded = true; throw e; }
+    catch (error) { const e = Error(messages[error.code] || error.message); e.code = error.code; e.status = error.status; if (finalRefusal(error.code)) e.notUploaded = true; throw e; }
   }
   /** Organisationens adresse og dine apps. Bruges også af Udgiv-dialogen. */
   async overview() {
@@ -108,20 +112,28 @@ class KomplaiDeployment {
       if (app.visibility !== config.visibility) throw Error(messages.visibility_changed);
       return { ...base, id: app.id, name: app.name, host: new URL(app.url).hostname, url: app.url, created: false, currentVisibility: app.visibility, portal: `${portal}?app=${app.id}` };
     }
-    if (d.slugs && config.slug) { const free = await this.address(config.slug); if (!free.available) throw Error(free.message); }
+    // Adressen kontrolleres altid, når der er valgt en, også når hubben ikke melder slugs.
+    if (config.slug) { const free = await this.address(config.slug); if (!free.available) throw Error(free.message); }
     const host = d.slugs ? (config.slug ? `${config.slug}.${d.address}` : 'en tilfældig adresse under ' + d.address) : 'en ny adresse under ' + d.address;
     return { ...base, id: null, name: config.name, host, url: null, created: true, portal };
   }
   async deploy(config, artifact, target, { onCreated = async () => {}, onUploaded = async () => {} } = {}) {
     // Hub har ingen atomisk kobling mellem release og ændret adgang. Aura ændrer
     // derfor aldrig en eksisterende apps adgang som led i uploaden.
-    if (target.id && target.currentVisibility !== config.visibility) throw Error(messages.visibility_changed);
+    if (target.id && target.currentVisibility !== config.visibility) throw refusal(messages.visibility_changed, 'visibility_changed');
     const refused = refusedFiles(artifact.files);
-    if (refused.length) throw Error(`komplai Run kan ikke modtage ${refused.length === 1 ? 'denne fil' : 'disse filer'}: ${refused.slice(0, 5).join(', ')}${refused.length > 5 ? ' …' : ''}. Filnavne må kun have a-z, tal, bindestreg og punktum, og filtypen skal være en webside, et billede, en skrifttype eller lignende.`);
+    if (refused.length) throw refusal(`komplai Run kan ikke modtage ${refused.length === 1 ? 'denne fil' : 'disse filer'}: ${refused.slice(0, 5).join(', ')}${refused.length > 5 ? ' …' : ''}. Filnavne må kun have a-z, tal, bindestreg og punktum, og filtypen skal være en webside, et billede, en skrifttype eller lignende.`);
     const single = artifact.files.length === 1 && artifact.files[0].file === 'index.html';
     const body = single ? artifact.files[0].data : zip(artifact.files);
-    if (body.length > 10 * 1024 * 1024) throw Error(messages.upload_limit);
+    if (body.length > 10 * 1024 * 1024) throw refusal(messages.upload_limit, 'upload_limit');
     let appId = target.id;
+    // Adressen tjekkes igen lige før upload. Melder hubben ikke slugs, kan en valgt adresse ikke bruges.
+    if (!appId && config.slug) {
+      const d = await this.overview();
+      if (d.slugs !== true) throw refusal(messages.invalid_slug, 'invalid_slug');
+      const free = await this.address(config.slug);
+      if (!free.available) throw refusal(free.message, free.reason || 'invalid_slug');
+    }
     if (!appId) {
       // komplai opretter altid en ny app for organisationen. At gøre den offentlig er sit eget trin,
       // bekræftet med appens navn, og det sker her før første version.
@@ -144,7 +156,7 @@ class KomplaiDeployment {
     try { response = await this.fetcher(`${this.hub}/api/publish/${appId}/releases`, { method: 'POST', redirect: 'error', signal: AbortSignal.timeout(120000), headers: { Authorization: `Bearer ${key}`, 'Content-Type': type, Accept: 'application/json' }, body }); }
     catch { throw Error(messages.publication_uncertain); }
     let data = {}; try { data = await response.json(); } catch {}
-    if (!response.ok) { const failure = Error(messages[data.error] || messages.publication_uncertain); if (data.error === 'busy') failure.notUploaded = true; throw failure; }
+    if (!response.ok) { const failure = Error(finalRefusal(data.error) ? messages[data.error] : messages.publication_uncertain); if (finalRefusal(data.error)) { failure.code = data.error; failure.notUploaded = true; } throw failure; }
     return data;
   }
   /** En ny app til forhåndsvisningen. Den er kun for organisationen og udgives først med Udgiv. */

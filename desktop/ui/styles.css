@@ -455,6 +455,9 @@ body.setup-guided .app-content { margin-left: 0; }
 .composer-status { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-size: 11px; color: var(--muted); margin: 0 20px 8px; min-height: 15px; }
 .composer-status #draft-status { margin: 0; }
 /* Kontekstmålingen står i statuslinjens detaljer. Første lag viser kun denne advarsel nær grænsen. */
+.approve-all-status { color: var(--warning-ink); }
+.approve-all-status[hidden] { display: none; }
+.approve-all-status .text-button { padding: 0 4px; }
 .context-warning { color: var(--warning-ink); }
 .context-warning[hidden] { display: none; }
 /* Funktioner: én kontakt pr. funktion som i en cookie-dialog. Anbefalet står først og er markeret. */

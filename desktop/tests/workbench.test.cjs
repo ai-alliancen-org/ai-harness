@@ -98,7 +98,8 @@ test('gateway kræver nøgle, fastholder model og OpenRouter-udbyder uden fallba
  assert.equal(received[0].body.models,undefined);
  assert.equal(received[0].headers.authorization,'Bearer prøvenøgle');
  await send({model:'anden'}); assert.equal(received.length,1);
- assert.equal((await send({model:'test:free'})).status,409); assert.equal(received.length,1);
+ // Et afvist modelskift når aldrig udbyderen og låser ikke forbindelsen: den rigtige model kan stadig sendes.
+ assert.equal((await send({model:'test:free'})).status,200); assert.equal(received.length,2);
 });
 test('serveradresser og ukendte vilkår er tydelige', () => {
  for(const value of ['file:///tmp/a','https://user:password@example.com','https://example.com/?key=secret']) assert.throws(()=>endpoint(value));

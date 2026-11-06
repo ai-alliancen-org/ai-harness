@@ -1,0 +1,102 @@
+{
+ "opencode": "1.19.5",
+ "aura": "d0c3fca+ændringer",
+ "scenario": "byg-uden-git-filer",
+ "outcome": "idle",
+ "case": "write-scratch",
+ "askIndex": 1,
+ "asksInStep": 1,
+ "layout": {
+  "mode": "build",
+  "git": false,
+  "copy": false,
+  "model": "kontraktmodel",
+  "worktree": "/",
+  "directory": "${ROOT}"
+ },
+ "sequence": [
+  "del:pending",
+  "del:running",
+  "spørg:edit",
+  "svar:once",
+  "del:completed"
+ ],
+ "request": {
+  "id": "per_1abd26b0e00124JnPJCfAPM8LY",
+  "sessionID": "ses_e542d9b55ffeJdBY9QhrJT9UJ1",
+  "permission": "edit",
+  "patterns": [
+   "${SCRATCH:rel/}/noter.md"
+  ],
+  "metadata": {
+   "filepath": "${SCRATCH}/noter.md",
+   "diff": "Index: ${SCRATCH}/noter.md\n===================================================================\n--- ${SCRATCH}/noter.md\n+++ ${SCRATCH}/noter.md\n@@ -0,0 +1,1 @@\n+midlertidig note\n"
+  },
+  "always": [
+   "*"
+  ],
+  "tool": {
+   "messageID": "msg_1abd26afc001Ny3jrvVrqx87Nr",
+   "callID": "kald-16-0"
+  }
+ },
+ "toolPartAtAsk": {
+  "status": "running",
+  "tool": "write",
+  "input": {
+   "filePath": "${SCRATCH}/noter.md",
+   "content": "midlertidig note\n"
+  }
+ },
+ "policyInput": {
+  "id": "per_1abd26b0e00124JnPJCfAPM8LY",
+  "sessionID": "ses_e542d9b55ffeJdBY9QhrJT9UJ1",
+  "permission": "edit",
+  "patterns": [
+   "${SCRATCH:rel/}/noter.md"
+  ],
+  "metadata": {
+   "filepath": "${SCRATCH}/noter.md",
+   "diff": "Index: ${SCRATCH}/noter.md\n===================================================================\n--- ${SCRATCH}/noter.md\n+++ ${SCRATCH}/noter.md\n@@ -0,0 +1,1 @@\n+midlertidig note\n"
+  },
+  "always": [
+   "*"
+  ],
+  "tool": {
+   "messageID": "msg_1abd26afc001Ny3jrvVrqx87Nr",
+   "callID": "kald-16-0"
+  },
+  "toolInput": {
+   "filePath": "${SCRATCH}/noter.md",
+   "content": "midlertidig note\n",
+   "tool": "write",
+   "input": {
+    "filePath": "${SCRATCH}/noter.md",
+    "content": "midlertidig note\n"
+   }
+  }
+ },
+ "recordedAura": {
+  "allowed": true,
+  "source": "scratch",
+  "label": "Filændring: ${SCRATCH}/noter.md",
+  "target": "${SCRATCH}/noter.md",
+  "match": {
+   "kind": "edit",
+   "targets": [
+    {
+     "path": "${SCRATCH}/noter.md",
+     "subtree": false
+    }
+   ]
+  },
+  "persistable": true,
+  "projectFile": true,
+  "scratch": true,
+  "folder": "${SCRATCH}",
+  "blockedMode": false
+ },
+ "toolResult": [
+  "Wrote file successfully."
+ ]
+}

@@ -99,7 +99,8 @@ test('læseregler virker med stier i forhold til Git-roden og uden Git', () => {
   assert.equal(decide(policy.read, 'referencer/ok.md'), 'allow', 'kun mappen references er privat');
   // Mappen uden for projektet: kun skillmappen er åben. Filer der kan ikke ændres.
   assert.equal(decide(policy.external_directory, `${engine}/config/skills/harness-kodestil/references/*`), 'allow');
-  assert.equal(decide(policy.external_directory, `${engine}/data/*`), 'ask');
+  // Motorens egne data (opencode.db, store.json) er spærret for AI'en (årsag 2); kun skills og tool-output er åbne.
+  assert.equal(decide(policy.external_directory, `${engine}/data/*`), 'deny');
   assert.equal(decide(policy.external_directory, '/Users/test/Documents/andet/*'), 'ask');
   assert.equal(decide(policy.edit, git.skill), 'deny');
   assert.equal(decide(policy.edit, '.git/hooks/pre-commit'), 'deny');

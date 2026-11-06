@@ -21,7 +21,7 @@ const folder = value => ({ id: 'mappe', permission: 'external_directory', metada
 
 test('eksisterende projekter får ingen automatisk adgang; projektfiler kan slås til og fra og huskes efter genåbning', async t => {
   const { root, context, policy, store } = await fixture(t), p = edit(path.join(root, 'ny.txt'));
-  assert.deepEqual(await policy.settings(root), { autoProjectFiles: false, autoCommands: false, rules: [] });
+  assert.deepEqual(await policy.settings(root), { autoProjectFiles: false, autoCommands: false, autoCommandsUnisolated: false, rules: [] });
   assert.equal((await policy.allowed(context, p)).allowed, false);
   await policy.setProjectFiles(root, true);
   assert.equal((await new ApprovalsPolicy(store).allowed(context, p)).source, 'project');
@@ -62,7 +62,7 @@ test('tilladelse til opgaven deler kun projektfiler og ophører med opgavens Set
 
 test('kommandoer matches fuldt sammen med den kanoniske arbejdsmappe, og kan tilbagekaldes', async t => {
   const { root, outside, context, policy } = await fixture(t), p = command('node logic-test.js', root);
-  await policy.grant(context, p, { scope: 'project' });
+  await policy.grant({ ...context, commandSandbox: true }, p, { scope: 'project' });
   assert.equal((await policy.allowed(context, p)).allowed, false, 'Heller ikke en husket kommando må køres automatisk uden isolation.');
   const isolated = { ...context, commandSandbox: true, autoCommandsSnapshot: false };
   assert.equal((await policy.allowed(isolated, p)).source, 'rule');
@@ -75,7 +75,7 @@ test('kommandoer matches fuldt sammen med den kanoniske arbejdsmappe, og kan til
 test('ændrede input og linkmål ændrer fingeraftryk og godkendelsesgruppe', async t => {
   const { root, outside, base, context, policy } = await fixture(t), link = path.join(base, 'arbejdslink');
   await fs.symlink(root, link); const p = command('node logic-test.js', link);
-  const before = await policy.describe(context, p); await policy.grant(context, p, { scope: 'project' });
+  const before = await policy.describe(context, p); await policy.grant({ ...context, commandSandbox: true }, p, { scope: 'project' });
   await fs.unlink(link); await fs.symlink(outside, link);
   const after = await policy.describe(context, p);
   assert.notEqual(before.fingerprint, after.fingerprint); assert.notEqual(before.key, after.key);
@@ -87,7 +87,7 @@ test('ændrede input og linkmål ændrer fingeraftryk og godkendelsesgruppe', as
 
 test('en platform uden kommandoisolation tilbyder kun enkeltgodkendelse, også ved en tidligere gemt regel', async t => {
   const { root, context, policy } = await fixture(t), p = command('node logic-test.js', root);
-  await policy.grant(context, p, { scope: 'project' });
+  await policy.grant({ ...context, commandSandbox: true }, p, { scope: 'project' });
   for (const commandSandboxSupported of [false, undefined, 'true']) {
     const unsupported = { ...context, commandSandboxSupported, commandSandbox: false, autoCommandsSnapshot: false };
     const descriptor = await policy.describe(unsupported, p);

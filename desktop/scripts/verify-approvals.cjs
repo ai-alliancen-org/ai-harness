@@ -36,6 +36,8 @@ const helpers = require('./ui-test-helpers.cjs');
     else if (last.includes('RET FIL')) step = { text: 'Jeg rettede siden. Testen fejlede, se resultatet.' };
     else if (last.includes('INSTALLER') && tools.length === 0) step = { tool: 'bash', args: { command: 'npm install leftpad-ukendt', description: 'Installerer en hjælpepakke' } };
     else if (last.includes('INSTALLER')) step = { text: JSON.stringify(tools).includes('following feedback') ? 'Forstået. Jeg skriver funktionen selv uden en pakke.' : 'Uventet.' };
+    else if (last.includes('GODKENDALT') && tools.length === 0) step = { tool: 'bash', args: { command: 'echo hej', description: 'Siger hej' } };
+    else if (last.includes('GODKENDALT')) step = { text: 'Kommandoen kørte.' };
     else if (last.includes('SLET') && tools.length === 0) step = { tool: 'bash', args: { command: 'rm -rf public', description: 'Rydder op' } };
     else if (last.includes('STOP') && tools.length === 0) step = { tool: 'write', args: { filePath: path.join(project, 'public/stop.html'), content: '<h1>Delvis</h1>\n' } };
     else if (last.includes('STOP')) step = { hold: true };
@@ -132,6 +134,20 @@ const helpers = require('./ui-test-helpers.cjs');
     assert.ok(requests.some(body => JSON.stringify(body.messages).includes('with the following feedback: Brug ikke en pakke. Skriv funktionen selv.')));
     // Kvitteringen i samtalen er kort. Hvilken handling der blev afvist, og hvad brugeren skrev, står i Aktivitet (5ffe905).
     assert.match(await page.locator('#messages .answer-record').last().textContent(), /Du afviste 1 handling og skrev: Brug ikke en pakke/);
+
+    // «Godkend alt» kan ses og slås fra, så længe det gælder (fund fra gennemgangen 3. november).
+    await send('GODKENDALT kør en kommando');
+    const alt = page.locator('#approvals .approval').first(); await alt.waitFor({ timeout: 90000 });
+    assert.equal(await page.locator('#approve-all-status').isHidden(), true, 'indikatoren vises ikke, før Godkend alt er valgt');
+    await helpers.approve(page, 'Godkend alt i denne samtale', { scope: alt });
+    await page.locator('#approve-all-status').waitFor({ state: 'visible', timeout: 30000 });
+    assert.match(await page.locator('#approve-all-status').innerText(), /Godkend alt.*slået til.*Slå fra/s);
+    await capture('godkend-alt-indikator.png');
+    await page.locator('#messages .assistant', { hasText: 'Kommandoen kørte.' }).waitFor({ timeout: 90000 });
+    await idle();
+    await page.click('#approve-all-off');
+    await page.locator('#approve-all-status').waitFor({ state: 'hidden', timeout: 30000 });
+    passed('«Godkend alt» vises med en Slå fra-knap, så længe det gælder, og forsvinder, når det slås fra');
     await page.click('#tab-activity');
     const afvist = page.locator('.activity-entry.kind-approval').filter({ hasText: 'npm install leftpad-ukendt' }).last();
     await afvist.waitFor({ timeout: 30000 });

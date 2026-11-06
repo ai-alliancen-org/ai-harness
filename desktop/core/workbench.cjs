@@ -307,6 +307,7 @@ class Workbench {
   send(input) { return this.chatFor(input?.chat).send(input); }
   stop(input) { return this.chatFor(input?.chat).stop(); }
   // Godkendelser og spørgsmål hører til den samtale, hvis motor stillede dem.
+  approveAllOff(input) { return this.chatFor(input?.chat).approveAllOff(); }
   reply(input) { const chat = input?.chat ? this.chatFor(input.chat) : [...this.chats.values()].find(item => item.engine?.pending.has(input?.id)) || this.chatFor(); return chat.reply(input); }
   question(input) { const chat = input?.chat ? this.chatFor(input.chat) : [...this.chats.values()].find(item => item.questions?.has(input?.id)) || this.chatFor(); return chat.question(input); }
   editPlan(input) { return this.chatFor(input?.chat).editPlan(input); }

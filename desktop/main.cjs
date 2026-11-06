@@ -653,6 +653,7 @@ handle('agent:send', value => {
 });
 handle('agent:stop', value => workbench.stop(chatInput(value)));
 handle('agent:reply', value => workbench.reply(chatInput(value)));
+handle('agent:approve-all-off', value => workbench.approveAllOff(chatInput(value)));
 handle('agent:question', value => workbench.question(chatInput(value)));
 // Afklaring og plan: briefen er brugerens egne ord, og planen kan rettes af brugeren. Intet sendes, før næste besked.
 handle('plan:brief', value => exclusive(() => workbench.saveBrief(value)));
@@ -748,6 +749,18 @@ function komplaiScript(root) { const owner = ownerFor(root); return route => own
 handle('komplai:preview-state', async () => currentProject() ? komplaiPreview.state(currentProject().root) : { active: false });
 handle('komplai:preview-create', async () => { if (!currentProject()) throw new Error('Åbn et projekt først.'); return komplaiPreview.create(currentProject().root); });
 handle('komplai:preview-call', async input => currentProject() ? komplaiPreview.call(currentProject().root, input, workspaceRoot()) : { status: 503, body: { error: 'unavailable' } });
+// Samtykke pr. adresse: kun brugerens klik i forhåndsvisningens panel når hertil. Adressen skal være set blokeret, og reglerne for https, vært og type ligger i grantAddress.
+handle('preview:allow', value => exclusive(async () => {
+  const root = requireProject(), ctx = currentSpace();
+  const seen = [...(ctx.blocked?.values() || []), ...(ctx.detectedRuntime?.diagnostics || [])];
+  const next = require('./core/preview-policy.cjs').grantAddress((await workbench.store.project(root)).runtime || {}, seen, { kind: value?.kind, origin: value?.origin });
+  await workbench.store.saveProject(root, { runtime: next });
+  ctx.blocked?.delete(`${value.kind}:${value.origin}`);
+  ctx.runtimeConfig = normalizeRuntimeConfig(next);
+  for (const chat of workbench.chats.values()) if (!chat.running && !chat.sending && !chat.starting && !chat.finishing) chat.prepared = null;
+  if (!['running', 'starting', 'installing', 'stopping'].includes(ctx.devServer?.state)) { ctx.detectedRuntime = await inspectRuntime(ctx.root, ctx.runtimeConfig); ctx.devServer.configure(ctx.runtimeConfig); }
+  return projectSettings();
+}));
 handle('preview:runtime', async () => ({ ...await currentSpace().devServer.status(), root: currentProject()?.root, workspaceRoot: workspaceRoot() }));
 // Kontrol af forhåndsvisningen efter en opgave: blev siden vist, og skrev den fejl i konsollen? Aura klikker ikke i siden.
 const previewLog = { documents: [], errors: [] };
@@ -773,6 +786,12 @@ let imageSessionReady = null, captureQueue = Promise.resolve();
 function previewAllowed(url) { return Boolean(previewSession.contextForURL(spaces.values(), url)); }
 function previewDiagnostic(ctx, diagnostic) {
   if (!ctx) return;
+  // Hovedprocessen husker de blokeringer, den selv har set (højst 20), så samtykket kun kan gælde en adresse, forhåndsvisningen faktisk blokerede.
+  // Blokeringen ændrer aldrig netlisten; kun brugerens klik gør det (preview:allow).
+  if (diagnostic?.origin && ['scripts', 'styles', 'images'].includes(diagnostic.kind)) {
+    ctx.blocked = ctx.blocked || new Map(); ctx.blocked.set(`${diagnostic.kind}:${diagnostic.origin}`, { kind: diagnostic.kind, origin: diagnostic.origin });
+    while (ctx.blocked.size > 20) ctx.blocked.delete(ctx.blocked.keys().next().value);
+  }
   sendEvent({ type: 'preview.diagnostic', root: ctx.owner.project.root, workspaceRoot: ctx.root, diagnostic });
 }
 function configurePreviewSession(ses) {
@@ -909,7 +928,7 @@ handle('preview:execute', token => exclusive(async () => {
 }));
 // AI'ens værktøj aura_preview: starter forhåndsvisningen, hvis brugeren har godkendt netop dette projekts pakker og opstart.
 const previewBridge = require('./core/preview-bridge.cjs');
-const aiPreview = (root, action) => require('./core/ai-preview.cjs').aiPreview(spaceFor(root), action);
+const aiPreview = async (root, action) => { const preview = require('./core/ai-preview.cjs'); return preview.aiPreview(await preview.resolveSpace(root, { spaceFor, ownerFor, selectSpace }), action); };
 
 handle('preview:stop', () => currentSpace().devServer.stop().then(() => currentSpace().devServer.snapshot()));
 

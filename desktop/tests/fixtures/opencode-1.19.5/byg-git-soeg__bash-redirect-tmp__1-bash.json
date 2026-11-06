@@ -1,0 +1,97 @@
+{
+ "opencode": "1.19.5",
+ "aura": "d0c3fca+ændringer",
+ "scenario": "byg-git-soeg",
+ "outcome": "idle",
+ "case": "bash-redirect-tmp",
+ "askIndex": 1,
+ "asksInStep": 1,
+ "layout": {
+  "mode": "build",
+  "git": true,
+  "copy": false,
+  "model": "kontraktmodel",
+  "worktree": "${ROOT}",
+  "directory": "${ROOT}"
+ },
+ "sequence": [
+  "del:pending",
+  "del:running",
+  "spørg:bash",
+  "svar:once",
+  "del:running",
+  "del:completed"
+ ],
+ "request": {
+  "id": "per_1abd27e5f001F1deIcz3mVq7TN",
+  "sessionID": "ses_e542d8d79ffeBga5YF1Pc60yWB",
+  "permission": "bash",
+  "patterns": [
+   "echo hej > ${SYSTMP}/aura-kontrakt-86963.txt"
+  ],
+  "metadata": {
+   "command": "echo hej > ${SYSTMP}/aura-kontrakt-86963.txt"
+  },
+  "always": [
+   "echo *"
+  ],
+  "tool": {
+   "messageID": "msg_1abd27e4e001bWQaublNWMwe53",
+   "callID": "kald-20-0"
+  }
+ },
+ "toolPartAtAsk": {
+  "status": "running",
+  "tool": "bash",
+  "input": {
+   "command": "echo hej > ${SYSTMP}/aura-kontrakt-86963.txt",
+   "description": "Skriver i systemets temp"
+  }
+ },
+ "policyInput": {
+  "id": "per_1abd27e5f001F1deIcz3mVq7TN",
+  "sessionID": "ses_e542d8d79ffeBga5YF1Pc60yWB",
+  "permission": "bash",
+  "patterns": [
+   "echo hej > ${SYSTMP}/aura-kontrakt-86963.txt"
+  ],
+  "metadata": {
+   "command": "echo hej > ${SYSTMP}/aura-kontrakt-86963.txt"
+  },
+  "always": [
+   "echo *"
+  ],
+  "tool": {
+   "messageID": "msg_1abd27e4e001bWQaublNWMwe53",
+   "callID": "kald-20-0"
+  },
+  "toolInput": {
+   "command": "echo hej > ${SYSTMP}/aura-kontrakt-86963.txt",
+   "description": "Skriver i systemets temp",
+   "tool": "bash",
+   "input": {
+    "command": "echo hej > ${SYSTMP}/aura-kontrakt-86963.txt",
+    "description": "Skriver i systemets temp"
+   }
+  }
+ },
+ "recordedAura": {
+  "allowed": false,
+  "source": null,
+  "label": "Kommando: echo hej > ${SYSTMP}/aura-kontrakt-86963.txt",
+  "target": "echo hej > ${SYSTMP}/aura-kontrakt-86963.txt",
+  "match": {
+   "kind": "bash",
+   "command": "echo hej > ${SYSTMP}/aura-kontrakt-86963.txt",
+   "cwd": "${ROOT}"
+  },
+  "persistable": false,
+  "projectFile": false,
+  "scratch": false,
+  "folder": null,
+  "blockedMode": false
+ },
+ "toolResult": [
+  "(no output)"
+ ]
+}

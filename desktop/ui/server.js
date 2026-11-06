@@ -1,5 +1,7 @@
 (() => {
-  let status = null, review = null, managedURL = null, liveDiagnostics = [];
+  let status = null, review = null, managedURL = null, liveDiagnostics = [], netlist = null;
+  const dismissed = new Set(), kindName = { scripts: 'et kodebibliotek', styles: 'en typografi eller skrift', images: 'et billede' };
+  const consentable = item => ['scripts', 'styles', 'images'].includes(item.kind) && /^https:\/\//.test(item.origin || '') && !dismissed.has(item.kind + ':' + item.origin);
   const active = () => ['installing', 'starting', 'running', 'stopping'].includes(status?.state);
   const labels = { idle: '', installing: 'Installerer pakker …', installed: 'Pakkerne er klar', starting: 'Starter forhåndsvisningen …', running: 'Forhåndsvisningen kører', stopping: 'Stopper …', stopped: 'Forhåndsvisningen er stoppet', error: 'Forhåndsvisningen kræver din hjælp' };
   function update(value) {
@@ -41,6 +43,32 @@
       problems.append(repair);
       if (diagnostics.length > 1) { const details = node('details'), summary = node('summary', 'Se detaljer'); details.append(summary, ...diagnostics.slice(1).map(item => node('p', item.message))); problems.append(details); }
     }
+    // Samtykke pr. adresse: ét spørgsmål ad gangen. Kun dit klik her kan føje en adresse til projektets netliste.
+    let consent = $('#server-consent');
+    if (!consent) { consent = node('div'); consent.id = 'server-consent'; problems.after(consent); }
+    const ask = diagnostics.find(consentable);
+    consent.hidden = !ask; consent.replaceChildren();
+    if (ask) {
+      consent.append(node('p', `Siden vil hente ${kindName[ask.kind]} fra ${ask.origin}. Aura har blokeret det, fordi adressen ikke står på projektets netliste. Tillad kun en adresse, du kender og stoler på.`));
+      const allow = node('button', 'Tillad denne adresse', 'primary'), keep = node('button', 'Behold blokeret'); allow.type = keep.type = 'button';
+      allow.onclick = () => action(async () => {
+        const settings = await call('previewAllow', { kind: ask.kind, origin: ask.origin });
+        netlist = settings.runtime.network; liveDiagnostics = liveDiagnostics.filter(item => !(item.kind === ask.kind && item.origin === ask.origin));
+        await refresh();
+        message('Adressen er tilladt. Den gælder, næste gang forhåndsvisningen starter eller genindlæses.');
+      });
+      keep.onclick = () => { dismissed.add(ask.kind + ':' + ask.origin); update(status); };
+      consent.append(allow, keep);
+    }
+    let list = $('#server-netlist');
+    if (!list) { list = node('details'); list.id = 'server-netlist'; consent.after(list); }
+    list.hidden = !netlist; list.replaceChildren();
+    if (netlist) {
+      const label = { scripts: 'Kodebiblioteker', styles: 'Typografi og skrifter', images: 'Billeder', connect: 'Forbindelser' };
+      list.append(node('summary', 'Se detaljer: projektets netliste'));
+      for (const kind of Object.keys(label)) list.append(node('p', `${label[kind]}: ${(netlist[kind] || []).join(', ') || 'ingen'}`));
+      list.append(node('p', 'Alt andet blokeres, indtil du selv tillader adressen her. AI-en kan ikke give samtykket.', 'hint'));
+    }
     if (!current.previewURL && framework) {
       $('#preview-empty h2').textContent = labels[value.state] || 'Se din app';
       $('#preview-empty p').textContent = value.state === 'error' ? value.message : project.supported ? 'Start projektets lokale server for at se resultatet. Du gennemgår handlingen, før noget køres.' : project.reason;
@@ -55,6 +83,7 @@
   async function open() {
     review = null; $('#server-review').hidden = true; $('#server-scripts').checked = false;
     $('#preview-dialog .dialog-notice')?.remove();
+    try { netlist = (await call('projectSettings')).runtime.network || null; } catch { netlist = null; }
     await refresh(); $('#preview-dialog').showModal();
   }
   async function prepare(operation) {

@@ -13,6 +13,7 @@
     if (ai.length) lines.push(`Data kan blive sendt til AI-leverandør${ai.length > 1 ? 'er' : ''}: ${list(ai.map(s => `${s.name}${s.hq ? ` (${s.hq})` : ''}`))}.`);
     lines.push(model.hosting.length ? `Appen er sat op til at blive hostet hos ${list(model.hosting.map(h => h.provider))}.` : 'Oversigten kan ikke se, hvor appen hostes. Det bestemmer du, når du udgiver den.');
     if (model.secrets.length) lines.push(`Appen forventer ${model.secrets.length === 1 ? 'en hemmelighed' : `${model.secrets.length} hemmeligheder`} i sit miljø (kun navnene vises).`);
+    if (model.secretsUncertain) lines.push(model.secrets.length ? 'Listen over hemmeligheder kan være ufuldstændig, fordi koden også henter miljøet på måder, oversigten ikke genkender.' : 'Oversigten kan ikke sige, om appen bruger hemmeligheder: koden henter miljøet på måder, den ikke genkender, eller filer var for store at læse.');
     return lines;
   }
   function list(items) { return items.length <= 1 ? items.join('') : `${items.slice(0, -1).join(', ')} og ${items.at(-1)}`; }
@@ -29,6 +30,8 @@
     hosts.forEach((h, i) => { const y = 90 + i * 66; parts.push(box(210, y, 200, 54, h.provider, 'hosting', 'host'), `<path d="M310 64 V${y}" class="so-line" fill="none"/>`); });
     return `<svg viewBox="0 0 700 ${height}" role="img" aria-label="Diagram over appens dele og eksterne tjenester" xmlns="http://www.w3.org/2000/svg">${parts.join('')}</svg>`;
   }
-  const api = { summary, diagram, list };
+  // Teksten under Hemmeligheder, når listen er tom: kun «ingen fundet», når oversigten genkendte alle opslag.
+  const noSecrets = model => model.secretsUncertain ? 'Oversigten fandt ingen navne, men den kan ikke se alle måder at hente hemmeligheder på. Tom liste betyder ikke, at der ingen er. Selve værdierne vises aldrig.' : 'Ingen navne på hemmeligheder fundet. Selve værdierne vises aldrig.';
+  const api = { summary, diagram, list, noSecrets };
   if (typeof module === 'object' && module.exports) module.exports = api; else root.SystemOverviewView = api;
 })(typeof window === 'object' ? window : globalThis);

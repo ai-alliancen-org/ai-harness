@@ -262,10 +262,7 @@
     $('#deployment-open').textContent = ['komplai', 'promte', 'github-pages', 'cloudflare'].includes(r.config.provider) ? 'Åbn appen' : 'Åbn testlink'; $('#deployment-portal').textContent = isKomplai ? 'Åbn i komplai' : isPromte ? 'Åbn appen i Promte' : 'Åbn hos udbyderen';
     $('#deployment-check').textContent = isPromte ? 'Kontrollér status' : 'Kontrollér status og startside';
     $('#deployment-check').hidden = !r.id; $('#deployment-open').hidden = !r.url; $('#deployment-portal').hidden = !r.target.portal;
-    const problem = !r.id || ['UNKNOWN', 'ERROR'].includes(r.state) || r.checks?.provider.status === 'unknown';
-    const checked = r.checks?.provider.status === 'checked' && r.state === 'READY';
-    const first = problem || isPromte && ['READY', 'BLOCKED', 'REJECTED'].includes(r.state) ? 'portal' : r.state === 'READY' && r.url ? 'open' : 'check'; primary.append($('#deployment-' + first)); $('#deployment-' + first).classList.add('primary');
-    if ((problem || isPromte && first === 'portal') && r.id) primary.append($('#deployment-check')); else if (first === 'open') primary.append($('#deployment-' + (checked ? 'new' : 'check')));
+    const actions = view.mainActions(r); for (const id of actions) primary.append($('#deployment-' + id)); $('#deployment-' + actions[0]).classList.add('primary');
     $('#deployment-receipt-details').open = false; go('result', { remember: false });
   }
   async function followLastApp() {
@@ -308,7 +305,7 @@
       // Uden udgivelse viser Udgiv ét kort, tydeligt næste trin. Opsætningen kan ellers klares, mens appen bygges.
       if (!window.sharingOn?.()) { pendingProvider = provider; go('sharingOff', { remember: false }); return; }
       go('destination', { remember: false }); receipt(state.last);
-      const generation = session; await setup.refresh(wantStatus); assertCurrent(generation); setup.opened(wantStatus);
+      const generation = session; await setup.refresh(wantStatus && state.last?.config?.provider !== 'komplai'); assertCurrent(generation); setup.opened(wantStatus);
       if (provider) await chooseProvider(provider);
     });
   }

@@ -108,7 +108,7 @@ test('simuleret Windows bevarer filopgaver og enkeltgodkendelse trods en husket 
   bench.selection = async () => ({ connection, model: { id: 'test' }, route: null });
   bench.skills.context = async () => ({ rules: '', skills: [], titles: [], features: {}, integrations: [] });
   const p = { id: 'kommando', permission: 'bash', metadata: { command: 'node lokal.cjs', workdir: bench.project.root }, patterns: [] };
-  await bench.approvalsPolicy.grant({ projectRoot: bench.project.root, workspaceRoot: bench.project.root, mode: 'free', commandSandboxSupported: true }, p, { scope: 'project' });
+  await bench.approvalsPolicy.grant({ projectRoot: bench.project.root, workspaceRoot: bench.project.root, mode: 'free', commandSandboxSupported: true, commandSandbox: true }, p, { scope: 'project' });
   t.mock.method(require('../core/command-sandbox.cjs'), 'support', async () => ({ available: false, platform: 'win32', reason: 'Isolation understøttes endnu ikke på Windows.' }));
   const input = { connectionID: connection.id, modelID: 'test', mode: 'free' }, disclosure = await bench.prepare({ ...input, text: 'Ret projektfilen' });
   assert.equal(bench.chat.prepared.commandIsolation, false);
@@ -133,7 +133,7 @@ test('gamle forbindelser og workspace-v1 åbner og kan sende uden nye tilvalg p�
   assert.equal(bench.chat.data.draft, 'Fortsæt herfra'); assert.equal(bench.chat.data.messages[0].text, 'Bevar den eksisterende idé.');
   assert.equal((await registry.history.project(project.root)).version, 2);
   assert.equal(bench.store.decrypt(await bench.connection(connection.id)), 'syntetisk-gammel-nøgle');
-  assert.deepEqual(await bench.approvalsPolicy.settings(project.root), { autoProjectFiles: false, autoCommands: false, rules: [] });
+  assert.deepEqual(await bench.approvalsPolicy.settings(project.root), { autoProjectFiles: false, autoCommands: false, autoCommandsUnisolated: false, rules: [] });
   bench.selection = async () => ({ connection: await bench.connection(connection.id), model: { id: 'gammel-model' }, route: null });
   bench.skills.context = async () => ({ rules: '', skills: [], titles: [], features: {}, integrations: [] });
   const disclosure = await bench.prepare({ connectionID: connection.id, modelID: 'gammel-model', mode: 'free', text: 'Sæt i gang!' });

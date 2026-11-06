@@ -2,6 +2,7 @@
 const path = require('node:path');
 const { spawn } = require('node:child_process');
 const { Terminal } = require('./terminal.cjs');
+const { createKeychain } = require('./keychain.cjs');
 const { Vault, dataDirectory, privateDirectory, lock, unlockStale } = require('./storage.cjs');
 const { configure, doctor } = require('./runtime.cjs');
 const { Application } = require('./app.cjs');
@@ -28,7 +29,8 @@ aura --version               Vis versionen
 Alle projekthandlinger kan også bruge --project "sti med mellemrum".
 I samtalen: /help, /plan, /build, /work, /model, /diff, /preview og /exit.
 Ingen automatisk commit, push, installation eller betaling ved opstart.
-API-nøgler indtastes skjult, aldrig som kommandolinjeargumenter.
+API-nøgler indtastes skjult, aldrig som kommandolinjeargumenter, og gemmes i computerens nøglering.
+En adgangssætning bruges kun, hvis nøgleringen ikke kan bruges.
 `;
 function parse(args) {
   if (args[0] === 'skills') return { command: 'skills', args: args.slice(1) };
@@ -49,6 +51,8 @@ function parse(args) {
   if (project && positional) throw new Error('Angiv kun én projektmappe.');
   return { command, project: project || (command !== 'login' ? positional : undefined), provider: command === 'login' ? positional : undefined };
 }
+// AURA_KEYCHAIN=off springer nøgleringen over, så automatiske prøver aldrig rører brugerens rigtige nøglering.
+function chooseKeychain(env, directory) { return env.AURA_KEYCHAIN === 'off' ? null : createKeychain({ directory }); }
 async function logout(app) {
   const { ui, vault } = app;
   const connections = (await app.bench.store.read()).connections;
@@ -60,6 +64,9 @@ async function logout(app) {
   if (id && await ui.confirm(question)) {
     if (revoke) await vault.unlock(ui);
     await app.bench.removeConnection(id); ui.line('Forbindelsen er fjernet.');
+    // Nøglen må ikke blive liggende i nøgleringen uden en forbindelse, der bruger den.
+    try { if (vault.forget(connection.secret)) ui.line('Nøglen er også slettet fra computerens nøglering.'); }
+    catch (error) { ui.line(`Nøglen ligger stadig i computerens nøglering og kunne ikke slettes automatisk. ${error.message}`); }
   }
 }
 async function main(argv = process.argv.slice(2), ui = new Terminal()) {
@@ -77,7 +84,7 @@ async function main(argv = process.argv.slice(2), ui = new Terminal()) {
   if (major < 22 || major === 22 && minor < 12) throw new Error('Aura kræver Node 22.12 eller nyere.');
   const directory = await privateDirectory(dataDirectory());
   if (options.command === 'unlock') { await unlockStale(directory, ui); return; }
-  const release = await lock(directory), vault = new Vault(directory);
+  const release = await lock(directory), vault = new Vault(directory, { keychain: chooseKeychain(process.env, directory) });
   const app = new Application({ directory, vault, ui });
   let terminating = false;
   const interrupt = () => {
@@ -106,4 +113,4 @@ if (require.main === module) {
   const ui = new Terminal();
   main(process.argv.slice(2), ui).catch(error => { ui.line(error.code === 'CANCELLED' ? 'Afbrudt.' : `Aura: ${error.message}`); process.exitCode = error.code === 'CANCELLED' ? 130 : 1; });
 }
-module.exports = { main, parse, HELP, logout };
+module.exports = { main, parse, HELP, logout, chooseKeychain };

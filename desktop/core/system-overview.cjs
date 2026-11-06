@@ -47,6 +47,13 @@ const TECHNOLOGIES = {
   leaflet: ['Leaflet', 'Kort'], 'mapbox-gl': ['Mapbox', 'Kort'], 'chart.js': ['Chart.js', 'Diagrammer'], d3: ['D3', 'Diagrammer']
 };
 const PY_TECHNOLOGIES = { flask: ['Flask', 'Server'], fastapi: ['FastAPI', 'Server'], django: ['Django', 'Server'], streamlit: ['Streamlit', 'Brugerflade'], sqlalchemy: ['SQLAlchemy', 'Database'], openai: ['OpenAI', 'AI'], anthropic: ['Anthropic Claude', 'AI'], requests: ['requests', 'Netværk'] };
+// Miljøopslag, som oversigten genkender: process.env.X, process.env["X"], import.meta.env.X, os.environ["X"], os.environ.get("X"),
+// os.getenv("X") og const { X } = process.env. Alt andet opslag (fx process.env[navn] eller små bogstaver) gør listen usikker.
+const ENV_NAME = '([A-Z][A-Z0-9_]{2,})';
+const ENV_FORMS = new RegExp([`process\\.env\\.${ENV_NAME}`, `import\\.meta\\.env\\.${ENV_NAME}`, `(?:process\\.env|import\\.meta\\.env)\\[\\s*['"\`]${ENV_NAME}['"\`]\\s*\\]`,
+  `(?:os\\.)?environ(?:\\.get)?\\(\\s*['"]${ENV_NAME}['"]`, `(?:os\\.)?environ\\[\\s*['"]${ENV_NAME}['"]\\s*\\]`, `(?:os\\.)?getenv\\(\\s*['"]${ENV_NAME}['"]`].join('|'), 'g');
+const ENV_DESTRUCTURE = /\{([^{}]*)\}\s*=\s*(?:process\.env|import\.meta\.env)\b/g;
+const UNRECOGNIZED_ENV = /\bprocess\.env\b|\bimport\.meta\.env\b|\benviron\b|\bgetenv\b|Deno\.env|\$_ENV|\$_SERVER|\bENV\[|System\.getenv/;
 const HOSTING_FILES = [
   ['vercel.json', 'Vercel'], ['.vercel', 'Vercel'], ['staticwebapp.config.json', 'Microsoft Azure Static Web Apps'], ['wrangler.toml', 'Cloudflare'], ['netlify.toml', 'Netlify'],
   ['Dockerfile', 'Docker (container)'], ['docker-compose.yml', 'Docker (container)'], ['render.yaml', 'Render'], ['fly.toml', 'Fly.io'], ['Procfile', 'Heroku-lignende platform']
@@ -76,6 +83,12 @@ const exists = file => fs.access(file).then(() => true, () => false);
 async function analyze(root) {
   const technologies = new Map(), services = new Map(), secrets = new Map(), hosting = new Map(), notes = [];
   const addTech = (name, kind, source) => { if (!technologies.has(name)) technologies.set(name, { name, kind, source }); };
+  let uncertain = false;
+  const addSecret = (name, rel) => {
+    if (['NODE_ENV', 'PORT', 'HOST', 'MODE', 'DEV', 'PROD', 'BASE_URL', 'SSR'].includes(name)) return;
+    if (!secrets.has(name)) secrets.set(name, { name, files: new Set() });
+    secrets.get(name).files.add(rel);
+  };
 
   const pkg = await readJSON(path.join(root, 'package.json'));
   if (pkg) {
@@ -99,11 +112,12 @@ async function analyze(root) {
   } catch { /* Ingen gemt udgivelsesindstilling. */ }
 
   const files = await walk(root);
-  if (files.length >= MAX_FILES) notes.push(`Oversigten bygger på de første ${MAX_FILES} kodefiler.`);
+  if (files.length >= MAX_FILES) { notes.push(`Oversigten bygger på de første ${MAX_FILES} kodefiler.`); uncertain = true; }
   for (const file of files) {
-    let text; try { const stat = await fs.stat(file); if (stat.size > MAX_BYTES) continue; text = await fs.readFile(file, 'utf8'); } catch { continue; }
+    let text; try { const stat = await fs.stat(file); if (stat.size > MAX_BYTES) { uncertain = true; continue; } text = await fs.readFile(file, 'utf8'); } catch { continue; }
     const rel = path.relative(root, file).split(path.sep).join('/');
-    for (const match of text.matchAll(/https?:\/\/([a-z0-9][a-z0-9.-]*[a-z0-9])(?::\d+)?/gi)) {
+    // En adresse som https://bruger:kode@vaert må kun give værten; brugernavnet og koden læses aldrig som en tjeneste.
+    for (const match of text.matchAll(/https?:\/\/(?:[^\s\/@?#"'`<>]*@)?([a-z0-9][a-z0-9.-]*[a-z0-9])(?::\d+)?/gi)) {
       const host = match[1].toLowerCase();
       if (IGNORED_HOSTS.test(host) || !host.includes('.')) continue;
       const vendor = vendorOf(host);
@@ -111,17 +125,22 @@ async function analyze(root) {
       if (!services.has(key)) services.set(key, { name: vendor?.name || host, host, kind: vendor?.kind || 'Ukendt tjeneste', owner: vendor?.owner || null, hq: vendor?.hq || null, known: Boolean(vendor), files: new Set() });
       services.get(key).files.add(rel);
     }
-    for (const match of text.matchAll(/process\.env\.([A-Z][A-Z0-9_]{2,})|import\.meta\.env\.([A-Z][A-Z0-9_]{2,})|os\.environ(?:\.get)?\(\s*['"]([A-Z][A-Z0-9_]{2,})['"]|getenv\(\s*['"]([A-Z][A-Z0-9_]{2,})['"]/g)) {
-      const name = match[1] || match[2] || match[3] || match[4];
-      if (['NODE_ENV', 'PORT', 'HOST', 'MODE', 'DEV', 'PROD', 'BASE_URL', 'SSR'].includes(name)) continue;
-      if (!secrets.has(name)) secrets.set(name, { name, files: new Set() });
-      secrets.get(name).files.add(rel);
-    }
+    // Navne på miljøvariabler i de former, oversigten genkender. Det, der er tilbage af miljøopslag, melder oversigten ærligt.
+    let rest = text.replace(ENV_DESTRUCTURE, (whole, inner) => {
+      for (const part of inner.split(',')) {
+        const name = part.trim().match(/^([A-Za-z_$][\w$]*)/)?.[1];
+        if (!name) continue;
+        if (/^[A-Z][A-Z0-9_]{2,}$/.test(name)) addSecret(name, rel); else uncertain = true;
+      }
+      return ' ';
+    });
+    rest = rest.replace(ENV_FORMS, (whole, ...groups) => { addSecret(groups.slice(0, 6).find(Boolean), rel); return ' '; });
+    if (UNRECOGNIZED_ENV.test(rest)) uncertain = true;
   }
-  for (const service of services.values()) if (service.kind === 'Hosting' && !hosting.has(service.name)) hosting.set(service.name, { provider: service.name, evidence: [...service.files][0] });
+  // Hosting udledes kun af hostingfiler og .aura/publishing: et link i koden viser, hvad appen kalder, ikke hvor den ligger.
 
   const list = map => [...map.values()].map(item => ({ ...item, ...(item.files ? { files: [...item.files].slice(0, 5) } : {}) }));
-  const result = { technologies: list(technologies), services: list(services).sort((a, b) => Number(b.known) - Number(a.known) || a.name.localeCompare(b.name)), hosting: list(hosting), secrets: list(secrets), notes, scanned: files.length };
+  const result = { technologies: list(technologies), services: list(services).sort((a, b) => Number(b.known) - Number(a.known) || a.name.localeCompare(b.name)), hosting: list(hosting), secrets: list(secrets), notes, scanned: files.length, secretsUncertain: uncertain };
   result.externalAI = result.services.filter(item => item.kind === 'AI');
   return result;
 }

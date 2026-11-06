@@ -1,6 +1,9 @@
 // One trusted name policy; callers retain their own realpath, content and consent checks.
 const RULES = Object.freeze({
-  credentials: Object.freeze(['.ssh', '.aws', '.gnupg', '.kube', '.azure', '.npmrc', '.pypirc', '.env*', '*.env', '*.env.*', '*.env*', '*.key', '*.pem', '*.p12', '*.pfx', '*credentials*', 'secrets', '.secrets', 'secrets.*']),
+  credentials: Object.freeze(['.ssh', '.aws', '.gnupg', '.kube', '.azure', '.npmrc', '.pypirc', '.netrc', '.htpasswd', 'id_rsa*', 'id_ed25519*', '*.tfvars', '.env*', '*.env', '*.env.*', '*.env*', '*.key', '*.pem', '*.p12', '*.pfx', 'credentials', 'credentials.json', 'credentials.*', '.credentials', '.git-credentials', '*.credentials', '*credentials', 'credentials_*', '*credentials.json', '*credentials.yml', '*credentials.yaml', '*credentials.xml', '*credentials.ini', '*credentials.txt', '*credentials.toml', '*credentials.csv', '*credentials.cfg', '*credentials.conf', '*:credentials', '*:credentials.*', '*:.credentials', '*:.git-credentials', 'secrets', '.secrets', 'secrets.*']),
+  // Et kolon er lovligt i POSIX-navne (public:credentials.json), så de fire *:-mønstre bevarer den beskyttelse, den gamle delstrengsregel gav.
+  // Navne, der ender på credentials eller credentials.<datafiltype> (gcp-credentials.json, aws_credentials), og credentials_*, er stadig beskyttede.
+  // credentials er et rigtigt filnavn, ikke en delstreng: CredentialsForm.tsx og credentials-provider.ts er almindelig kode.
   // "secrets" er navnet på en hemmelighedsmappe eller -fil, ikke en delstreng: SecretsPage.jsx og useSecrets.js er almindelig kode.
   metadata: Object.freeze(['.git', '.aura-private']),
   references: Object.freeze(['references'])

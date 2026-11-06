@@ -44,7 +44,7 @@ const call = async action => {
 export const AuraPreview = async () => ({
   tool: {
     aura_preview: tool({
-      description: 'Starter appens forhåndsvisning gennem Aura, eller viser dens status. Brug dette værktøj i stedet for at køre npm run dev, vite eller en anden server med kommandoer: serveren bliver ellers aldrig koblet til forhåndsvisningen. Svaret er JSON med state (running, error, needs_consent, idle), url og en kort besked. Hvis state er needs_consent, skal brugeren selv godkende start i forhåndsvisningen; spørg brugeren, og gæt ikke.',
+      description: 'Starter appens forhåndsvisning gennem Aura, eller viser dens status. Brug dette værktøj i stedet for at køre npm run dev, vite eller en anden server med kommandoer: serveren bliver ellers aldrig koblet til forhåndsvisningen. Svaret er JSON med state (running, error, needs_consent, idle), url og en kort besked. Hvis state er needs_consent, skal brugeren selv godkende start i forhåndsvisningen; spørg brugeren, og gæt ikke. Indeholder svaret blocked, henter siden fra en adresse uden for projektets netliste, og den bliver blokeret: ret siden til at bruge lokale filer eller projektets egne pakker i stedet, bed ikke om netadgang, og skjul ikke fejlen eller brug opdigtede eksempeldata i stedet for rigtige data.',
       args: { action: tool.schema.enum(['start', 'status']).describe('start for at starte forhåndsvisningen, status for at se, om den kører') },
       async execute(args) { try { return await call(args.action); } catch { return JSON.stringify({ state: 'error', message: 'Aura svarede ikke. Bed brugeren starte forhåndsvisningen i appen.' }); } }
     })

@@ -1,0 +1,92 @@
+{
+ "opencode": "1.19.5",
+ "aura": "d0c3fca+ændringer",
+ "scenario": "byg-git-soeg",
+ "outcome": "idle",
+ "case": "grep-hemmelighed",
+ "askIndex": 1,
+ "asksInStep": 1,
+ "layout": {
+  "mode": "build",
+  "git": true,
+  "copy": false,
+  "model": "kontraktmodel",
+  "worktree": "${ROOT}",
+  "directory": "${ROOT}"
+ },
+ "sequence": [
+  "del:pending",
+  "spørg:grep",
+  "del:running",
+  "svar:once",
+  "del:completed"
+ ],
+ "request": {
+  "id": "per_1abd27865001X8r7ICAfQ7nfxL",
+  "sessionID": "ses_e542d8d79ffeBga5YF1Pc60yWB",
+  "permission": "grep",
+  "patterns": [
+   "HEMMELIG"
+  ],
+  "metadata": {
+   "pattern": "HEMMELIG"
+  },
+  "always": [
+   "*"
+  ],
+  "tool": {
+   "messageID": "msg_1abd27854001A9w0M5n8qv8tvk",
+   "callID": "kald-4-0"
+  }
+ },
+ "toolPartAtAsk": {
+  "status": "pending",
+  "tool": "grep",
+  "input": {}
+ },
+ "policyInput": {
+  "id": "per_1abd27865001X8r7ICAfQ7nfxL",
+  "sessionID": "ses_e542d8d79ffeBga5YF1Pc60yWB",
+  "permission": "grep",
+  "patterns": [
+   "HEMMELIG"
+  ],
+  "metadata": {
+   "pattern": "HEMMELIG"
+  },
+  "always": [
+   "*"
+  ],
+  "tool": {
+   "messageID": "msg_1abd27854001A9w0M5n8qv8tvk",
+   "callID": "kald-4-0"
+  },
+  "toolInput": {
+   "tool": "grep",
+   "input": {}
+  }
+ },
+ "recordedAura": {
+  "allowed": false,
+  "source": null,
+  "label": "Læsning: ${ROOT}/*",
+  "target": "${ROOT}/*",
+  "match": {
+   "kind": "grep",
+   "targets": [
+    {
+     "path": "${ROOT}",
+     "subtree": true
+    }
+   ]
+  },
+  "persistable": false,
+  "projectFile": false,
+  "scratch": false,
+  "folder": "${ROOT}",
+  "blockedMode": false
+ },
+ "toolResult": [
+  "No files found"
+ ]
+}

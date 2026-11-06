@@ -20,6 +20,7 @@ def session(steps):
     pid, fd = pty.fork()
     if pid == 0:
         os.environ['AURA_HOME'] = state
+        os.environ['AURA_KEYCHAIN'] = 'off'
         os.execv(node, [node, cli, 'chat', project])
     pending = bytearray()
     try:

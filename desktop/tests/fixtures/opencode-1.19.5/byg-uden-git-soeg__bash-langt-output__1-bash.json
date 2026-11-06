@@ -1,0 +1,97 @@
+{
+ "opencode": "1.19.5",
+ "aura": "d0c3fca+ændringer",
+ "scenario": "byg-uden-git-soeg",
+ "outcome": "idle",
+ "case": "bash-langt-output",
+ "askIndex": 1,
+ "asksInStep": 1,
+ "layout": {
+  "mode": "build",
+  "git": false,
+  "copy": false,
+  "model": "kontraktmodel",
+  "worktree": "/",
+  "directory": "${ROOT}"
+ },
+ "sequence": [
+  "del:pending",
+  "del:running",
+  "spørg:bash",
+  "svar:once",
+  "del:running",
+  "del:completed"
+ ],
+ "request": {
+  "id": "per_1abd28e3a001dpoFi1Ei8F7K6b",
+  "sessionID": "ses_e542d7b68ffezKI5f78zcPRWM1",
+  "permission": "bash",
+  "patterns": [
+   "seq 1 40000"
+  ],
+  "metadata": {
+   "command": "seq 1 40000"
+  },
+  "always": [
+   "seq *"
+  ],
+  "tool": {
+   "messageID": "msg_1abd28e2a001M27la133VmKYXf",
+   "callID": "kald-21-0"
+  }
+ },
+ "toolPartAtAsk": {
+  "status": "running",
+  "tool": "bash",
+  "input": {
+   "command": "seq 1 40000",
+   "description": "Tæller"
+  }
+ },
+ "policyInput": {
+  "id": "per_1abd28e3a001dpoFi1Ei8F7K6b",
+  "sessionID": "ses_e542d7b68ffezKI5f78zcPRWM1",
+  "permission": "bash",
+  "patterns": [
+   "seq 1 40000"
+  ],
+  "metadata": {
+   "command": "seq 1 40000"
+  },
+  "always": [
+   "seq *"
+  ],
+  "tool": {
+   "messageID": "msg_1abd28e2a001M27la133VmKYXf",
+   "callID": "kald-21-0"
+  },
+  "toolInput": {
+   "command": "seq 1 40000",
+   "description": "Tæller",
+   "tool": "bash",
+   "input": {
+    "command": "seq 1 40000",
+    "description": "Tæller"
+   }
+  }
+ },
+ "recordedAura": {
+  "allowed": false,
+  "source": null,
+  "label": "Kommando: seq 1 40000",
+  "target": "seq 1 40000",
+  "match": {
+   "kind": "bash",
+   "command": "seq 1 40000",
+   "cwd": "${ROOT}"
+  },
+  "persistable": false,
+  "projectFile": false,
+  "scratch": false,
+  "folder": null,
+  "blockedMode": false
+ },
+ "toolResult": [
+  "...output truncated...\n\nFull output saved to: ${RUNTIME}/data/opencode/tool-output/tool_1abd28e530011JopKMEyCuPz6L\n\n38002\n38003\n38004\n38005\n38006\n38007\n38008\n38009\n38010\n38011\n38012\n38013\n38014\n38015\n38016\n38017\n38018\n38019\n38020\n38021\n38022\n38023\n38024\n38025\n38026\n38027\n38028\n38029\n38030\n38031\n3803"
+ ]
+}

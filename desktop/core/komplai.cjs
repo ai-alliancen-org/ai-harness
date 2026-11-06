@@ -115,22 +115,31 @@ class KomplaiLogin {
   }
 
 }
+// Afviser komplai adgangen som ugyldig eller ukendt (401, 404 med fejlkoden not_found, invalid_token), er den allerede væk på serveren.
+// Så er tilbagekaldelsen lykkedes, og den lokale post kan slettes.
+// En 404 uden komplais egen fejlkode kan være en forkert rute eller adresse, så den tæller ikke som slettet.
+const alreadyGone = error => error?.status === 401 || (error?.status === 404 && error?.code === 'not_found') || error?.code === 'invalid_token';
+async function gone(request) {
+  try { return await request(); }
+  catch (error) { if (alreadyGone(error)) return { revoked: true, alreadyGone: true }; throw error; }
+}
 async function revokePublishing(secret, baseURL = API, fetcher = fetch) {
-  return json(`${baseURL}/publishing/session`, { method: 'DELETE', key: secret, fetcher });
+  return gone(() => json(`${baseURL}/publishing/session`, { method: 'DELETE', key: secret, fetcher }));
 }
 async function publishingState(store, now = Date.now()) {
   const saved = (await store.read()).hosting?.komplai;
   if (!saved?.secret) return { connected: false };
   return { connected: true, organisationId: saved.organisationId, organisationName: saved.organisationName, address: saved.address, expiresAt: saved.expiresAt, expired: Date.parse(saved.expiresAt) <= now };
 }
-/** Log ud tilbagekalder på serveren før den lokale sletning. Ved netværksfejl bevares adgangen, så det kan prøves igen. */
-async function disconnectPublishing(store, baseURL = API, fetcher = fetch) {
+/** Log ud tilbagekalder på serveren før den lokale sletning. Ved netværksfejl bevares adgangen, så det kan prøves igen. En adgang, komplai selv afviser, er allerede væk og slettes lokalt. */
+async function disconnectPublishing(store, baseURL = API, fetcher = fetch, { force = false } = {}) {
   const saved = (await store.read()).hosting?.komplai;
-  if (saved?.secret) await revokePublishing(store.decrypt(saved), baseURL, fetcher);
+  // «Fjern alligevel»: er komplai ikke til at nå, fjernes kun den lokale adgang. Den kan så stadig være gyldig hos komplai.
+  if (saved?.secret) { try { await revokePublishing(store.decrypt(saved), baseURL, fetcher); } catch (error) { if (!force) throw error; } }
   await store.update(state => { if (state.hosting) delete state.hosting.komplai; });
   return publishingState(store);
 }
 async function disconnect(connection, key) {
-  return json(`${connection.baseURL.replace(/\/v1$/, '')}/session`, { method: 'DELETE', key });
+  return gone(() => json(`${connection.baseURL.replace(/\/v1$/, '')}/session`, { method: 'DELETE', key }));
 }
 module.exports = { API, ISSUER, KomplaiLogin, json, readBounded, disconnect, organisation, publishingState, disconnectPublishing, revokePublishing };

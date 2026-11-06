@@ -90,13 +90,15 @@ class KeyWindow {
       const contents = win.webContents;
       contents.setWindowOpenHandler(() => ({ action: 'deny' }));
       for (const blocked of ['will-navigate', 'will-redirect', 'will-frame-navigate', 'will-attach-webview']) contents.on(blocked, event => event.preventDefault());
-      contents.on('render-process-gone', () => this.cancel());
+      contents.on('render-process-gone', () => this.finish(null));
       const reveal = () => { if (!win.isDestroyed()) win.show(); };
       if (this.current) this.current.reveal = reveal;
       // Svarer siden ikke med en højde, vises vinduet alligevel.
       win.once('ready-to-show', () => setTimeout(reveal, 150));
+      // Mens en nøgle gemmes, må vinduet ikke lukkes: så ville hovedvinduet tro, at brugeren annullerede.
+      win.on('close', event => { if (this.win === win && this.current?.busy) event?.preventDefault?.(); });
       win.on('closed', () => { if (this.win === win) this.win = null; this.finish(null); });
-      win.loadURL(PAGE).catch(() => this.cancel());
+      win.loadURL(PAGE).catch(() => this.finish(null));
     });
   }
   async submit(raw) {
@@ -105,33 +107,43 @@ class KeyWindow {
     current.busy = true; current.offered = false;
     try {
       const result = await current.submit(String(raw ?? ''));
-      if (result.receipt) { this.finish(result.receipt); return { done: true }; }
+      if (result.receipt) { this.settle(current, result.receipt); return { done: true }; }
       current.offered = result.offerSave === true;
       return { error: result.error, details: result.details || '', offerSave: current.offered };
     } catch (error) {
       // Kendte fejl har en tekst uden nøglen. En ukendt fejl kan i princippet nævne den og vises derfor ikke.
       return { error: error?.reason ? error.message : 'Nøglen kunne ikke kontrolleres. Prøv igen.', details: error?.reason ? error.details || '' : '' };
-    } finally { if (this.current === current) current.busy = false; }
+    } finally { current.busy = false; this.settle(current, null); }
   }
   async saveAnyway() {
     const current = this.current;
     if (!current?.offered || current.busy || !current.saveAnyway) return { error: 'Kontrollér nøglen først.' };
     current.busy = true;
-    try { this.finish(await current.saveAnyway()); return { done: true }; }
+    try { const receipt = await current.saveAnyway(); this.settle(current, receipt); return { done: true }; }
     catch (error) { return { error: error?.reason ? error.message : 'Forbindelsen kunne ikke gemmes. Prøv igen.' }; }
-    finally { if (this.current === current) current.busy = false; }
+    finally { current.busy = false; this.settle(current, null); }
   }
-  cancel() { this.finish(null); }
+  // Brugerens Annullér virker ikke, mens en gemning er i gang. Gemningen afgør, hvad hovedvinduet får at vide.
+  cancel() { if (this.current?.busy) return; this.finish(null); }
+  // Afslutter vinduet. Er en gemning i gang (nedlukning eller en lukket side), venter svaret på gemningen,
+  // så hovedvinduet får kvitteringen og opdaterer sin tilstand i stedet for at tro, at brugeren annullerede.
   finish(receipt) {
     const current = this.current; if (!current) return;
     this.current = null;
     current.forget?.();
     const win = this.win; this.win = null;
     if (win && !win.isDestroyed()) win.destroy();
+    if (current.busy && receipt === null) { current.closing = true; return; }
     current.resolve(receipt);
   }
+  // Svarer for en gemning, der blev afsluttet, mens vinduet allerede var lukket.
+  settle(current, receipt) {
+    if (receipt) current.result = receipt;
+    if (this.current === current) { if (receipt) this.finish(receipt); return; }
+    if (current.closing && !current.busy) { current.closing = false; current.resolve(current.result ?? null); }
+  }
   // Ved nedlukning: luk vinduet og glem en nøgle, der venter på Gem alligevel.
-  close() { this.cancel(); }
+  close() { const current = this.current; if (current) current.busy = false; this.finish(null); }
 }
 
 const recipient = connection => {

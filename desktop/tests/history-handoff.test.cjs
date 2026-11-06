@@ -22,3 +22,7 @@ test('uden en kørende motor sendes historikken ved skift af arbejdsmåde som f�
 test('uden tidligere beskeder er der intet at sende', () => {
   assert.equal(handoffNeeded({ messages: [], engineActive: true, modelSwitch: true, previousMode: 'chat', mode: 'build' }), false);
 });
+
+test('uden en kørende motor sendes historikken, når den gemte AI-session hører til en anden model (årsag 4)', () => {
+  assert.equal(handoffNeeded({ messages: beskeder, engineActive: false, modelSwitch: true, previousMode: 'build', mode: 'build' }), true);
+});

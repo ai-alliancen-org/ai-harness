@@ -54,7 +54,8 @@ test('Responses kan hverken skifte model eller falde tilbage til Chat Completion
     const gateway = await startGateway({ kind: 'openai', baseURL: 'http://127.0.0.1:1/v1' }, { id: 'gpt-test' }, 'syntetisk', null);
     try {
       const res = await fetch(gateway.url + request.route, { method: 'POST', headers: { authorization: `Bearer ${gateway.token}` }, body: JSON.stringify({ model: request.model }) });
-      assert.equal(res.status, 502); assert.match(await res.text(), /Ingen reserveudbyder/);
+      // En lokal afvisning før udbyderen: 400 med dansk tekst, ingen reserveudbyder og ingen netfejl-vejledning.
+      assert.equal(res.status, 400); assert.match(await res.text(), /Modelskift kræver|ikke understøtter/);
     } finally { await gateway.close(); }
   }
 });

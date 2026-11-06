@@ -108,7 +108,7 @@ class EngineEvents {
               let event; try { event = JSON.parse(data); } catch { continue; }
               if (typeof event.type !== 'string') continue;
               if (reconciling) { if (queued.length >= 2000) throw new Error('Recovery queue full'); queued.push(event); }
-              else { await this.deliver(event); healthy = true; } // En leveret hændelse (også et hjerteslag) viser, at strømmen lever: en senere afbrydelse er en ny hændelse.
+              else { await this.deliver(event); healthy = true; if (this.recovered) { this.snapshotMode = false; this.recovered = false; } } // En leveret hændelse (også et hjerteslag) viser, at strømmen lever: en senere afbrydelse er en ny hændelse.
             }
           }
           if (!signal.aborted && this.engine.active) throw new Error('Event stream ended');
@@ -119,6 +119,8 @@ class EngineEvents {
           reconciling = false;
           for (const event of queued) await this.deliver(event);
           this.engine.handleEvent({ type: 'engine.recovery', recovery: { phase: 'recovered', attempt: attempt + 1 } });
+          // Genoprettelsen lykkedes: snapshottilstanden slås fra, når næste live-hændelse er leveret, så en delta ikke hver gang giver et fuldt GET.
+          this.recovered = true;
         }
         this.resolve();
         await pump;

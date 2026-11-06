@@ -119,9 +119,16 @@ class Deployments {
         else if(['github-pages','cloudflare'].includes(r.config.provider)&&receipt.state==='SUBMITTING') receipt.verification='Starten af GitHub-kørslen er ikke bekræftet. Kontrollér status før et nyt forsøg.';
         else receipt.verification='Handlingen er registreret, men resultatet er ikke bekræftet. Kontrollér status hos udbyderen, før du prøver igen.';
       }
+      else if(before?.id&&before.state==='READY'&&(!receipt.appId||receipt.appId===before.appId)&&before.config?.provider===r.config.provider) {
+        // Den sidste kvittering for en side, der er live, overskrives aldrig med UNKNOWN. Kun en note om det uklare forsøg tilføjes.
+        await this.store.saveProject(root,{deploymentLast:{...before,verification:'Et nyt forsøg blev ikke bekræftet. Den tidligere udgivelse står uændret. Kontrollér udbyderens oversigt før et nyt forsøg.'},deploymentTrackingSource:trackingBefore});
+        throw Error('Udgivelsen blev ikke bekræftet. Kontrollér udbyderens oversigt før et nyt forsøg. Dit lokale projekt er bevaret.');
+      }
       else { receipt.state='UNKNOWN'; await this.store.saveProject(root,{deploymentLast:receipt}); throw Error('Udgivelsen blev ikke bekræftet. Kontrollér udbyderens oversigt før et nyt forsøg. Dit lokale projekt er bevaret.'); }
     }
-    await this.store.saveProject(root,{deploymentLast:receipt}); return receipt;
+    await this.store.saveProject(root,{deploymentLast:receipt});
+    // komplai: en upload er ikke en udgivelse, før brugeren selv har trykket Kontrollér. Aura henter aldrig adressen af sig selv.
+    return receipt;
   }
   async saveCheck(root,expected,receipt) {
     const apply=project=>{

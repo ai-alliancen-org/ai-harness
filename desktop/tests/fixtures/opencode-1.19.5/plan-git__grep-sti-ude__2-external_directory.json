@@ -1,0 +1,104 @@
+{
+ "opencode": "1.19.5",
+ "aura": "d0c3fca+ændringer",
+ "scenario": "plan-git",
+ "outcome": "idle",
+ "case": "grep-sti-ude",
+ "askIndex": 2,
+ "asksInStep": 2,
+ "layout": {
+  "mode": "plan",
+  "git": true,
+  "copy": false,
+  "model": "kontraktmodel",
+  "worktree": "${ROOT}",
+  "directory": "${ROOT}"
+ },
+ "sequence": [
+  "del:pending",
+  "del:running",
+  "spørg:grep",
+  "svar:once",
+  "spørg:external_directory",
+  "svar:once",
+  "del:completed"
+ ],
+ "request": {
+  "id": "per_1abd2a60e001R6vpyx6QR0oSSK",
+  "sessionID": "ses_e542d601affehVTQ3V1ieZtYav",
+  "permission": "external_directory",
+  "patterns": [
+   "${OUTSIDE}/*"
+  ],
+  "metadata": {
+   "filepath": "${OUTSIDE}",
+   "parentDir": "${OUTSIDE}"
+  },
+  "always": [
+   "${OUTSIDE}/*"
+  ],
+  "tool": {
+   "messageID": "msg_1abd2a5f2001njfqRFSLxwhG6T",
+   "callID": "kald-5-0"
+  }
+ },
+ "toolPartAtAsk": {
+  "status": "running",
+  "tool": "grep",
+  "input": {
+   "pattern": "Ekstern",
+   "path": "${OUTSIDE}"
+  }
+ },
+ "policyInput": {
+  "id": "per_1abd2a60e001R6vpyx6QR0oSSK",
+  "sessionID": "ses_e542d601affehVTQ3V1ieZtYav",
+  "permission": "external_directory",
+  "patterns": [
+   "${OUTSIDE}/*"
+  ],
+  "metadata": {
+   "filepath": "${OUTSIDE}",
+   "parentDir": "${OUTSIDE}"
+  },
+  "always": [
+   "${OUTSIDE}/*"
+  ],
+  "tool": {
+   "messageID": "msg_1abd2a5f2001njfqRFSLxwhG6T",
+   "callID": "kald-5-0"
+  },
+  "toolInput": {
+   "pattern": "Ekstern",
+   "path": "${OUTSIDE}",
+   "tool": "grep",
+   "input": {
+    "pattern": "Ekstern",
+    "path": "${OUTSIDE}"
+   }
+  }
+ },
+ "recordedAura": {
+  "allowed": false,
+  "source": null,
+  "label": "Mappeadgang: ${OUTSIDE}/*",
+  "target": "${OUTSIDE}/*",
+  "match": {
+   "kind": "external_directory",
+   "targets": [
+    {
+     "path": "${OUTSIDE}",
+     "subtree": true
+    }
+   ]
+  },
+  "persistable": true,
+  "projectFile": false,
+  "scratch": false,
+  "folder": "${OUTSIDE}",
+  "blockedMode": false
+ },
+ "toolResult": [
+  "No files found"
+ ]
+}

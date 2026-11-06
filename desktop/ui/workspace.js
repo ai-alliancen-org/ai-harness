@@ -500,6 +500,7 @@
     if (event.type === 'activity' && event.root === current?.root && mine(event)) putEntry(event.entry);
     if (event.type === 'run.status' && mine(event)) {
       activity.running = ['starting', 'working'].includes(event.status); updateActivityStatus(); updateActivityBadge();
+      if (!activity.running) staleOverview();
     }
     if (event.type === 'changes.updated' && event.root === current?.root && !mine(event)) { code.stale = true; return; }
     if (event.type === 'changes.updated' && event.root === current?.root) {
@@ -509,14 +510,17 @@
       else { changes.stale = true; changes.source = event.task; changes.file = ''; }
       if (active === 'code') action(checkCodeFile);
     }
+    if (event.type === 'run.review' && mine(event)) staleOverview();
     if (event.type === 'run.review' && !mine(event)) { action(async () => { await loadCodeList(); linkifyAll(); }); return; }
     if (event.type === 'run.review' && event.files?.length && active !== 'changes') badge('changes', event.files.length, event.files.length === 1 ? 'ændret fil' : 'ændrede filer');
     if (event.type === 'run.review') action(async () => { await loadCodeList(); linkifyAll(); });
     if (event.type === 'plan.ready' && mine(event) && active !== 'plan') { $('#plan-badge').hidden = false; $('#plan-badge').replaceChildren(visuallyHidden('ny plan')); }
   });
+  // Overblikket udledes af projektets filer: det er gammelt ved projektskift, samtaleskift og efter en afsluttet opgave.
+  function staleOverview() { if (active === 'overview') { window.systemOverview?.stale(); window.systemOverview?.show(); } else window.systemOverview?.invalidate(); }
   // Et nyt projekt starter i Forhåndsvisning med tomme faner.
   async function onProject() {
-    show('preview'); $('#plan-badge').hidden = true;
+    show('preview'); window.systemOverview?.invalidate(); $('#plan-badge').hidden = true;
     Object.assign(changes, { data: null, source: '', file: '', stale: true, latest: '', mode: 'session', sessionSource: '', versionView: null }); badge('changes', 0); applyMode(); window.versions?.reset();
     $('#changes-source').replaceChildren(option('', 'Ingen opgaver endnu')); $('#changes-source').disabled = true;
     $('#changes-overview').hidden = true; $('#changes-diff').hidden = true; $('#changes-empty').hidden = false; $('#changes-notice').hidden = true;
@@ -529,6 +533,7 @@
   }
   // En anden samtale åbnes: Ændringer under Denne samtale og Aktivitet følger den. Kode og Versioner gælder projektet.
   async function onChat() {
+    staleOverview();
     $('#plan-badge').hidden = true; badge('changes', 0);
     Object.assign(changes, { data: null, file: '', stale: true, latest: '', sessionSource: '' });
     if (changes.mode === 'session') { changes.source = ''; $('#changes-source').replaceChildren(option('', 'Ingen opgaver endnu')); $('#changes-source').disabled = true; $('#changes-overview').hidden = true; $('#changes-diff').hidden = true; $('#changes-empty').hidden = false; $('#changes-notice').hidden = true; if (active === 'changes') await action(() => loadChanges()); }

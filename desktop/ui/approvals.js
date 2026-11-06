@@ -116,6 +116,7 @@
       const guesses = view.commandHints(where.text);
       if (guesses.length) { const list = node('ul', undefined, 'approval-hints'); for (const guess of guesses) list.append(node('li', guess)); const note = node('span', 'Et gæt ud fra kommandoens tekst, ikke en kontrol.', 'hint'); note.append(info('gættet', 'Kommandoer kan ændre eller slette filer, installere programmer og kontakte andre tjenester med dine rettigheder. Aura læser kun kommandoens tekst og kan ikke se, hvad den faktisk gør.')); effectDd.append(list, note); }
     }
+    if (p.permission === 'bash' && p.policy?.unisolated) box.append(node('p', 'Der er ingen isolation: kommandoen kører med dine rettigheder og kan røre alt, du kan.', 'hint approval-scope'));
     box.append(facts, items);
     if (diff && (diff.added || diff.removed)) { const fold = node('details', undefined, 'approval-fold'); fold.append(node('summary', 'Se ændringen'), diffRows(diff, p.permission === 'edit' ? where.text : '')); box.append(fold); }
     const technical = node('details', undefined, 'approval-fold'); technical.append(node('summary', 'Tekniske detaljer'), node('pre', JSON.stringify({ tilladelse: p.permission, mønstre: p.patterns, detaljer: { ...p.metadata, ...(p.metadata?.diff ? { diff: '(se ændringen ovenfor)' } : {}) } }, null, 2))); box.append(technical);
@@ -124,12 +125,12 @@
     const row = node('div', undefined, 'approval-actions');
     // Handlingen i almindeligt dansk til linjen i samtalen, fx "ændre filer i projektet: public/index.html".
     const label = `${title.replace(/\?$/, '').replace(/^Må AI’en /, '')}${where.text ? `: ${where.text.split('\n')[0].slice(0, 120)}` : ''}`;
-    const reply = (allow, scope, message, folder) => action(async () => {
+    const reply = (allow, scope, message, folder, unisolated) => action(async () => {
       if (group.busy || !group.requests.size) return;
       group.busy = true;
       const ids = [...group.requests.keys()];
       for (const button of box.querySelectorAll('button')) button.disabled = true;
-      try { await call('reply', { id: ids[0], ids, allow, scope, chat: v.id, ...(message ? { message } : {}), ...(folder ? { folder } : {}) }, { root: v.root || current?.root, chat: v.id }); }
+      try { await call('reply', { id: ids[0], ids, allow, scope, chat: v.id, ...(message ? { message } : {}), ...(folder ? { folder } : {}), ...(unisolated ? { unisolated: true } : {}) }, { root: v.root || current?.root, chat: v.id }); }
       catch (error) { let feedback = box.querySelector('.approval-feedback'); if (!feedback) { feedback = node('p', '', 'approval-feedback'); feedback.setAttribute('role', 'status'); box.append(feedback); } feedback.textContent = error.message; return; }
       finally { group.busy = false; for (const button of box.querySelectorAll('button')) button.disabled = false; }
       for (const id of ids) removeRequest(v, id);
@@ -147,8 +148,23 @@
     if (projectFile) { const task = node('button', 'Tillad for denne opgave'); task.type = 'button'; task.onclick = () => reply(true, 'task'); extra.append(task); }
     // «Godkend alt» findes kun, når kommandosandkassen er aktiv, og gælder kun denne samtale (beslutning for beta 2).
     if (p.policy?.approveAllAvailable) {
-      const all = node('button', 'Godkend alt i denne samtale'); all.type = 'button'; all.onclick = () => reply(true, 'chat');
-      extra.append(all, node('p', 'AI’en må køre kommandoer, ændre filer og hente fra nettet i denne samtale uden at spørge igen, også uden for projektmappen. Brug det kun, hvis du stoler på opgaven.', 'hint'));
+      const all = node('button', 'Godkend alt i denne samtale'); all.type = 'button';
+      if (p.policy.approveAllUnisolated) {
+        // Uden sandkasse (Windows) vises advarslen hver gang, og valget er et selvstændigt spørgsmål med to knapper.
+        all.onclick = () => {
+          extra.hidden = true;
+          const form = node('div', undefined, 'approval-folder'); form.setAttribute('role', 'group'); form.setAttribute('aria-label', 'Kør uden isolation');
+          const allow = node('button', 'Tillad uden isolation', 'primary'); allow.type = 'button'; allow.onclick = () => reply(true, 'chat', undefined, undefined, true);
+          const keep = node('button', 'Behold spørgsmål'); keep.type = 'button'; keep.onclick = () => { form.remove(); extra.hidden = false; };
+          const details = node('details', undefined, 'approval-fold'); details.append(node('summary', 'Se detaljer'), node('p', 'Windows har ingen isolation af kommandoer i Aura. Aura kontrollerer kun kommandoens tekst for beskyttede navne som .env, nøgler og .git, og for jokertegn, korte filnavne og git-kommandoer, der kan ændre .git. Det er ikke en sikring: navne, der bygges undervejs, fanges ikke. Filer i projektet beskyttes som før. Du kan slå valget fra i statuslinjen under skrivefeltet.', 'hint'));
+          form.append(node('strong', 'Vil du køre uden isolation?'), node('p', 'Kommandoerne kører uden isolation med dine rettigheder og kan røre alt, du kan, også uden for projektet. AI’en spørger ikke igen om kommandoer i denne samtale.', 'hint'), details, allow, keep);
+          box.append(form); allow.focus();
+        };
+        extra.append(all, node('p', 'AI’en må køre kommandoer uden isolation, ændre filer i projektet og spørger ikke igen i denne samtale. Du bliver bedt om at bekræfte, at der ingen isolation er.', 'hint'));
+      } else {
+        all.onclick = () => reply(true, 'chat');
+        extra.append(all, node('p', 'AI’en må køre kommandoer, ændre filer og hente fra nettet i denne samtale uden at spørge igen, også uden for projektmappen. Brug det kun, hvis du stoler på opgaven.', 'hint'));
+      }
     }
     if (p.policy?.folder && p.policy.persistable && !projectFile) {
       const folderButton = node('button', 'Tillad en mappe fremover'); folderButton.type = 'button';
@@ -182,7 +198,18 @@
     v.approvals.append(box); if (v === viewFor()) box.scrollIntoView({ block: 'nearest' });
     waitFor(p.id, title, box, v);
   }
+  // «Godkend alt» uden isolation skal kunne ses i statuslinjen, så længe det er tændt, og slås fra med den samme knap som ellers.
+  const statusNote = () => {
+    const status = document.getElementById('approve-all-status'); if (!status) return;
+    let note = status.querySelector('.approve-all-unisolated');
+    const on = !status.hidden && viewFor()?.approveAllUnisolated === true;
+    if (on && !note) { note = node('strong', 'Der er ingen isolation: kommandoerne kører med dine rettigheder og kan røre alt, du kan.', 'approve-all-unisolated'); status.insertBefore(note, status.querySelector('button')); status.insertBefore(document.createTextNode(' '), status.querySelector('button')); }
+    if (note) note.hidden = !on;
+  };
+  const approveAllStatus = document.getElementById('approve-all-status');
+  if (approveAllStatus) new MutationObserver(statusNote).observe(approveAllStatus, { attributes: true, attributeFilter: ['hidden'] });
   window.harness.onEvent(event => {
+    if (event.type === 'approve-all') { const v = viewFor(event.chat); if (v) v.approveAllUnisolated = event.enabled === true && event.unisolated === true; statusNote(); }
     if (event.type === 'permission.replied') removeRequest(viewFor(event.chat), event.properties?.requestID);
     if (event.type === 'permission.auto') {
       const v = viewFor(event.chat), policy = event.policy;
@@ -190,5 +217,5 @@
     }
     if (event.type === 'run.status' && !['starting', 'working'].includes(event.status)) pending.delete(viewFor(event.chat));
   });
-  window.approvals = { show };
+  window.approvals = { show, refresh: statusNote };
 })();

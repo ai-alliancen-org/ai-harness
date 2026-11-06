@@ -44,6 +44,29 @@
   }
   // Upload, adgang og indhold er forskellige beviser. Et READY-svar alene giver
   // aldrig en grøn indholdskontrol eller bevis for en persons adgang.
+  const UNCHECKED = 'Uploadet, adressen er ikke kontrolleret endnu';
+  // Sandt for en komplai-kvittering, hvor ingen adressekontrol har fået svar fra adressen (2xx, viderestilling eller login krævet).
+  function addressUnchecked(r) {
+    const site = r?.checks?.site;
+    // 3xx, 401 og 403 er også svar fra adressen: appen viderestiller til login eller kræver login, og det er ikke en fejl.
+    return r?.config?.provider === 'komplai' && !(site?.status === 'answered' && ((site.http >= 200 && site.http < 400) || site.http === 401 || site.http === 403));
+  }
+  // Appen er først klar, når udbyderen har bekræftet den, og adressen har svaret uden fejl eller afvigende indhold.
+  function appReady(r) {
+    const c = r?.checks, site = c?.site;
+    if (!r?.id || r.state !== 'READY' || c?.provider?.status !== 'checked' || addressUnchecked(r)) return false;
+    if (site?.status === 'unreachable' || (site?.status === 'answered' && (site.http === 404 || site.http >= 500))) return false;
+    return c?.content?.status !== 'different';
+  }
+  // Knapperne i hovedrækken i rækkefølge; den første er hovedknappen. Højst to synlige valg.
+  // «Udgiv en ny version» kommer kun med, når appen er kontrolleret og klar; ellers står «Kontrollér» i hovedrækken.
+  function mainActions(r) {
+    const problem = !r.id || ['UNKNOWN', 'ERROR'].includes(r.state) || r.checks?.provider?.status === 'unknown';
+    const promte = r.config?.provider === 'promte';
+    if (problem || (promte && ['READY', 'BLOCKED', 'REJECTED'].includes(r.state))) return r.id ? ['portal', 'check'] : ['portal'];
+    if (appReady(r)) return r.url ? ['open', 'new'] : ['new'];
+    return r.url && r.state === 'READY' ? ['check', 'open'] : ['check'];
+  }
   function receiptSummary(r) {
     const c = r.checks, known = c?.provider?.status === 'checked', failed = c?.provider?.status === 'unknown';
     const pending = !r.id || ['SUBMITTING', 'UNKNOWN'].includes(r.state), legacy = r.checkedAt && !c;
@@ -52,6 +75,8 @@
       : failed ? { title: 'Status kunne ikke hentes', detail: 'Uploadsvaret er gemt. Prøv statuskontrollen igen.', tone: 'warning' }
       : legacy ? { title: 'Tidligere status: ' + (titles[r.state] || 'ukendt'), detail: 'Ældre kvittering. Kontrollér status igen.', tone: 'neutral' }
       : { title: titles[r.state] || 'Status er ukendt', detail: r.state === 'PREPARED' ? 'Versionen er oprettet. Kontrollér status, før du uploader igen.' : known ? 'Bekræftet af ' + provider(r.config.provider) + '.' : r.state === 'UPLOADED' ? 'Den aktive version er endnu ikke bekræftet.' : 'Fra udbyderens uploadsvar. Status kan kontrolleres igen.', tone: known && r.state === 'READY' ? 'positive' : ['ERROR', 'CANCELED', 'REMOVED', 'BLOCKED', 'REJECTED'].includes(r.state) ? 'warning' : 'neutral' };
+    // komplai: en upload er ikke en udgivelse, før en adressekontrol har fået et svar.
+    if (!pending && !failed && !legacy && addressUnchecked(r) && r.state === 'READY') publication.title = UNCHECKED, publication.detail = 'Filerne er modtaget hos komplai, men adressen er ikke kontrolleret. Kontrollér status og startside, før du deler linket.', publication.tone = 'neutral';
     // Udbyderen har modtaget versionen, men adressen svarer ikke endnu eller giver en fejlside. Så er appen ikke klar, og kortet må ikke se færdigt ud.
     const notReady = known && r.state === 'READY' && (c.site?.status === 'unreachable' || (c.site?.status === 'answered' && (c.site.http === 404 || c.site.http >= 500)));
     if (notReady) publication.title = 'Appen er ikke klar endnu', publication.detail = 'Udbyderen har modtaget din version, men adressen svarer ikke endnu. Prøv kontrollen igen om lidt, før du åbner appen.', publication.tone = 'warning';
@@ -77,5 +102,5 @@
     return { publication, access, verification };
   }
   const scope = c => c?.copyCount ? `Udgivelsen bruger projektets gemte version. ${c.copyCount === 1 ? 'En samtalekopi er' : `${c.copyCount} samtalekopier er`} endnu ikke flettet ind og kommer ikke med. Gennemgå ændringerne og flet dem ind, hvis de skal med.` : 'Udgivelsen bruger projektets gemte version. Ugemte rettelser kommer ikke med.';
-  return { time, version, provider, destination, checks, identity, receiptSummary, scope };
+  return { time, version, provider, destination, checks, identity, receiptSummary, scope, addressUnchecked, appReady, mainActions, UNCHECKED };
 });

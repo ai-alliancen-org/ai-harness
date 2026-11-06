@@ -114,7 +114,8 @@ test('native command sandbox blocks newly covered names for reads, writes and ch
   const configured = await sandbox.prepare({ workspaceRoot: root, scratchRoot: scratch, directory: path.join(base, 'policy') });
   const policy = JSON.parse(await fs.readFile(configured.policyPath));
   for (const pattern of common.toSandboxGlobs()) {
-    assert.ok(policy.config.filesystem.denyRead.includes(path.join(root, pattern)));
+    // .git holdes åben for læsning, så git virker i sandkassen, når ingen git-config rummer en nøgle (fixturen har ingen .git). Skrivespærringen gælder altid.
+    if (!/\[gG\]\[iI\]\[tT\]/.test(pattern)) assert.ok(policy.config.filesystem.denyRead.includes(path.join(root, pattern)));
     assert.ok(policy.config.filesystem.denyWrite.includes(path.join(root, pattern)));
   }
   const script = `const fs=require('node:fs'),cp=require('node:child_process');const leaks=[];for(const file of ${JSON.stringify(checked)}){try{fs.readFileSync(file);leaks.push('read:'+file)}catch{}try{fs.appendFileSync(file,'wrong');leaks.push('write:'+file)}catch{}}if(cp.spawnSync(process.execPath,['-e',"require('node:fs').readFileSync('.kube/config')"],{stdio:'ignore'}).status===0)leaks.push('child');fs.writeFileSync('result.json',JSON.stringify(leaks));`;

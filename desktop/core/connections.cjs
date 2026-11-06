@@ -189,6 +189,8 @@ function redact(text, keys = []) {
   let out = String(text).replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, '');
   for (const key of keys) if (typeof key === 'string' && key.length >= 6) out = out.split(key).join('••••');
   out = out.replace(/\b(sk-[A-Za-z0-9_-]{8,}|gh[pousr]_[A-Za-z0-9]{12,}|github_pat_[A-Za-z0-9_]{12,})/g, '••••').replace(/\b(bearer|api-key|x-api-key)(["']?\s*[:=]?\s*["']?)[^\s"',}]+/gi, '$1$2••••').replace(/[A-Za-z0-9+/_=-]{40,}/g, '••••');
+  // Den fælles rensning tager resten: Authorization-hoved, NAVN=værdi, JWT, privat nøgle og udbydertokens.
+  out = require('./secrets.cjs').redact(out);
   return out.length > 600 ? out.slice(0, 600) + ' …' : out;
 }
 // Kendte afvisninger fra udbydernes svar, oversat til dansk. Selve svaret står bag Se detaljer.

@@ -14,7 +14,7 @@ const writable = mode => ['free', 'build'].includes(mode);
 // realpath på den nærmeste eksisterende forælder dækker også nye filer. Et link
 // uden et eksisterende mål afvises; det må ikke ligne en ny, almindelig fil.
 async function canonicalPath(value) {
-  if (typeof value !== 'string' || !path.isAbsolute(value) || /[\0\r\n]/.test(value) || value.length > 4096 || /[?*\[\]{}]/.test(value) || value.split(/[\\/]/).includes('..')) throw new Error('Stien kan ikke afgrænses sikkert.');
+  if (typeof value !== 'string' || !path.isAbsolute(value) || /[\0\r\n]/.test(value) || value.length > 4096 || /[?*]/.test(value) || value.split(/[\\/]/).includes('..')) throw new Error('Stien kan ikke afgrænses sikkert.');
   if (path.sep === '\\') {
     // Kun fulde drev- og UNC-stier. NTFS-streams, enheder og navne, som Win32
     // omskriver, må ikke blive en almindelig automatisk filgodkendelse.
@@ -53,7 +53,9 @@ async function fileTargets(p, workspace) {
   // mål i metadata. Hvert mønster skal passe entydigt til et helt sti-suffix;
   // det må hverken indføre et nyt mål eller skjule ../, jokere eller navnesammenfald.
   const bindTargets = async values => {
-    const safe = value => typeof value === 'string' && value.length > 0 && value.length <= 4096 && !/[\0\r\n?*\[\]{}]/.test(value) && !value.split(/[\\/]/).includes('..');
+    // [ ] { } er almindelige tegn i stinavne (fx app/[slug]/page.tsx). Stierne sammenlignes bogstaveligt, og der dannes ingen glob af dem,
+    // så parenteserne kan ikke passe på andre filer. ? og * afvises stadig, fordi de er jokere i OpenCodes mønstre.
+    const safe = value => typeof value === 'string' && value.length > 0 && value.length <= 4096 && !/[\0\r\n?*]/.test(value) && !value.split(/[\\/]/).includes('..');
     if (values.length > 200 || patterns.length > 100 || [...values, ...patterns].some(value => !safe(value))) return [];
     const absolute = [...new Set(values.filter(value => path.isAbsolute(value)).map(value => path.normalize(value)))];
     // OpenCode normaliserer Windows-metadata, mens toolInput kan have et andet
@@ -108,8 +110,13 @@ async function fileTargets(p, workspace) {
     return bindTargets(candidates);
   }
   if (!['external_directory', 'read', 'grep', 'glob', 'list'].includes(p.permission)) return [];
-  // OpenCode 1.18.33 sender mappeadgang med metadata.filepath og metadata.parentDir (tests/fixtures); path er ældre.
+  // OpenCode 1.18.33 og 1.19.5 sender mappeadgang med metadata.filepath og metadata.parentDir (tests/fixtures); path er ældre.
   const specified = p.toolInput?.path || p.metadata?.path || p.metadata?.filepath || p.metadata?.parentDir;
+  // Søgning (grep): patterns er søgeordet, ikke en sti. Uden sti søges hele projektet; en relativ sti regnes fra projektmappen.
+  if (p.permission === 'grep') {
+    if (specified !== undefined && typeof specified !== 'string') return [];
+    return [{ value: !specified ? workspace : path.isAbsolute(specified) ? specified : path.join(workspace, specified), subtree: !specified }];
+  }
   const requested = specified ? [specified] : p.patterns;
   if (!Array.isArray(requested) || !requested.length || requested.length > 100) return [];
   return requested.map(value => typeof value === 'string' && /[\\/]\*{1,2}$/.test(value) ? { value: value.replace(/[\\/]\*{1,2}$/, ''), subtree: true } : { value, subtree: p.permission === 'external_directory' });
@@ -122,12 +129,34 @@ async function broadDirectory(target) {
   return /^(?:opencode|\.opencode)$/i.test(path.basename(target));
 }
 
+// Uden isolation kan kun kommandoens tekst kontrolleres: hvert ord og hver sti i den og arbejdsmappen sammenlignes med de beskyttede navne
+// (.env, nøgler, .git, references). Det er en grænse for, hvad der tillades uden kort, ikke en isolation.
+function commandNamesProtected(command, cwd, workspace) {
+  if (isProtectedIn(workspace, cwd)) return true;
+  if (command.split(/[\s"'`;&|<>(){}=,]+/).filter(Boolean).some(token => protectedPath(token) || WILDCARD_OR_SHORT_NAME.test(token))) return true;
+  return command.split(/[;&|\n]+/).some(changesGit);
+}
+// Et jokertegn (.e*, refer*) eller et kort Windows-navn (ENV~1) kan ramme et beskyttet navn uden at nævne det, og det kan en tekstkontrol ikke afgøre.
+// Derfor kræver de kortet. Det samme gælder git-kommandoer, der kan ændre .git (commit, config, remote m.fl.); kun læsende kommandoer slipper igennem.
+const WILDCARD_OR_SHORT_NAME = /[*?[\]]|~\d/;
+const GIT_READ_ONLY = new Set(['status', 'diff', 'log', 'show', 'ls-files', 'rev-parse', 'blame', 'shortlog', 'describe', 'grep', 'help', 'version', '--version']);
+function changesGit(segment) {
+  const words = segment.trim().split(/\s+/).filter(Boolean);
+  if (!/^git(?:\.exe)?$/i.test(words[0] || '')) return false;
+  for (let i = 1; i < words.length; i++) {
+    if (words[i] === '-C' || words[i] === '-c') { i++; continue; }
+    if (words[i].startsWith('-') && words[i] !== '--version') continue;
+    return !GIT_READ_ONLY.has(words[i].toLowerCase());
+  }
+  return false;
+}
+
 class ApprovalsPolicy {
   constructor(store) { this.store = store; }
   async settings(root) {
     root = await directory(root); const data = (await this.store.project(root)).approvals;
     const rules = data?.version === 1 && Array.isArray(data.rules) ? data.rules.filter(rule => rule && /^[a-f0-9]{64}$/.test(rule.id) && rule.id === digest(rule.match) && ['bash', 'webfetch', 'edit', 'read', 'grep', 'glob', 'list', 'external_directory'].includes(rule.kind) && rule.kind === rule.match?.kind && typeof rule.label === 'string' && typeof rule.target === 'string').slice(0, 200) : [];
-    return { autoProjectFiles: data?.version === 1 && data.autoProjectFiles === true, autoCommands: data?.version === 1 && data.autoCommands === true, rules };
+    return { autoProjectFiles: data?.version === 1 && data.autoProjectFiles === true, autoCommands: data?.version === 1 && data.autoCommands === true, autoCommandsUnisolated: data?.version === 1 && data.autoCommands === true && data.autoCommandsUnisolated === true, rules };
   }
   async update(root, change) {
     root = await directory(root);
@@ -135,7 +164,7 @@ class ApprovalsPolicy {
     // overskrive hinandens regel eller en samtidig tilbagekaldelse.
     await this.store.update(state => {
       const key = this.store.projectKey(root), project = state.projects[key] ||= {}, old = project.approvals;
-      const value = { version: 1, autoProjectFiles: old?.version === 1 && old.autoProjectFiles === true, autoCommands: old?.version === 1 && old.autoCommands === true, rules: old?.version === 1 && Array.isArray(old.rules) ? old.rules.slice(0, 200) : [] };
+      const value = { version: 1, autoProjectFiles: old?.version === 1 && old.autoProjectFiles === true, autoCommands: old?.version === 1 && old.autoCommands === true, autoCommandsUnisolated: old?.version === 1 && old.autoCommands === true && old.autoCommandsUnisolated === true, rules: old?.version === 1 && Array.isArray(old.rules) ? old.rules.slice(0, 200) : [] };
       change(value); project.approvals = value;
     });
     return this.settings(root);
@@ -150,9 +179,10 @@ class ApprovalsPolicy {
     if (typeof enabled !== 'boolean') throw new Error('Vælg, om projektfiler skal godkendes automatisk.');
     return this.update(root, data => { data.autoProjectFiles = enabled; });
   }
-  setCommands(root, enabled) {
+  // unisolated gemmer brugerens eksplicitte valg om at køre uden isolation (Windows). Uden valget gemmes intet, og slås kommandoer fra, forsvinder det.
+  setCommands(root, enabled, { unisolated = false } = {}) {
     if (typeof enabled !== 'boolean') throw new Error('Vælg, om lokale kommandoer skal godkendes automatisk.');
-    return this.update(root, data => { data.autoCommands = enabled; });
+    return this.update(root, data => { data.autoCommands = enabled; data.autoCommandsUnisolated = enabled && unisolated === true; });
   }
   revoke(root, id) {
     if (typeof id !== 'string' || !/^[a-f0-9]{64}$/.test(id)) throw new Error('Tilladelsen findes ikke.');
@@ -160,7 +190,7 @@ class ApprovalsPolicy {
   }
   async describe(context, p) {
     const kind = typeof p?.permission === 'string' ? p.permission : 'unknown';
-    const descriptor = { kind, label: 'Denne handling', target: '', projectFile: false, persistable: false, scratch: false, key: `request:${p?.id || ''}` };
+    const descriptor = { kind, label: 'Denne handling', target: '', projectFile: false, projectSearch: false, engineData: false, persistable: false, scratch: false, key: `request:${p?.id || ''}` };
     try {
       const project = await directory(context.projectRoot), workspace = await directory(context.workspaceRoot);
       let match, identity = null;
@@ -172,7 +202,12 @@ class ApprovalsPolicy {
         // AI'ens begrundelse og tidsgrænse skifter fra gang til gang og hører ikke til nøglen: ellers ville en husket kommando aldrig matche.
         match = { kind, command, cwd };
         descriptor.target = command; descriptor.label = `Kommando: ${command}`;
-        descriptor.persistable = writable(context.mode) && context.commandSandboxSupported === true;
+        // En gemt kommandoregel bruges kun, når sandkassen kører (se allowed). Uden den ville «Tillad altid» ikke have nogen virkning.
+        // En husket kommando tænder ikke sandkassen (decisions.md), så den tilbydes kun, når sandkassen allerede kører.
+        // Uden isolation (Windows, brugerens valg) er en kommando, der nævner beskyttede navne, aldrig en gemt regel. Sandkassen tager sig af dem på Mac og Linux.
+        const unisolated = context.commandUnisolated === true;
+        if (unisolated) { descriptor.unisolated = true; descriptor.commandProtected = commandNamesProtected(command, cwd, workspace); }
+        descriptor.persistable = writable(context.mode) && ((context.commandSandboxSupported === true && context.commandSandbox === true) || (unisolated && !descriptor.commandProtected));
       } else if (kind === 'webfetch') {
         const raw = p.toolInput?.url || p.metadata?.url || (p.patterns?.length === 1 ? p.patterns[0] : null);
         const url = new URL(raw);
@@ -191,7 +226,16 @@ class ApprovalsPolicy {
         targets.sort((a, b) => a.path.localeCompare(b.path) || Number(a.subtree) - Number(b.subtree));
         // Både den viste sti og dens faktiske mål skal være inde i arbejdsområdet.
         const inProject = requested.every(item => within(path.resolve(context.workspaceRoot), path.resolve(item.value))) && await allCanonicalWithin(workspace, targets.map(item => item.path));
+        // Motorens egne data (opencode.db, store.json, andre projekters runtime) får aldrig en gemt regel eller en automatisk godkendelse.
+        // Valgte skills og tool-output, som OpenCode selv beder modellen læse, er undtaget.
+        const closed = [];
+        for (const value of [context.storeRoot, context.engineRoot]) if (value) { try { closed.push(await canonicalPath(value)); } catch { /* Mappen findes ikke. */ } }
+        const engineRoot = context.engineRoot ? await canonicalPath(context.engineRoot).catch(() => null) : null;
+        const open = engineRoot ? [path.join(engineRoot, 'data', 'opencode', 'tool-output'), path.join(engineRoot, 'config', 'skills')] : [];
+        descriptor.engineData = targets.some(item => !within(workspace, item.path) && closed.some(base => within(base, item.path)) && !open.some(base => within(base, item.path)));
         descriptor.projectFile = kind === 'edit' && inProject;
+        // Søgning i projektet er en læsning. Den tillades kun uden kort, når motoren har søgevagten (se allowed).
+        descriptor.projectSearch = kind === 'grep' && inProject;
         let scratch = null;
         if (context.scratchRoot) { try { scratch = await directory(context.scratchRoot); } catch {} }
         descriptor.scratch = Boolean(scratch && requested.every(item => within(path.resolve(context.scratchRoot), path.resolve(item.value))) && await allCanonicalWithin(scratch, targets.map(item => item.path)));
@@ -202,6 +246,8 @@ class ApprovalsPolicy {
         if (parent && !await broadDirectory(parent)) descriptor.folder = parent;
         descriptor.label = `${kind === 'edit' ? 'Filændring' : kind === 'external_directory' ? 'Mappeadgang' : 'Læsning'}: ${descriptor.target}`;
         descriptor.persistable = (kind !== 'edit' || writable(context.mode)) && !(await Promise.all(targets.map(item => item.subtree ? broadDirectory(item.path) : false))).some(Boolean);
+        // Søgning i projektet styres af indstillingen for projektfiler og søgevagten, ikke af en gemt regel.
+        if (descriptor.projectSearch || descriptor.engineData) descriptor.persistable = false;
         if (descriptor.projectFile) identity = { kind, projectFiles: workspace };
       }
       if (match) {
@@ -215,7 +261,7 @@ class ApprovalsPolicy {
       }
       descriptor.fingerprint = digest(stable({ project, workspace, mode: context.mode, permission: kind, patterns: p.patterns, metadata: p.metadata, toolInput: p.toolInput, match: descriptor.match }));
     } catch {
-      descriptor.persistable = false; descriptor.projectFile = false; descriptor.scratch = false; delete descriptor.match;
+      descriptor.persistable = false; descriptor.projectFile = false; descriptor.projectSearch = false; descriptor.engineData = false; descriptor.scratch = false; delete descriptor.match;
       descriptor.key = `request:${p?.id || ''}`;
       descriptor.fingerprint = digest(stable({ permission: kind, patterns: p?.patterns, metadata: p?.metadata, toolInput: p?.toolInput, mode: context.mode }));
     }
@@ -223,14 +269,16 @@ class ApprovalsPolicy {
   }
   async allowed(context, p) {
     const descriptor = await this.describe(context, p);
-    if (!descriptor.match || descriptor.blockedMode) return { allowed: false, descriptor };
-    if (descriptor.kind === 'bash' && context.commandSandbox !== true) return { allowed: false, descriptor };
+    if (!descriptor.match || descriptor.blockedMode || descriptor.engineData) return { allowed: false, descriptor };
+    if (descriptor.kind === 'bash' && context.commandSandbox !== true && !(context.commandUnisolated === true && descriptor.commandProtected === false)) return { allowed: false, descriptor };
     if (descriptor.scratch) return { allowed: true, source: 'scratch', descriptor };
     if (descriptor.projectFile && context.taskRules?.has(descriptor.key)) return { allowed: true, source: 'task', descriptor };
     const settings = await this.settings(context.projectRoot);
     if (descriptor.projectFile && settings.autoProjectFiles) return { allowed: true, source: 'project', descriptor };
+    // Søgevagten i motoren (createGrepGuard) fjerner beskyttede filer fra resultatet. Uden den, og i Samtale og Planlæg, bliver det ved kortet.
+    if (descriptor.projectSearch && writable(context.mode) && context.grepGuard === true && settings.autoProjectFiles) return { allowed: true, source: 'project', descriptor };
     // Hovedprocessen bekræfter både opgavens opt-in og motorens aktive sandbox.
-    if (descriptor.kind === 'bash' && context.commandSandbox === true && context.autoCommandsSnapshot === true) {
+    if (descriptor.kind === 'bash' && context.autoCommandsSnapshot === true && (context.commandSandbox === true || (context.commandUnisolated === true && context.autoCommandsUnisolated === true))) {
       const roots = [await directory(context.workspaceRoot)];
       if (context.scratchRoot) roots.push(await directory(context.scratchRoot));
       if ((await Promise.all(roots.map(root => canonicalWithin(root, descriptor.match.cwd)))).some(Boolean)) return { allowed: true, source: 'commands', descriptor };

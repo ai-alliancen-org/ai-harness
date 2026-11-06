@@ -53,12 +53,13 @@ test('rigtig OS-isolation tillader projektarbejde og spærrer hemmeligheder, and
   await assert.rejects(fs.access(path.join(f.other, 'skrevet.txt')));
   assert.equal(await fs.readFile(path.join(f.scratch, 'ok.txt'), 'utf8'), 'ok');
 });
-test('rigtig netværksisolation afviser net uden for pakkeregistrene og direkte loopback', async t => {
+test('rigtig netværksisolation afviser net uden for pakkeregistrene (loopback er lukket, se b1-sandkasse)', async t => {
   if (!['darwin', 'linux'].includes(process.platform)) return t.skip('Denne platforms isolation understøttes ikke.');
   const f = await fixture(t);
   const result = await f.execute('/usr/bin/curl --max-time 5 --fail --silent --show-error https://example.com');
   assert.notEqual(result.code, 0); assert.match(result.stderr, /403|denied|refused|beskyttelse|isolation/i);
   const direct = await f.execute('/usr/bin/curl --noproxy "*" --max-time 3 --fail --silent --show-error http://127.0.0.1:9');
+  // Port 9 lytter ingen på, så forbindelsen afvises af maskinen; loopback er lukket (b1-sandkasse), så forbindelsen afvises uanset porten.
   assert.notEqual(direct.code, 0);
 });
 test('npm installerer en fast pakke i projektet gennem det tilladte register', async t => {

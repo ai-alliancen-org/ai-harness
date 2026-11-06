@@ -6,8 +6,9 @@ const { randomUUID, createHash } = require('node:crypto');
 const { stripVTControlCharacters } = require('node:util');
 const runtime = require('./runtime.cjs');
 const net = require('node:net');
-const { normalizeRuntimeConfig, detectServices, inspectPreviewDependencies, serviceDirectory } = require('./project-runtime.cjs');
+const { startFileDigest, normalizeRuntimeConfig, detectServices, inspectPreviewDependencies, serviceDirectory } = require('./project-runtime.cjs');
 const { npmInstallPolicy, npmFailure } = require('./npm-policy.cjs');
+const secrets = require('./secrets.cjs');
 const run = promisify(execFile);
 const active = state => ['installing', 'starting', 'running', 'stopping'].includes(state);
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -22,11 +23,16 @@ function environment(source = process.env) {
   return { ...env, NO_COLOR: '1', FORCE_COLOR: '0', ASTRO_TELEMETRY_DISABLED: '1', npm_config_update_notifier: 'false' };
 }
 function cleanOutput(value) {
-  return stripVTControlCharacters(value).replace(/[\x00-\x08\x0b-\x1f\x7f]/g, '')
+  // Det fælles modul kører først, mens Authorization-hoved, Bearer og KEY=værdi står intakte; de gamle mønstre tager resten.
+  // Omvendt rækkefølge ville lade det gamle mønster skjule ordet Bearer og efterlade selve nøglen.
+  return secrets.redact(stripVTControlCharacters(value).replace(/[\x00-\x08\x0b-\x1f\x7f]/g, ''))
     .replace(/\b(?:sk-[\w-]{8,}|gh[pousr]_[\w]{10,}|github_pat_[\w]+)\b/g, '[skjult nøgle]')
     .replace(/(https?:\/\/)[^\s/@:]+:[^\s/@]+@/gi, '$1[skjult]@')
     .replace(/((?:api[_-]?key|token|password|secret|authorization)\s*[:=]\s*)[^\s,;]+/gi, '$1[skjult]');
 }
+// Nyt output skæres ned, før det renses: en enkelt lang bid fra en proces må ikke koste mere at rense end det, loggen kan rumme.
+const CHUNK_LIMIT = 64_000;
+const appendOutput = (previous, addition) => cleanOutput(previous + String(addition).slice(-CHUNK_LIMIT)).slice(-16000);
 // Mange servere (Vite, Next, Astro) vælger selv deres port og lytter kun på "localhost", som kan være ::1. Serverens egen
 // "Local: http://localhost:5173/"-linje er derfor den sikreste kilde. Kun lokale adresser tæller, og den sidste vinder.
 function announcedURL(text) {
@@ -82,6 +88,8 @@ async function inspectRuntime(root, config = {}) {
     const detail = await detectServices(cwd, { mode: 'auto' });
     fingerprints.push(detail.fingerprint);
     let pkg; try { pkg = JSON.parse(detail.files['package.json']); } catch {}
+    // Startfilerne, som kommandoen eller dens npm-script peger på, hører med til samtykket.
+    fingerprints.push(await startFileDigest(root, cwd, service.command, service.command[0] === 'npm' && service.command[1] === 'run' ? pkg?.scripts?.[service.command[2]] : null));
     const program = service.command[0], python = /^python(?:3)?(?:\.exe)?$/.test(program);
     const dependencies = { ...pkg?.dependencies, ...pkg?.devDependencies };
     let installed = true;
@@ -210,7 +218,7 @@ class DevServer {
     const output = chunk => {
       if (generation !== this.generation) return;
       // Bevar en afgrænset, maskeret proceslog i hukommelsen. Send aldrig til modellen automatisk.
-      this.output = cleanOutput(this.output + chunk.toString()).slice(-16000); this.emit(this.snapshot());
+      this.output = appendOutput(this.output, chunk); this.emit(this.snapshot());
     };
     child.stdout.on('data', output); child.stderr.on('data', output);
     child.once('error', () => void failure('Programmet kunne ikke startes. Kontrollér adgang til projektet og Node.js.'));
@@ -258,7 +266,7 @@ class DevServer {
     this.update(installing ? 'installing' : 'starting');
     const env = environment();
     if (review.executables.node) env.PATH = [path.dirname(review.executables.node), env.PATH || ''].join(path.delimiter);
-    const append = (label, chunk) => { if (generation === this.generation) { this.output = cleanOutput(this.output + `[${label}] ${chunk}`).slice(-16000); this.emit(this.snapshot()); } };
+    const append = (label, chunk) => { if (generation === this.generation) { this.output = appendOutput(this.output, `[${label}] ${chunk}`); this.emit(this.snapshot()); } };
     const failed = async message => {
       if (generation !== this.generation) return;
       ++this.generation; this.url = null; this.services = [];
@@ -349,4 +357,4 @@ class DevServer {
     return this.stopping;
   }
 }
-module.exports = { announcedURL, DevServer, inspect, environment, cleanOutput, nodeRuntime, terminate, findProgram };
+module.exports = { appendOutput, announcedURL, DevServer, inspect, environment, cleanOutput, nodeRuntime, terminate, findProgram };

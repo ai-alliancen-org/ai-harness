@@ -1,12 +1,18 @@
 const readline = require('node:readline');
 const { Writable } = require('node:stream');
 const { stripVTControlCharacters } = require('node:util');
+const { redact, MASK } = require('../desktop/core/secrets.cjs');
 
 class Cancelled extends Error { constructor() { super('Handlingen blev afbrudt.'); this.code = 'CANCELLED'; } }
 // Modeltekst, filnavne og fejl må ikke sende kontrolsekvenser til brugerens terminal.
 function safeText(value) {
-  return stripVTControlCharacters(String(value ?? '')).replace(/[\x00-\x08\x0b-\x1f\x7f-\x9f\u202a-\u202e\u2066-\u2069]/g, '')
-    .replace(/\b(?:kp_live_[\w-]+|sk-(?:ant-|or-v1-)?[\w-]{12,}|gh[pousr]_[\w]{20,}|github_pat_[\w]+)\b/g, '[skjult nøgle]');
+  const clean = stripVTControlCharacters(String(value ?? '')).replace(/[\x00-\x08\x0b-\x1f\x7f-\x9f\u202a-\u202e\u2066-\u2069]/g, '');
+  // Den fælles rensning skjuler nøgler, Authorization-hoveder og NAVN=værdi-linjer. Terminalen bevarer sin egen tekst.
+  // Stier holdes uden for den fælles rensning, fordi dens regel for lange nøgler også rammer '/' og '-'. Hvert stisegment renses for sig.
+  const stier = [];
+  const beskyttet = clean.replace(/(^|[\s'"`(])((?:~|\.{1,2})?(?:\/[^\s\/'"`)=]+){2,})/g, (_, foran, sti) => { stier.push(sti.split('/').map(del => redact(del)).join('/')); return `${foran}\uE000${stier.length - 1}\uE001`; });
+  const renset = redact(beskyttet).replace(/\uE000(\d+)\uE001/g, (_, i) => stier[Number(i)]);
+  return renset.split(MASK).join('[skjult nøgle]');
 }
 class Terminal {
   constructor(input = process.stdin, output = process.stdout) { this.input = input; this.output = output; this.active = null; this.ended = false; this.redactions = new Set(); }
