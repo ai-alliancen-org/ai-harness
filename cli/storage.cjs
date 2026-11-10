@@ -3,6 +3,7 @@ const sync = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
 const { randomBytes, randomUUID, scrypt: derive, createCipheriv, createDecipheriv } = require('node:crypto');
+const { spawnSync } = require('node:child_process');
 const { promisify } = require('node:util');
 const { serviceName } = require('./keychain.cjs');
 const scrypt = promisify(derive);
@@ -105,6 +106,8 @@ class Vault {
       } catch (error) {
         this.mode = 'passphrase';
         ui.line(`Computerens nøglering kan ikke bruges. ${error.message} Nøglerne gemmes derfor i stedet krypteret med en adgangssætning, som du selv vælger.`);
+        // Værktøjets egen fejltekst, fx fra PowerShell på Windows, står for sig under beskeden (RN:F-3).
+        if (error.details) ui.line(`Detaljer: ${error.details}`);
       }
     }
     await this.unlockPassphrase(ui);
@@ -130,31 +133,40 @@ class Vault {
       }
     } catch { this.close(); throw new Error('Nøglelageret kunne ikke åbnes eller oprettes. Kontrollér adgangssætningen; eksisterende filer er bevaret.'); }
   }
+  // De gamle værdier (AURA1), der endnu ligger i settings.json.
+  async pendingLegacy(store) { return [...new Set(secretHolders(await store.read()).map(holder => holder.secret).filter(isLegacy))]; }
   // Flytter nøgler fra adgangssætningslageret til nøgleringen. Hver ny post læses tilbage og skal stemme, før noget i
-  // settings.json ændres; først da forsvinder den gamle kopi. Fejler noget, rulles de nye poster tilbage, og de gamle bevares.
+  // settings.json ændres; først da forsvinder den gamle kopi. Fejler nøgleringen, rulles de nye poster tilbage, og de gamle
+  // bevares. En værdi, som den rigtige adgangssætning ikke kan åbne, kan aldrig bruges; den bliver liggende, men stopper ikke
+  // flytningen af de andre (fund 46).
   async migrate(store, ui) {
     if (this.mode !== 'keychain') return 0;
-    const legacy = [...new Set(secretHolders(await store.read()).map(holder => holder.secret).filter(isLegacy))];
+    const legacy = await this.pendingLegacy(store);
     if (!legacy.length) return 0;
-    ui.line('Dine gemte nøgler ligger endnu i terminalens adgangssætningslager. De flyttes nu til computerens nøglering. Du skal bruge din adgangssætning denne ene gang.');
+    ui.line('Dine gemte nøgler flyttes nu fra terminalens gamle adgangssætningslager til computerens nøglering. Når de er flyttet, bruges adgangssætningen ikke mere.');
     await this.unlockPassphrase(ui);
-    const created = new Map();
+    const created = new Map(); let unreadable = 0;
     try {
       for (const old of legacy) {
-        const plain = this.decryptString(Buffer.from(old, 'base64')), account = randomUUID();
+        let plain;
+        try { plain = this.decryptString(Buffer.from(old, 'base64')); } catch { unreadable++; continue; }
+        const account = randomUUID();
         created.set(old, account);
         this.keychain.set(this.service, account, plain);
         if (this.keychain.get(this.service, account) !== plain) throw new Error('Nøgleringen gav ikke nøglen tilbage uændret.');
       }
-      await store.update(state => {
+      if (created.size) await store.update(state => {
         for (const holder of secretHolders(state)) { const account = created.get(holder.secret); if (account) holder.secret = Buffer.from(MARKER + account).toString('base64'); }
       });
     } catch (error) {
       for (const account of created.values()) { try { this.keychain.delete(this.service, account); } catch { /* bedst muligt */ } }
       throw new Error(`Nøglerne blev ikke flyttet. De gamle er bevaret uændret. ${error.message}`);
     } finally { this.close(); }
-    ui.line(`${legacy.length} ${legacy.length === 1 ? 'nøgle er' : 'nøgler er'} flyttet til computerens nøglering. De gamle kopier er fjernet fra terminalens lager.`);
-    return legacy.length;
+    if (created.size) ui.line(`${created.size} ${created.size === 1 ? 'nøgle er' : 'nøgler er'} flyttet til computerens nøglering. De gamle kopier er fjernet fra terminalens lager.`);
+    if (unreadable) ui.line(unreadable === 1
+      ? '1 gammel nøgle kunne ikke åbnes med adgangssætningen og er ikke flyttet. Fjern den gamle forbindelse med aura logout, og tilføj nøglen igen med aura login.'
+      : `${unreadable} gamle nøgler kunne ikke åbnes med adgangssætningen og er ikke flyttet. Fjern de gamle forbindelser med aura logout, og tilføj nøglerne igen med aura login.`);
+    return created.size;
   }
   // Sletter nøgleringens post for en fjernet forbindelse. Returnerer false, hvis værdien ikke var en post.
   forget(secret) {
@@ -163,16 +175,36 @@ class Vault {
   }
   close() { this.key?.fill(0); this.key = null; }
 }
+// Navnet på det program, der nu har låsens nummer, eller null, hvis det ikke kan afgøres.
+function processName(pid, { platform = process.platform, runner = spawnSync } = {}) {
+  try {
+    if (platform === 'win32') {
+      const result = runner('tasklist', ['/FI', `PID eq ${pid}`, '/FO', 'CSV', '/NH'], { encoding: 'utf8', windowsHide: true, timeout: 5000 });
+      const match = /^"([^"]+)","(\d+)"/m.exec(result.stdout || '');
+      return match && Number(match[2]) === pid ? match[1] : null;
+    }
+    const result = runner('ps', ['-p', String(pid), '-o', 'comm='], { encoding: 'utf8', timeout: 5000 });
+    const name = result.status === 0 ? String(result.stdout || '').trim() : '';
+    return name ? path.basename(name) : null;
+  } catch { return null; }
+}
+// Aura kører altid som et Node-program. Har låsens nummer fået et andet program, fx efter et nedbrud eller en genstart, er
+// låsen forældet (fund 47). Kan navnet ikke afgøres, regnes processen for en mulig Aura.
+const mayBeAura = name => name === null || /node/i.test(name);
 async function lock(root) {
   const file = path.join(root, 'cli.lock'), token = randomUUID();
   const write = () => fs.writeFile(file, JSON.stringify({ pid: process.pid, token }), { flag: 'wx', mode: 0o600 });
   try { await write(); }
   catch (error) {
-    // En lås fra en proces, der ikke findes mere (fx en lukket terminal), overtages automatisk. En levende ejer afviser stadig.
+    // En lås fra en proces, der ikke findes mere (fx en lukket terminal), eller hvis nummer nu bruges af et andet program,
+    // overtages automatisk. En levende ejer, der kan være Aura, afviser stadig.
     if (error.code === 'EEXIST') {
       const record = await readPrivate(file).catch(() => null);
       let alive = true;
-      if (record && Number.isSafeInteger(record.pid) && record.pid > 0) { try { process.kill(record.pid, 0); } catch (killError) { if (killError.code === 'ESRCH') alive = false; } }
+      if (record && Number.isSafeInteger(record.pid) && record.pid > 0) {
+        try { process.kill(record.pid, 0); } catch (killError) { if (killError.code === 'ESRCH') alive = false; }
+        if (alive && !mayBeAura(processName(record.pid))) alive = false;
+      }
       if (!alive) {
         // Læs låsen igen efter omdøbningen: er det ikke den, vi vurderede som forældet, har en anden proces nået at overtage den.
         const moved = file + '.' + randomUUID(); let renamed = true; await fs.rename(file, moved).catch(() => { renamed = false; });
@@ -191,11 +223,16 @@ async function lock(root) {
   }
   return () => { try { if (JSON.parse(sync.readFileSync(file)).token === token) sync.unlinkSync(file); } catch {} };
 }
+// Hvordan låsens proces har det: findes ikke, kører under en anden bruger eller med andre rettigheder, eller kører.
+function owner(pid) {
+  try { process.kill(pid, 0); return 'running'; }
+  catch (error) { if (error.code === 'ESRCH') return 'gone'; if (error.code === 'EPERM') return 'foreign'; throw error; }
+}
 async function unlockStale(root, ui) {
   const file = path.join(root, 'cli.lock');
   let stat; try { stat = await fs.lstat(file); } catch (error) { if (error.code === 'ENOENT') { ui.line('Der er ingen lås at fjerne.'); return; } throw error; }
   if (stat.isDirectory()) throw new Error('Låsen er en mappe og kan ikke fjernes her. Gennemgå den manuelt.');
-  // En lås med forkerte rettigheder eller ulæseligt indhold må ikke låse terminalen for altid. Pid læses, hvis den kan, og en levende proces afviser stadig.
+  // En lås med forkerte rettigheder eller ulæseligt indhold må ikke låse terminalen for altid. Pid læses, hvis den kan, og en levende proces, der kan være Aura, afviser stadig.
   let record = null, problem = '';
   if (stat.isSymbolicLink() || !stat.isFile() || stat.size > 10000) problem = 'Låsen er ikke en almindelig lille fil.';
   else {
@@ -204,13 +241,16 @@ async function unlockStale(root, ui) {
   }
   const known = Number.isSafeInteger(record?.pid) && record.pid > 0;
   if (!known) problem ||= 'Låsen kan ikke læses.';
-  if (known) {
-    try { process.kill(record.pid, 0); throw new Error('Processen findes stadig. Luk den, før låsen fjernes.'); }
-    catch (error) { if (error.code !== 'ESRCH') throw error; }
-  }
-  const question = problem
+  // Nummeret vises, så brugeren kan se, hvilken proces låsen peger på (fund 47).
+  let question = problem
     ? `${problem} Fjern den kun, hvis du er sikker på, at ingen anden Aura-terminal kører. Fjern låsen?`
-    : 'Den tidligere proces findes ikke. Fjern dens lås?';
+    : `Den tidligere proces (${record.pid}) findes ikke. Fjern dens lås?`;
+  if (known) {
+    const state = owner(record.pid), name = state === 'gone' ? null : processName(record.pid), before = problem ? problem + ' ' : '';
+    if (state !== 'gone' && !mayBeAura(name)) question = `${before}Låsen peger på proces ${record.pid}, men nummeret bruges nu af et andet program (${name}). Den tidligere Aura-proces findes ikke. Fjern låsen?`;
+    else if (state === 'foreign') question = `${before}Låsen peger på proces ${record.pid}, som kører under en anden bruger eller med andre rettigheder. Det er næppe Aura, men fjern kun låsen, hvis ingen anden Aura-terminal er åben. Fjern låsen?`;
+    else if (state === 'running') throw new Error(`Proces ${record.pid}, som har låsen, findes stadig og kan være en anden Aura-terminal. Luk den først. Har du ingen anden Aura-terminal åben, så genstart computeren; så overtager Aura låsen ved næste start.`);
+  }
   if (await ui.confirm(question)) {
     // Omdøb først: en ny proces kan ikke få sin lås slettet ved den efterfølgende oprydning.
     const moved = file + '.' + randomUUID(); await fs.rename(file, moved); await fs.unlink(moved); ui.line('Den gamle lås er fjernet.');
@@ -220,4 +260,4 @@ function separateState(project, state) {
   const inside = (a, b) => { const relative = path.relative(a, b); return !relative || (!relative.startsWith('..' + path.sep) && relative !== '..' && !path.isAbsolute(relative)); };
   if (inside(project, state) || inside(state, project)) throw new Error('Projektet og Auras datamappe må ikke ligge inde i hinanden. Åbn en mere afgrænset projektmappe, eller vælg en anden AURA_HOME.');
 }
-module.exports = { Vault, isLegacy, dataDirectory, privateDirectory, lock, unlockStale, separateState };
+module.exports = { Vault, isLegacy, dataDirectory, privateDirectory, lock, unlockStale, separateState, processName };

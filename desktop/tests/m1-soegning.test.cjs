@@ -23,6 +23,14 @@ async function fixture(t) {
 }
 const result = (root, ...files) => ['Found ' + files.length + ' matches', ...files.map(([file, text]) => `${path.join(root, file)}:\n  Line 1: ${text}\n`)].join('\n');
 const grep = (metadata, id = 'g') => ({ id, permission: 'grep', patterns: [metadata.pattern], metadata, always: ['*'] });
+// Som OpenCode kalder pluginet: tool.execute.before med værktøjets input, så tool.execute.after for samme kald.
+let calls = 0;
+async function search(hooks, args, output, callID = 'kald-' + ++calls) {
+  const before = hooks.before || hooks['tool.execute.before'], after = hooks.after || hooks['tool.execute.after'];
+  await before({ tool: 'grep', sessionID: 's', callID }, { args });
+  await after({ tool: 'grep', sessionID: 's', callID, args }, output);
+  return output;
+}
 
 test('søgevagten fjerner blokke for beskyttede filer, regner antallet om og lader almindelige filer stå', async t => {
   const { root, guard } = await fixture(t);
@@ -121,4 +129,96 @@ test('et link i projektet, der peger på en fil uden for projektet, skjules i s�
   assert.ok(!output.output.includes('UDEN_FOR'), 'indholdet uden for projektet skal skjules');
   assert.match(output.output, /Found 1 matches/);
   assert.ok(output.output.includes('Hej NEEDLE'));
+});
+
+// Fund 3 i gennemgangen af beta 3: en søgning uden for projektet kræver altid brugerens ja på et kort (OpenCode spørger, og «Godkend alt»
+// dækker ikke søgning). Vagten skjulte alligevel alle resultater uden for projektet, så modellen fik "No files found" efter godkendelsen.
+test('en godkendt søgning uden for projektet viser resultaterne i målet, men ikke beskyttede filer eller noget uden for målet', { skip: process.platform === 'win32' }, async t => {
+  const { base, root } = await fixture(t);
+  const outside = path.join(base, 'ekstern'), other = path.join(base, 'andet');
+  for (const folder of [outside, other]) await fs.mkdir(folder);
+  await fs.writeFile(path.join(outside, 'noter.txt'), 'Ekstern NEEDLE'); await fs.writeFile(path.join(outside, '.env'), 'EKSTERN_HEMMELIG NEEDLE');
+  await fs.writeFile(path.join(other, 'fremmed.txt'), 'FREMMED NEEDLE'); await fs.symlink(path.join(other, 'fremmed.txt'), path.join(outside, 'genvej.txt'));
+  const guard = createGrepGuard({ fs, path, root, classifyPath: classify });
+  const output = { output: result(outside, ['noter.txt', 'Ekstern NEEDLE'], ['.env', 'EKSTERN_HEMMELIG NEEDLE'], ['genvej.txt', 'FREMMED NEEDLE']) };
+  await search(guard, { pattern: 'NEEDLE', path: outside }, output);
+  assert.match(output.output, /^Found 1 matches\n/); assert.match(output.output, /Ekstern NEEDLE/);
+  assert.doesNotMatch(output.output, /EKSTERN_HEMMELIG|FREMMED|genvej/);
+  // En relativ sti ud af projektet regnes fra projektmappen, som OpenCode gør.
+  const relative = { output: result(outside, ['noter.txt', 'Ekstern NEEDLE']) };
+  await search(guard, { pattern: 'NEEDLE', path: '../ekstern' }, relative);
+  assert.match(relative.output, /Ekstern NEEDLE/);
+  // En søgning i projektet skjuler stadig alt uden for projektet, også når stien er angivet.
+  const inside = { output: result(root, ['notes.txt', 'Hej NEEDLE']) + '\n' + result(outside, ['noter.txt', 'Ekstern NEEDLE']).replace(/^Found 1 matches\n/, '') };
+  await search(guard, { pattern: 'NEEDLE', path: 'src' }, inside);
+  assert.doesNotMatch(inside.output, /Ekstern/); assert.match(inside.output, /Hej NEEDLE/);
+});
+
+test('en godkendt søgning i motorens gemte værktøjsoutput giver resultater, mens motorens øvrige data stadig skjules', { skip: process.platform === 'win32' }, async t => {
+  const { base, root } = await fixture(t);
+  const store = path.join(base, 'appdata'), engineRoot = path.join(store, 'runtime', 'noegle'), toolOutput = path.join(engineRoot, 'data', 'opencode', 'tool-output');
+  await fs.mkdir(toolOutput, { recursive: true }); await fs.writeFile(path.join(toolOutput, 'tool_1'), '39999');
+  await fs.writeFile(path.join(store, 'store.json'), 'STORE 39999'); await fs.writeFile(path.join(engineRoot, 'data', 'opencode', 'log.txt'), 'MOTOR 39999');
+  const guard = createGrepGuard({ fs, path, root, classifyPath: classify, engineRoot, storeRoot: store });
+  const output = { output: result(toolOutput, ['tool_1', '39999']) };
+  await search(guard, { pattern: '^39999$', path: toolOutput }, output);
+  assert.match(output.output, /^Found 1 matches\n[\s\S]*Line 1: 39999/);
+  // Selv en godkendt søgning i hele appens mappe viser ikke motorens egne data, ligesom læsevagten.
+  const wide = { output: result(store, ['store.json', 'STORE 39999'], ['runtime/noegle/data/opencode/log.txt', 'MOTOR 39999'], ['runtime/noegle/data/opencode/tool-output/tool_1', '39999']) };
+  await search(guard, { pattern: '39999', path: store }, wide);
+  assert.doesNotMatch(wide.output, /STORE|MOTOR/); assert.match(wide.output, /^Found 1 matches\n/);
+});
+
+test('pluginet giver søgningens mål videre til vagten efter søgningen', { skip: process.platform === 'win32' }, async t => {
+  const { base, root } = await fixture(t);
+  const outside = path.join(base, 'ekstern'); await fs.mkdir(outside); await fs.writeFile(path.join(outside, 'noter.txt'), 'Ekstern NEEDLE');
+  const directory = path.join(base, 'motor'); await fs.mkdir(directory);
+  const hooks = await (await import((await writeReadGuard(directory, root, [], [])).pluginURL)).AuraReadProtection();
+  const output = { output: result(outside, ['noter.txt', 'Ekstern NEEDLE']) };
+  await search(hooks, { pattern: 'NEEDLE', path: outside }, output);
+  assert.match(output.output, /Ekstern NEEDLE/);
+});
+
+// N:A-1 (skeptikeren, vist med rigtig OpenCode 1.19.5): en søgning i en mappe i projektet godkendes uden kort, og mappen skiftes derefter til
+// et link ud af projektet. OpenCodes egen kontrol er leksikalsk og spørger ikke. Vagten må derfor bruge målet fra før søgningen, ikke stien,
+// som den ser ud bagefter.
+test('målet fra før søgningen gælder: en mappe, der skiftes til et link ud af projektet under søgningen, viser ikke indhold udefra', { skip: process.platform === 'win32' }, async t => {
+  const { base, root } = await fixture(t);
+  const outside = path.join(base, 'ekstern'); await fs.mkdir(outside); await fs.writeFile(path.join(outside, 'noter.txt'), 'Ekstern NEEDLE');
+  await fs.mkdir(path.join(root, 'del')); await fs.writeFile(path.join(root, 'del', 'egen.txt'), 'Egen NEEDLE');
+  const plugin = await (await import((await writeReadGuard(await fs.mkdtemp(path.join(base, 'motor-')), root, [], [])).pluginURL)).AuraReadProtection();
+  for (const hooks of [createGrepGuard({ fs, path, root, classifyPath: classify }), plugin]) {
+    const before = hooks.before || hooks['tool.execute.before'], after = hooks.after || hooks['tool.execute.after'];
+    const args = { pattern: 'NEEDLE', path: 'del' };
+    await before({ tool: 'grep', sessionID: 's', callID: 'skift' }, { args });
+    // Mappen skiftes til et link ud af projektet, mens søgningen kører. Resultatet viser filen gennem linket.
+    await fs.rm(path.join(root, 'del'), { recursive: true, force: true }); await fs.symlink(outside, path.join(root, 'del'));
+    const output = { output: result(root, ['del/noter.txt', 'Ekstern NEEDLE'], ['notes.txt', 'Hej NEEDLE']) };
+    await after({ tool: 'grep', sessionID: 's', callID: 'skift', args }, output);
+    assert.doesNotMatch(output.output, /Ekstern/, 'indholdet uden for projektet når ikke modellen');
+    assert.match(output.output, /^Found 1 matches\n[\s\S]*Hej NEEDLE/);
+    // Et mål, der lå uden for projektet før søgningen (og derfor fik et kort), gælder stadig for netop det kald.
+    const approved = await search(hooks, { pattern: 'NEEDLE', path: outside }, { output: result(outside, ['noter.txt', 'Ekstern NEEDLE']) });
+    assert.match(approved.output, /Ekstern NEEDLE/);
+    // Uden et kald før søgningen, eller med et andet kald, gælder projektets grænse.
+    const unknown = { output: result(outside, ['noter.txt', 'Ekstern NEEDLE']) };
+    await before({ tool: 'grep', sessionID: 's', callID: 'et-kald' }, { args: { pattern: 'NEEDLE', path: outside } });
+    await after({ tool: 'grep', sessionID: 's', callID: 'et-andet-kald', args: { pattern: 'NEEDLE', path: outside } }, unknown);
+    assert.equal(unknown.output, 'No files found');
+    await fs.rm(path.join(root, 'del')); await fs.mkdir(path.join(root, 'del'));
+  }
+});
+
+// N:A-3: pluginet giver motorens og appens mapper videre til søgevagten. Uden dem viste en godkendt søgning i appens mappe motorens egne
+// data (opencode.db og store.json), som læsevagten ellers skjuler. Prøven går gennem det genererede plugin, så den fejler, hvis de forsvinder.
+test('pluginet giver motorens og appens mapper videre: en godkendt søgning i appens mappe viser ikke motorens egne data', { skip: process.platform === 'win32' }, async t => {
+  const { base, root } = await fixture(t);
+  const store = path.join(base, 'appdata'), directory = path.join(store, 'runtime', 'noegle'), data = path.join(directory, 'data', 'opencode');
+  await fs.mkdir(path.join(data, 'tool-output'), { recursive: true });
+  await fs.writeFile(path.join(store, 'store.json'), '{"STORE":"NEEDLE"}'); await fs.writeFile(path.join(data, 'opencode.db'), 'MOTOR NEEDLE'); await fs.writeFile(path.join(data, 'tool-output', 'tool_1'), 'GEMT NEEDLE');
+  const other = path.join(store, 'runtime', 'andet-projekt'); await fs.mkdir(other); await fs.writeFile(path.join(other, 'opencode.db'), 'ANDET NEEDLE');
+  const hooks = await (await import((await writeReadGuard(directory, root, [], [])).pluginURL)).AuraReadProtection();
+  const output = await search(hooks, { pattern: 'NEEDLE', path: store }, { output: result(store, ['store.json', '{"STORE":"NEEDLE"}'], ['runtime/noegle/data/opencode/opencode.db', 'MOTOR NEEDLE'], ['runtime/andet-projekt/opencode.db', 'ANDET NEEDLE'], ['runtime/noegle/data/opencode/tool-output/tool_1', 'GEMT NEEDLE']) });
+  assert.doesNotMatch(output.output, /STORE|MOTOR|ANDET|store\.json|opencode\.db/);
+  assert.match(output.output, /^Found 1 matches\n[\s\S]*GEMT NEEDLE/);
 });

@@ -44,6 +44,20 @@ async function selectMode(page, mode) {
 async function previewOptions(page) {
   if (!await page.locator('#preview-menu').evaluate(el => el.matches(':popover-open'))) await page.click('#preview-options');
 }
+// Sidens egne mål i forhåndsvisningen. Rammen har sin egen origin (aura-preview://) og kører i sin egen proces. Chromium sender kun én
+// ny størrelse ad gangen til en sådan ramme og venter, til siden har tegnet den forrige, så siden får sine mål lidt efter iframe-elementet.
+// previewSize venter på målene og returnerer den sidst sete størrelse, hvis de ikke kommer. En forkert størrelse fejler derfor stadig med
+// en tydelig forskel. Ventetiden lægges i `waits`, så kørslen måler forsinkelsen i stedet for at gætte den.
+async function previewSize(page, frame, want, { timeout = 10000, waits } = {}) {
+  const started = Date.now(); let size;
+  do {
+    size = await frame.locator('body').evaluate(() => [innerWidth, innerHeight]);
+    if (want.every((value, i) => size[i] === value)) break;
+    await page.waitForTimeout(50);
+  } while (Date.now() - started < timeout);
+  waits?.push({ want: want.join(' × '), ms: Date.now() - started });
+  return size.slice(0, want.length);
+}
 // Projektskærmens valgfrie sektioner ligger bag Flere valg.
 async function projectOptions(page) { if (!await page.locator('#project-options').evaluate(el => el.open)) await page.click('#project-options > summary'); }
 // Nye projekter lægges som standard i Dokumenter/Aura. Testene bruger deres egen midlertidige mappe.
@@ -149,19 +163,28 @@ async function chooseProviderCard(page, kind) {
   if (!await page.locator(`#provider-cards [data-kind="${kind}"]`).count()) await page.click('#provider-more');
   await page.click(`[data-kind="${kind}"]`);
 }
-// Godkendelseskortet viser Tillad én gang, Tillad altid i projektet og Afvis. Tillad for denne opgave og Tillad en
-// mappe fremover ligger bag Flere valg, jf. DESIGN.md. Hjælperen venter på kortet, folder Flere valg ud, hvis
+// Godkendelseskortet viser Tillad én gang og Afvis og for en fil, der kan huskes, også Tillad altid i projektet (en kommando huskes
+// ikke, beslutning 10. november 2026). Tillad for denne opgave og Tillad en mappe fremover ligger bag Flere valg, jf. DESIGN.md. Hjælperen venter på kortet, folder Flere valg ud, hvis
 // knappen ligger der, og klikker så. scope afgrænser til ét bestemt kort, når der er flere.
+// Kortsamlingen (beslutning 10. november 2026): efter fem kort i én opgave spørger Aura om resten af opgaven. Hjælperne svarer «Nej, spørg
+// hver gang», så kortet bliver et almindeligt kort, og prøven svarer på det som før.
+async function declineCollect(box, timeout) {
+  await box.getByRole('button', { name: /^(Afvis|Nej, spørg hver gang)$/ }).first().waitFor({ timeout });
+  const no = box.getByRole('button', { name: 'Nej, spørg hver gang', exact: true }).first();
+  if (await no.isVisible()) await no.click();
+}
 async function approve(page, label = 'Tillad én gang', { timeout = 90000, scope } = {}) {
   const box = scope || page.locator('#approvals');
   const button = box.getByRole('button', { name: label, exact: true }).first();
   const more = box.getByRole('button', { name: 'Flere valg', exact: true }).first();
+  await declineCollect(box, timeout);
   await box.getByRole('button', { name: 'Afvis', exact: true }).first().waitFor({ timeout });
   if (!await button.isVisible()) await more.click();
   await button.click();
 }
 // Venter på, at et godkendelseskort er fremme, uden at svare på det.
 async function awaitApproval(page, { timeout = 90000, scope } = {}) {
+  await declineCollect(scope || page.locator('#approvals'), timeout);
   await (scope || page.locator('#approvals')).getByRole('button', { name: 'Afvis', exact: true }).first().waitFor({ timeout });
 }
 // Resultatkortets sekundære valg, fx Fortryd opgaven, ligger bag Flere valg. Hjælperen folder ud og giver knappen.
@@ -187,6 +210,7 @@ async function firstVersion(page, projectDir, title) {
   await fs.writeFile(index, (await fs.readFile(index, 'utf8')).replace('HER BEGYNDER DIN IDÉ', 'FØRSTE VERSION'));
   await page.frameLocator('#preview').locator('h1').filter({ hasText: title }).waitFor({ timeout: 15000 });
 }
-// Nye projekter får filændringer og kommandoer godkendt automatisk (beslutning for beta 2). Prøver, der skal vise godkendelseskortene, slår det fra.
+// Nye projekter med Versioner og fortryd får filændringer og kommandoer godkendt automatisk (beslutning for beta 2); uden versioner
+// spørger projektet som før (beslutning 10. november 2026). Prøver, der skal vise godkendelseskortene, slår det fra.
 async function manualApprovals(page) { await page.evaluate(() => window.harness.saveProjectSettings({ autoProjectFiles: false, autoCommands: false })); }
-module.exports = { manualApprovals, firstVersion, approve, awaitApproval, resultOption, openSetup, addConnection, chooseProviderCard, keyWindow, enterCredential, assertNoKeyFields, enableSharing, skipIntroduction, toOnboarding, menuClick, taskOptions, closeTaskOptions, selectMode, previewOptions, projectOptions, isolateDocuments, chooseLocation, openExistingProject, forbidGitWrites, assertNoGitWrites };
+module.exports = { manualApprovals, firstVersion, approve, awaitApproval, resultOption, openSetup, addConnection, chooseProviderCard, keyWindow, enterCredential, assertNoKeyFields, enableSharing, skipIntroduction, toOnboarding, menuClick, taskOptions, closeTaskOptions, selectMode, previewOptions, previewSize, projectOptions, isolateDocuments, chooseLocation, openExistingProject, forbidGitWrites, assertNoGitWrites };

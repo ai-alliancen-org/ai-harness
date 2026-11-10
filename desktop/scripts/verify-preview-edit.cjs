@@ -246,7 +246,9 @@ const helpers = require('./ui-test-helpers.cjs');
     }
     await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(w => w.webContents.getURL().startsWith('harness://')).webContents.setZoomFactor(1));
     // Mobilvisningen skaleres ned i panelet; et klik rammer stadig det element, man ser.
-    await page.selectOption('#viewport-preset', 'phone'); await page.waitForTimeout(300);
+    await page.selectOption('#viewport-preset', 'phone');
+    // Rammen kører i sin egen proces, så siden indeni får den nye bredde lidt efter rammen (se verify-desktop.cjs).
+    await previewFrame().evaluate(() => new Promise(resolve => { const done = () => innerWidth === 390 ? resolve() : requestAnimationFrame(done); done(); setTimeout(resolve, 10000); }));
     assert.ok(await page.locator('#preview').evaluate(el => /scale\(0\./.test(el.style.transform)), 'visningen er skaleret');
     // Museklikket sendes til vinduet på det sted, knappen ses, så prøven bruger browserens egen omregning af skaleringen.
     const box = await page.locator('#preview').evaluate(el => { const r = el.getBoundingClientRect(); return { x: r.left, y: r.top, scale: r.width / el.offsetWidth }; });

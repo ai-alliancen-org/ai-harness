@@ -89,7 +89,7 @@ test('fortrydelse kvitterer én gang og fjerner opgavens mulighed for at blive f
   await context.window.reviewRestoration({ task: 'opgave' }, { taskUndo: true, taskID: 'opgave' });
   assert.equal($('#restore-confirm').disabled, false);
   await $('#restore-confirm').onclick();
-  assert.equal(dialog.open, false); assert.match(view.review.textContent, /^Opgaven er fortrudt/); assert.equal(view.review.querySelectorAll('button').length, 0);
+  assert.equal(dialog.open, false); assert.match(view.review.textContent, /^Opgaven er fortrudt/); assert.deepEqual(view.review.querySelectorAll('button').map(button => button.textContent), ['Gennemse forhåndsvisningen']);
   assert.equal(view.undoneTasks.has('opgave'), true);
   context.renderRunReview({ task: 'opgave', mode: 'build', status: 'idle', files: ['a'] }, view);
   assert.doesNotMatch(view.review.textContent, /Fortryd opgaven/);

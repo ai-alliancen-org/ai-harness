@@ -62,10 +62,11 @@ test('en vedhæftning starter ikke en ny AI-session', async t => {
   await f.bench.send({ text: 'Første besked', fingerprint: first.fingerprint, contextBinding: first.contextBinding });
   await f.finish();
   const handle = await f.attach();
-  // Med historik i beskeden er den tidligere samtale ikke tom, så forudsigelsen af den skal ramme den samme tekst,
-  // motoren faktisk får. Ellers afvises afsendelsen som en ændret kontekst.
+  // Tilvalget af tidligere samtale i en fortsat AI-session: forudsigelsen skal ramme den tekst, motoren faktisk får, ellers
+  // afvises afsendelsen som en ændret kontekst. Sessionen har allerede samtalen, så gennemgangen lover ingen ekstra kopi.
   const second = await f.bench.prepare({ ...f.input, text: 'Anden besked', includeHistory: true, chatMaterials: handle });
-  assert.ok(second.conversation, 'prøven har en tidligere samtale at tage med');
+  assert.equal(second.historyRequested, true);
+  assert.equal(second.historyIncluded, false, 'Før du sender lover ingen kopi, som ikke sendes');
   await f.bench.send({ text: 'Anden besked', fingerprint: second.fingerprint, contextBinding: second.contextBinding });
   assert.equal(f.engines.length, 1, 'samme motor og samme modelsession fortsætter');
   assert.match(f.engines[0].sent[1].text, /BRUGERVALGTE VEDHÆFTNINGER/);

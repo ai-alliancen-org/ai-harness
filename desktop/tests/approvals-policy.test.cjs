@@ -18,6 +18,14 @@ async function fixture(t) {
 const edit = file => ({ id: 'fil', permission: 'edit', metadata: { filepath: file }, patterns: [] });
 const command = (text, cwd) => ({ id: 'kommando', permission: 'bash', metadata: {}, patterns: [text], toolInput: { tool: 'bash', command: text, workdir: cwd } });
 const folder = value => ({ id: 'mappe', permission: 'external_directory', metadata: {}, patterns: [value + '/*'] });
+// Gemte regler, som tidligere versioner skrev dem. beta2Rule er det, beta 2's grant() gemte (main:desktop/core/approvals-policy.cjs): match med
+// input: stable(toolInput.input || null). Beta 3 gemte { kind, command, cwd }.
+const ruleId = value => require('node:crypto').createHash('sha256').update(JSON.stringify(value)).digest('hex');
+const beta2Rule = (command, cwd, input) => { const match = { kind: 'bash', command, cwd, input }; return { id: ruleId(match), kind: 'bash', label: `Kommando: ${command}`, target: command, match }; };
+const beta3Rule = (command, cwd) => { const match = { kind: 'bash', command, cwd }; return { id: ruleId(match), kind: 'bash', label: `Kommando: ${command}`, target: command, match }; };
+const saveRules = (store, root, rules) => store.update(state => { state.projects[store.projectKey(root)] = { approvals: { version: 1, autoProjectFiles: false, autoCommands: false, rules } }; });
+// Som OpenCode 1.19.5 spørger: værktøjets input har command, workdir og AI'ens description (tests/fixtures/opencode-1.19.5).
+const bashAsk = (command, cwd, description) => ({ id: 'p', permission: 'bash', patterns: [command], metadata: { command }, toolInput: { command, workdir: cwd, description, tool: 'bash', input: { command, workdir: cwd, description } } });
 
 test('eksisterende projekter får ingen automatisk adgang; projektfiler kan slås til og fra og huskes efter genåbning', async t => {
   const { root, context, policy, store } = await fixture(t), p = edit(path.join(root, 'ny.txt'));
@@ -60,22 +68,20 @@ test('tilladelse til opgaven deler kun projektfiler og ophører med opgavens Set
   await assert.rejects(policy.grant(context, command('node a.js', root), { scope: 'task' }), /projektmappen/);
 });
 
-test('kommandoer matches fuldt sammen med den kanoniske arbejdsmappe, og kan tilbagekaldes', async t => {
-  const { root, outside, context, policy } = await fixture(t), p = command('node logic-test.js', root);
-  await policy.grant({ ...context, commandSandbox: true }, p, { scope: 'project' });
-  assert.equal((await policy.allowed(context, p)).allowed, false, 'Heller ikke en husket kommando må køres automatisk uden isolation.');
-  const isolated = { ...context, commandSandbox: true, autoCommandsSnapshot: false };
-  assert.equal((await policy.allowed(isolated, p)).source, 'rule');
-  for (const other of [command('node build-copies.js', root), command('node logic-test.js && rm -rf data', root), command('node logic-test.js', outside), command('node  logic-test.js', root)]) assert.equal((await policy.allowed(isolated, other)).allowed, false);
-  assert.equal((await policy.allowed({ ...isolated, mode: 'plan' }, p)).allowed, false);
-  const [rule] = (await policy.settings(root)).rules; await policy.revoke(root, rule.id);
-  assert.equal((await policy.allowed(isolated, p)).allowed, false);
+// Huskede kommandoer er fjernet (brugerens beslutning 10. november 2026): kommandoer styres af sandkassen, projektets automatik og «Godkend alt».
+test('en kommando kan ikke huskes for projektet, heller ikke med kørende sandkasse eller uden isolation (beslutning 10. november 2026)', async t => {
+  const { root, context, policy, store } = await fixture(t), p = command('node logic-test.js', root);
+  for (const [what, ctx] of [['med kørende sandkasse', { ...context, commandSandbox: true }], ['uden kørende sandkasse', { ...context, commandSandbox: false }], ['uden isolation på Windows', { ...context, commandSandboxSupported: false, commandSandbox: false, commandUnisolated: true }]]) {
+    assert.equal((await policy.describe(ctx, p)).persistable, false, `«Tillad altid i projektet» tilbydes ikke ${what}`);
+    await assert.rejects(policy.grant(ctx, p, { scope: 'project' }), /kun godkendes én gang/, what);
+  }
+  assert.deepEqual((await store.project(root)).approvals?.rules || [], [], 'intet er gemt');
 });
 
 test('ændrede input og linkmål ændrer fingeraftryk og godkendelsesgruppe', async t => {
   const { root, outside, base, context, policy } = await fixture(t), link = path.join(base, 'arbejdslink');
   await fs.symlink(root, link); const p = command('node logic-test.js', link);
-  const before = await policy.describe(context, p); await policy.grant({ ...context, commandSandbox: true }, p, { scope: 'project' });
+  const before = await policy.describe(context, p);
   await fs.unlink(link); await fs.symlink(outside, link);
   const after = await policy.describe(context, p);
   assert.notEqual(before.fingerprint, after.fingerprint); assert.notEqual(before.key, after.key);
@@ -86,8 +92,9 @@ test('ændrede input og linkmål ændrer fingeraftryk og godkendelsesgruppe', as
 });
 
 test('en platform uden kommandoisolation tilbyder kun enkeltgodkendelse, også ved en tidligere gemt regel', async t => {
-  const { root, context, policy } = await fixture(t), p = command('node logic-test.js', root);
-  await policy.grant({ ...context, commandSandbox: true }, p, { scope: 'project' });
+  const { root, context, policy, store } = await fixture(t), p = command('node logic-test.js', root);
+  const match = { kind: 'bash', command: 'node logic-test.js', cwd: root };
+  await saveRules(store, root, [{ id: ruleId(match), kind: 'bash', label: 'Kommando: node logic-test.js', target: 'node logic-test.js', match }]);
   for (const commandSandboxSupported of [false, undefined, 'true']) {
     const unsupported = { ...context, commandSandboxSupported, commandSandbox: false, autoCommandsSnapshot: false };
     const descriptor = await policy.describe(unsupported, p);
@@ -95,7 +102,7 @@ test('en platform uden kommandoisolation tilbyder kun enkeltgodkendelse, også v
     assert.equal((await policy.allowed(unsupported, p)).allowed, false);
     await assert.rejects(policy.grant(unsupported, p, { scope: 'project' }), /kun godkendes én gang/);
   }
-  assert.equal((await policy.settings(root)).rules.length, 1, 'Den gemte regel bevares til en platform med isolation eller brugerens tilbagekaldelse.');
+  assert.equal((await policy.settings(root)).rules.length, 1, 'Den gemte regel bevares, indtil brugeren sletter den.');
 });
 
 test('lokale kommandoer kræver opt-in og en faktisk isoleret motor; aldrig planning, eksternt cwd eller andre værktøjer', async t => {
@@ -232,7 +239,7 @@ test('uden sandkasse slås kun filændringer til, så en ny opgave ikke fejler p
   assert.deepEqual([(await policy.settings(root)).autoProjectFiles, (await policy.settings(root)).autoCommands], [true, false]);
 });
 
-test('en husket kommando matcher uanset AI\'ens begrundelse og tidsgrænse, men ikke en anden kommando eller mappe (beta 3)', async t => {
+test('samme kommando i samme mappe samles på ét kort uanset AI\'ens begrundelse og tidsgrænse, men ikke en anden kommando eller mappe (beta 3)', async t => {
   const { root, policy, context } = await fixture(t);
   const sandboxContext = { ...context, commandSandbox: true, commandSandboxSupported: true };
   const bash = (command, input = {}, workdir) => ({ id: 'p', permission: 'bash', patterns: [command], metadata: { command }, toolInput: { tool: 'bash', command, ...(workdir ? { workdir } : {}), input: { command, ...input } } });
@@ -241,7 +248,7 @@ test('en husket kommando matcher uanset AI\'ens begrundelse og tidsgrænse, men 
   assert.equal(a.key, b.key, 'begrundelse og timeout hører ikke til nøglen');
   assert.notEqual(a.key, (await policy.describe(sandboxContext, bash('npm run build', { description: 'Kører testene' }))).key);
   await fs.mkdir(path.join(root, 'sub'));
-  assert.notEqual(a.key, (await policy.describe(sandboxContext, bash('npm test', {}, path.join(root, 'sub')))).key, 'en anden mappe er en anden tilladelse');
+  assert.notEqual(a.key, (await policy.describe(sandboxContext, bash('npm test', {}, path.join(root, 'sub')))).key, 'en anden mappe er et andet kort');
 });
 
 test('en mappe over hjemmemappen er for bred til at blive husket (beta 3)', async t => {
@@ -250,4 +257,103 @@ test('en mappe over hjemmemappen er for bred til at blive husket (beta 3)', asyn
   const over = path.dirname(home);
   const d = await policy.describe({ ...context, mode: 'build' }, { id: 'p', permission: 'external_directory', patterns: [over + '/*'], metadata: { filepath: over, parentDir: over } });
   assert.equal(d.persistable, false, 'mappen over hjemmemappen kan ikke huskes');
+});
+
+// Fund 1 og 10 i gennemgangen af beta 3: «Tillad uden isolation» i projektets indstillinger kunne ikke gemmes på Windows, fordi
+// project:settings-save i main.cjs kastede sandkassens begrundelse og aldrig gav valget videre. Afgørelsen ligger nu her.
+test('projektets valg af automatiske kommandoer: Windows kan vælge uden isolation, men en Mac eller Linux uden sandkasse kan ikke', async t => {
+  const { projectCommandSettings } = require('../core/approvals-policy.cjs');
+  const { support } = require('../core/command-sandbox.cjs');
+  const windows = await support({ platform: 'win32' });
+  // Det, ui/project-settings.js sender efter advarslen, gemmes som et valg uden isolation.
+  assert.deepEqual(projectCommandSettings({ autoCommands: true, autoCommandsUnisolated: true }, windows), { enabled: true, unisolated: true });
+  // Uden brugerens udtrykkelige valg er der ingen stille reservevej.
+  assert.throws(() => projectCommandSettings({ autoCommands: true }, windows), /teknisk isolation er endnu ikke understøttet på Windows/);
+  assert.throws(() => projectCommandSettings({ autoCommands: true, autoCommandsUnisolated: false }, windows), /Windows/);
+  // En Mac eller Linux, hvor sandkassen ikke kan starte, får aldrig kommandoer uden isolation.
+  const broken = { available: false, platform: 'darwin', reason: 'Kommandobeskyttelsen kan ikke starte på denne computer. Automatisk kommandokørsel er slået fra.' };
+  assert.throws(() => projectCommandSettings({ autoCommands: true, autoCommandsUnisolated: true }, broken), /Kommandobeskyttelsen kan ikke starte/);
+  // Med sandkassen kører kommandoerne isoleret, også hvis valget uden isolation sendes med.
+  assert.deepEqual(projectCommandSettings({ autoCommands: true, autoCommandsUnisolated: true }, { available: true, platform: 'darwin' }), { enabled: true, unisolated: false });
+  assert.deepEqual(projectCommandSettings({ autoCommands: true }, { available: true, platform: 'linux' }), { enabled: true, unisolated: false });
+  // Fravalg kræver ingen sandkasse og fjerner også valget uden isolation. Uden autoCommands ændres intet.
+  assert.deepEqual(projectCommandSettings({ autoCommands: false }, null), { enabled: false, unisolated: false });
+  assert.equal(projectCommandSettings({ autoProjectFiles: true }, null), null);
+  for (const value of [{ autoCommands: 'ja' }, { autoCommands: true, autoCommandsUnisolated: 'ja' }, { autoCommandsUnisolated: true }]) assert.throws(() => projectCommandSettings(value, windows), /Ugyldigt valg af Auto-godkend/, JSON.stringify(value));
+  // Hele vejen til det gemte valg, som ChatSession læser.
+  const { root, policy } = await fixture(t);
+  const choice = projectCommandSettings({ autoCommands: true, autoCommandsUnisolated: true }, windows);
+  await policy.setCommands(root, choice.enabled, { unisolated: choice.unisolated });
+  assert.deepEqual(await policy.settings(root), { autoProjectFiles: false, autoCommands: true, autoCommandsUnisolated: true, rules: [] });
+  const off = projectCommandSettings({ autoCommands: false }, null);
+  await policy.setCommands(root, off.enabled, { unisolated: off.unisolated });
+  assert.equal((await policy.settings(root)).autoCommandsUnisolated, false);
+});
+
+// Fund 9 og brugerens beslutning 10. november 2026 («Fjern funktionen»): huskede kommandoer findes ikke længere. Gemte kommandoregler fra
+// beta 2 (nøglet med AI'ens input) og beta 3 (nøglet med kommando og mappe) bevares i lageret, men matcher aldrig. Projektets tilladelser viser
+// dem som «Ikke i brug» med kommando og mappe, så de kan slettes. Andre gemte tilladelser virker som før.
+const q = value => `'${value}'`;
+// Sandkassens indpakning (command-sandbox.cjs), som beta 2 gemte, når værktøjets input var tomt.
+const wrappedCommand = (command, cwd) => ['exec', '/usr/bin/env', '-i', `PATH=${q('/app/node/bin:/usr/bin:/bin')}`, `TMPDIR=${q('/appdata/scratch/noegle/opgave-1/tmp')}`, q('/app/node/bin/node'), q('/app/core/command-sandbox-runner.mjs'), q('/appdata/sandboxes/policy/policy.json')].join(' ') + ` '${Buffer.from(JSON.stringify({ command, cwd })).toString('base64url')}'`;
+
+test('gemte kommandoregler fra beta 2 og beta 3 bruges aldrig, heller ikke med kørende sandkasse eller uden isolation (fund 9, beslutning 10. november 2026)', async t => {
+  const { root, context, policy, store } = await fixture(t);
+  await saveRules(store, root, [beta2Rule('npm test', root, { command: 'npm test', description: 'Kører testene', workdir: root }), beta3Rule('npm run build', root), beta2Rule(wrappedCommand('npm run lint', root), root, {})]);
+  const contexts = [['med kørende sandkasse', { ...context, commandSandbox: true, autoCommandsSnapshot: false }], ['uden kørende sandkasse', { ...context, commandSandbox: false }], ['uden isolation på Windows', { ...context, commandSandboxSupported: false, commandSandbox: false, commandUnisolated: true, autoCommandsSnapshot: false }]];
+  for (const [what, ctx] of contexts) for (const ask of [bashAsk('npm test', root, 'Kører testene'), bashAsk('npm run build', root, 'Bygger'), bashAsk('npm run lint', root, 'Tjekker')]) {
+    const result = await policy.allowed(ctx, ask);
+    assert.equal(result.allowed, false, `${ask.toolInput.command} ${what}`); assert.equal(result.descriptor.persistable, false, `${ask.toolInput.command} ${what}`);
+  }
+  assert.equal((await store.project(root)).approvals.rules.length, 3, 'reglerne bevares i lageret, til brugeren sletter dem');
+});
+
+test('gamle kommandoregler vises som ikke i brug med kommando og mappe, også den indpakkede form, og sletning fjerner dem helt (fund 9, RN:A-2)', async t => {
+  const { root, outside, policy, store } = await fixture(t);
+  await fs.mkdir(path.join(root, 'web'));
+  // Samme kommando i samme mappe fra beta 2 og beta 3 er én række. Samme kommando i en anden mappe er en anden række.
+  await saveRules(store, root, [
+    beta2Rule('npm test', root, { command: 'npm test', description: 'Kører testene', workdir: root }), beta3Rule('npm test', root),
+    beta3Rule('npm test', path.join(root, 'web')), beta3Rule('ls', outside), beta2Rule(wrappedCommand('npm run build', path.join(root, 'web')), root, {})
+  ]);
+  const rows = (await policy.settings(root)).rules;
+  assert.deepEqual(rows.map(rule => [rule.label, rule.inactive]), [['Kommando: npm test · i projektmappen', true], ['Kommando: npm test · i mappen web', true], [`Kommando: ls · i ${outside}`, true], ['Kommando: npm run build · i mappen web', true]]);
+  // Sletning af rækken fjerner både reglen fra beta 2 og den fra beta 3.
+  await policy.revoke(root, rows[0].id);
+  assert.deepEqual((await policy.settings(root)).rules.map(rule => rule.label), ['Kommando: npm test · i mappen web', `Kommando: ls · i ${outside}`, 'Kommando: npm run build · i mappen web']);
+  assert.deepEqual((await store.project(root)).approvals.rules.map(rule => rule.match.cwd), [path.join(root, 'web'), outside, root]);
+  for (const rule of (await policy.settings(root)).rules) await policy.revoke(root, rule.id);
+  assert.deepEqual((await store.project(root)).approvals.rules, [], 'alle gamle kommandoregler kan slettes');
+});
+
+test('andre gemte tilladelser virker som før ved siden af gamle kommandoregler, og en ugyldig regel røres ikke (fund 9)', async t => {
+  const { root, outside, context, policy, store } = await fixture(t);
+  const web = { kind: 'webfetch', origin: 'https://example.test' };
+  const webRule = { id: ruleId(web), kind: 'webfetch', label: 'Hjemmeside: https://example.test', target: 'https://example.test', match: web };
+  const folderMatch = { kind: 'external_directory', folder: outside };
+  const folderRule = { id: ruleId(folderMatch), kind: 'external_directory', label: `Mappeadgang: ${outside}`, target: outside, match: folderMatch };
+  // En regel, hvis id ikke passer til dens match, er ugyldig og skjult.
+  const forged = { ...beta3Rule('rm -rf data', root), id: 'f'.repeat(64) };
+  await saveRules(store, root, [beta3Rule('npm test', root), webRule, folderRule, forged]);
+  const rules = (await policy.settings(root)).rules;
+  assert.deepEqual(rules.map(rule => [rule.label, rule.inactive === true]), [['Kommando: npm test · i projektmappen', true], ['Hjemmeside: https://example.test', false], [`Mappeadgang: ${outside}`, false]]);
+  assert.equal((await policy.allowed(context, { id: 'w', permission: 'webfetch', metadata: { url: 'https://example.test/side' } })).source, 'rule', 'hjemmesiden er stadig tilladt');
+  assert.equal((await policy.allowed(context, folder(outside))).source, 'rule', 'mappen er stadig tilladt');
+  assert.equal((await policy.allowed({ ...context, commandSandbox: true }, bashAsk('rm -rf data', root, 'Rydder op'))).allowed, false, 'den forfalskede regel gælder ikke');
+  await policy.revoke(root, rules[0].id);
+  assert.deepEqual((await store.project(root)).approvals.rules.map(rule => rule.id), [webRule.id, folderRule.id, forged.id], 'kun kommandoreglen er slettet');
+  assert.equal((await policy.allowed(context, { id: 'w', permission: 'webfetch', metadata: { url: 'https://example.test/side' } })).source, 'rule');
+});
+
+// Vagterne bag persistable: selv hvis describe en dag sagde, at en kommando kunne huskes, gemmer grant den ikke, og allowed bruger ingen
+// gemt kommandoregel (beslutning 10. november 2026). describe erstattes kun i denne prøve.
+test('en kommando gemmes og bruges ikke som projekttilladelse, heller ikke hvis describe sagde persistable (beslutning 10. november 2026)', async t => {
+  const { root, context, policy, store } = await fixture(t);
+  await saveRules(store, root, [beta3Rule('npm test', root)]);
+  const describe = policy.describe.bind(policy);
+  policy.describe = async (...args) => { const descriptor = await describe(...args); return descriptor.kind === 'bash' ? { ...descriptor, persistable: true } : descriptor; };
+  const isolated = { ...context, commandSandbox: true, autoCommandsSnapshot: false };
+  await assert.rejects(policy.grant(isolated, bashAsk('npm run build', root, 'Bygger'), { scope: 'project' }), /kun godkendes én gang/);
+  assert.equal((await store.project(root)).approvals.rules.length, 1, 'intet nyt er gemt');
+  assert.equal((await policy.allowed(isolated, bashAsk('npm test', root, 'Kører testene'))).allowed, false, 'den gemte regel for præcis denne kommando bruges ikke');
 });

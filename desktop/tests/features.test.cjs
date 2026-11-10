@@ -79,7 +79,8 @@ test('Komplai Run når kun motoren efter tilvalg og fjernes igen ved fravalg', a
 });
 
 // Samme regler som OpenCodes tilladelser: * rammer alt, også skråstreger, og den sidste regel, der passer, gælder.
-// Mønstrene er afprøvet mod den rigtige OpenCode 1.18.33 med scripts/verify-app-skills.cjs.
+// Mønstrene blev afprøvet mod den rigtige OpenCode 1.18.33 med scripts/verify-app-skills.cjs, før Auras læsevagt kom ind (dce68ea).
+// Siden da svarer læsevagten først for references/, .env og .git, så den prøve ser ikke længere OpenCodes egne afvisninger af dem.
 const match = (text, pattern) => new RegExp('^' + pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.') + '$', 's').test(text);
 function decide(rules, text) { let result = 'ask'; for (const [pattern, action] of Object.entries(typeof rules === 'string' ? { '*': rules } : rules)) if (match(text, pattern)) result = action; return result; }
 

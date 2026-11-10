@@ -1,6 +1,6 @@
 {
  "opencode": "1.19.5",
- "aura": "d0c3fca+ændringer",
+ "aura": "1cfa7a6+ændringer",
  "scenario": "byg-uden-git-soeg",
  "outcome": "idle",
  "case": "grep-sti-ude-relativ",
@@ -24,8 +24,8 @@
   "del:completed"
  ],
  "request": {
-  "id": "per_1abd28967001ykWi2yjcaCd1Qf",
-  "sessionID": "ses_e542d7b68ffezKI5f78zcPRWM1",
+  "id": "per_1c4c6897a001UKAhT3ipN3ueAM",
+  "sessionID": "ses_e3b3979f3ffe5KHrNXt25TaWnK",
   "permission": "grep",
   "patterns": [
    "Ekstern"
@@ -38,7 +38,7 @@
    "*"
   ],
   "tool": {
-   "messageID": "msg_1abd2895b001gUA96YDzhnIYvZ",
+   "messageID": "msg_1c4c68971001EnAXPhn2FGp444",
    "callID": "kald-6-0"
   }
  },
@@ -51,8 +51,8 @@
   }
  },
  "policyInput": {
-  "id": "per_1abd28967001ykWi2yjcaCd1Qf",
-  "sessionID": "ses_e542d7b68ffezKI5f78zcPRWM1",
+  "id": "per_1c4c6897a001UKAhT3ipN3ueAM",
+  "sessionID": "ses_e3b3979f3ffe5KHrNXt25TaWnK",
   "permission": "grep",
   "patterns": [
    "Ekstern"
@@ -65,7 +65,7 @@
    "*"
   ],
   "tool": {
-   "messageID": "msg_1abd2895b001gUA96YDzhnIYvZ",
+   "messageID": "msg_1c4c68971001EnAXPhn2FGp444",
    "callID": "kald-6-0"
   },
   "toolInput": {
@@ -99,6 +99,6 @@
   "blockedMode": false
  },
  "toolResult": [
-  "No files found"
+  "Found 2 matches\n${OUTSIDE}/fil.txt:\n  Line 1: Ekstern fil\n\n\n${OUTSIDE}/fil2.txt:\n  Line 1: Ekstern fil 2\n"
  ]
 }

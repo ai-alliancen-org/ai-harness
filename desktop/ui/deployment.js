@@ -13,13 +13,36 @@
   let guides = [], review = null, last = null, context = null, step = 'destination', trail = [], busyNow = false;
   // komplai: færdige filer fra en mappe som hidtil, eller en lokal bygning, når projektet har et byggescript og ingen færdig mappe.
   let komplaiSource = null, folderChosen = false, sourceToken = 0;
-  const publish = { overview: null, account: null, organisations: [], generation: 0, slugEdited: false, addressCheck: 0, loginPending: false };
+  // En app, komplai oprettede ved et forsøg, hvor uploaden blev afvist. Næste gennemgang bruger den i stedet for at oprette en ny.
+  let pendingApp = null;
+  // Den samme app, som kernen husker den efter Luk (deployments.cjs, state().createdApp). Udgiv, valget af komplai, login og
+  // «Udgiv en ny version» fortsætter til den, indtil en anden destination gennemgås, eller appen får en version.
+  let createdApp = null;
+  // afterLogin: login fra kortet kontrollerer udgivelsen bagefter. logoutFailed: Log ud fejlede, så trinnet tilbyder at fjerne adgangen lokalt.
+  const publish = { overview: null, account: null, organisations: [], generation: 0, slugEdited: false, addressCheck: 0, loginPending: false, afterLogin: null, logoutFailed: false };
   const titles = { sharingOff: 'Vil du udgive dit projekt?', destination: 'Hvordan vil du udgive?', providers: 'Hvor vil du udgive?', guides: 'Hvilken udbyder vil du læse om?', login: 'Log ind med komplai', organisation: 'Hvilken organisation vil du udgive for?', connect: 'Forbind organisationen?', app: 'Hvilken app vil du udgive til?', existing: 'Hvilken app vil du opdatere?', name: 'Hvad skal appen hedde?', address: 'Hvilken adresse skal appen have?', access: 'Hvem kan åbne appen?', confirmPublic: 'Skal appen være offentlig?', team: 'Hvilket Vercel-team bruger du?', subscription: 'Hvilket Azure-abonnement bruger du?', group: 'Hvilken ressourcegruppe bruger du?', project: 'Hvilket projekt vil du udgive til?', files: 'Klar til at udgive den gemte version?', options: 'Hvad vil du rette?', destinationOptions: 'Hvad vil du rette ved destinationen?', account: 'Konto og adgang', providerGuide: 'Udbyderens opsætning', kind: 'Hvad skal udgives?', directory: 'Hvor ligger filerne?', functions: 'Hvor ligger webside og Functions?', review: 'Gennemgå udgivelsen', result: 'Seneste udgivelse' };
   const onward = { name: 'access', confirmPublic: 'files', team: 'project', subscription: 'group', group: 'project', project: 'files', kind: 'directory', functions: 'files' };
   const fields = { name: ['deploy-komplai-name'], confirmPublic: ['deploy-komplai-confirm'], team: ['deploy-scope'], subscription: ['deploy-subscription'], group: ['deploy-group'], project: ['deploy-project'], directory: ['deploy-directory'], functions: ['deploy-frontend', 'deploy-api'] };
   const komplai = () => $('#deploy-provider').value === 'komplai';
   const komplaiBuild = () => komplai() && komplaiSource?.build === true && !folderChosen;
   const chosenApp = () => publish.overview?.apps.find(app => app.id === $('#deploy-komplai-app').value);
+  // Knapper, der ikke står i index.html: «Log ind og kontrollér» på kortet, når komplai-adgangen er udløbet, tilbagekaldt eller
+  // gælder en anden organisation, «Åbn kørslen på GitHub» ved en Pages-udgivelse, «Fjern kun fra denne computer» under Konto og
+  // adgang, når Log ud ikke kan gennemføres, og «Konto og adgang» ved appvalget.
+  const created = (tag, values) => Object.assign(document.createElement(tag), { hidden: true, ...values });
+  const loginAgain = created('button', { type: 'button', id: 'deployment-login', textContent: 'Log ind og kontrollér' });
+  const workflow = created('button', { type: 'button', id: 'deployment-workflow', textContent: 'Åbn kørslen på GitHub' });
+  const forget = created('button', { type: 'button', id: 'komplai-publish-forget', className: 'text-button', textContent: 'Fjern kun fra denne computer' });
+  const forgetNote = created('p', { className: 'hint', textContent: 'Adgangen kan stadig være gyldig hos komplai, til den udløber.' });
+  // Er testeren logget ind i den forkerte organisation, kan kontoen skiftes direkte fra appvalget (N:D2-3).
+  const appAccount = created('button', { type: 'button', id: 'deploy-komplai-account', className: 'text-button', textContent: 'Konto og adgang', hidden: false });
+  $('#deployment-extra-actions').append(loginAgain, workflow);
+  form.querySelector('[data-deploy-step="account"]').append(forget, forgetNote);
+  form.querySelector('[data-deploy-step="app"]').append(appAccount);
+  // Kvitteringen viser højst to hovedknapper og Se detaljer (AGENTS.md: højst tre til fire synlige valg). Udgiv et andet sted og
+  // Konto og adgang ligger under Se detaljer sammen med de øvrige handlinger.
+  $('#deployment-receipt-details').append($('#deployment-another'), $('#deployment-komplai-account'));
+  const actionButton = id => id === 'login' ? loginAgain : id === 'workflow' ? workflow : $('#deployment-' + id);
   function rows(id, values) { $(id).replaceChildren(...values.flatMap(([label, value]) => { const dt = document.createElement('dt'), dd = document.createElement('dd'); dt.textContent = label; dd.textContent = value || 'Ikke oplyst'; return [dt, dd]; })); }
   function appCard(prefix, r) { const value = view.identity(r); for (const key of ['name', 'address', 'account']) $(`#${prefix}-${key}`).textContent = value[key]; }
   function invalidate() { review = null; $('#deployment-send').disabled = true; }
@@ -32,6 +55,7 @@
     $('#deployment-next').textContent = step === 'files' ? (komplaiBuild() ? 'Byg og gennemgå' : 'Gennemgå udgivelse') : step === 'existing' ? 'Brug denne app' : 'Fortsæt';
   }
   function renderStep() {
+    if (!['login', 'organisation', 'connect'].includes(step)) publish.afterLogin = null;
     if (step === 'review') $('#deployment-review-footer').prepend($('#deployment-feedback')); else $('#deployment-feedback-slot').append($('#deployment-feedback'));
     for (const panel of form.querySelectorAll('[data-deploy-step]')) panel.hidden = panel.dataset.deployStep !== setup.panel(step);
     form.hidden = ['review', 'result'].includes(step); $('#deployment-review').hidden = step !== 'review'; $('#deployment-result').hidden = step !== 'result';
@@ -39,11 +63,13 @@
     $('#deployment-intro').textContent = step === 'destination' ? 'Giv andre et link til dit projekt.' : step === 'files' ? (komplai() ? 'Filerne sendes til organisationens app hos komplai.' : setup.pages() ? 'Den offentlige hjemmeside opdateres gennem GitHub Actions.' : $('#deploy-provider').value === 'promte' ? 'Kildekoden sendes til dit arbejdsområde hos Promte.' : 'Filerne sendes til et testmiljø hos den valgte udbyder.') : '';
     $('#deployment-intro').hidden = !$('#deployment-intro').textContent;
     $('#deployment-copy').hidden = !context?.viewingCopy || step === 'result' || step === 'sharingOff';
-    $('#deployment-komplai-account').hidden = !komplai() || ['account', 'login', 'organisation', 'connect', 'destination', 'providers', 'sharingOff', 'guides'].includes(step);
+    // Konto og adgang står under Se detaljer på kvitteringen og som link ved appvalget. I resten af forløbet ligger kontoen under
+    // Ret filer og indstillinger › Destination og app, så hvert trin har højst fire synlige valg (AGENTS.md).
+    $('#deployment-komplai-account').hidden = !komplai() || step !== 'result';
     if (step === 'files') {
       $('#deployment-scope').textContent = view.scope(context);
       const app = chosenApp(); $('#deploy-komplai-current').hidden = !komplai() || !app;
-      if (app) $('#deploy-komplai-current').textContent = `${new URL(app.url).hostname} · ${app.visibility === 'public' ? 'Alle med linket' : 'Organisationen'}. En ny version erstatter den udgivne.`;
+      if (app) $('#deploy-komplai-current').textContent = `${new URL(app.url).hostname} · ${app.visibility === 'public' ? 'Alle med linket' : 'Organisationen'}. ${app.activeRelease === null ? 'Appen har ingen version endnu.' : 'En ny version erstatter den udgivne.'}`;
       sourceView();
       if (komplai()) void refreshSource();
     }
@@ -55,9 +81,13 @@
     if (step === 'destinationOptions') $('#deployment-account-options').open = !komplai();
     if (step === 'confirmPublic') publicConfirmation();
     if (step === 'account') {
-      const app = chosenApp(); $('#deployment-account-name').textContent = publish.account?.organisationName || publish.overview?.organisationName || '';
-      $('#deployment-account-access').textContent = app ? `${app.name}: ${app.visibility === 'private' ? 'Organisationens medlemmer' : 'Alle med linket'}.` : 'Forbundet til komplai Run.';
-      $('#deploy-komplai-access').hidden = !app;
+      const app = chosenApp(), until = Date.parse(publish.account?.expiresAt); $('#deployment-account-name').textContent = publish.account?.organisationName || publish.overview?.organisationName || '';
+      // Uden en app siges kun det, Aura ved: adgangen er gemt på computeren og udløber på en dato. Om komplai stadig godtager
+      // den, ses først ved næste kald, fx Kontrollér (Q:D2-4).
+      $('#deployment-account-access').textContent = app ? `${app.name}: ${app.visibility === 'private' ? 'Organisationens medlemmer' : 'Alle med linket'}.` : `Udgivelsesadgangen er gemt på denne computer${Number.isFinite(until) ? ` og udløber ${new Date(until).toLocaleDateString('da-DK')}` : ''}.`;
+      // Efter et mislykket Log ud er spørgsmålet kun, om adgangen skal væk: Log ud igen eller Fjern kun fra denne computer.
+      $('#deploy-komplai-access').hidden = !app || publish.logoutFailed;
+      forget.hidden = forgetNote.hidden = !publish.logoutFailed;
     }
     heading(titles[step] || setup.title(step) || titles.destination); setup.render(step);
   }
@@ -72,19 +102,20 @@
   }
   async function busy(fn, label = 'Arbejder …') {
     if (busyNow) return; busyNow = true; const token = session; progress(true, label);
-    for (const id of ['check', 'open', 'portal', 'new']) $('#deployment-' + id).disabled = true;
+    for (const id of ['check', 'open', 'portal', 'new', 'login', 'workflow']) actionButton(id).disabled = true;
     $('#deployment-feedback').textContent = '';
     try { await fn(); }
     catch (error) {
       if (error.stale || token !== session) return;
       invalidate();
-      if (step === 'review') go('files', { remember: false });
+      // Tilbage fra filtrinnet skal føre til trinnet før det, ikke til filtrinnet selv.
+      if (step === 'review') { if (trail.at(-1) === 'files') trail.pop(); go('files', { remember: false }); }
       $('#deployment-feedback').textContent = error.message;
     } finally {
       if (token === session) {
         busyNow = false; progress(false);
         $('#deployment-check').disabled = !last?.id; $('#deployment-open').disabled = !last?.url;
-        $('#deployment-portal').disabled = !last?.target?.portal; $('#deployment-new').disabled = false;
+        $('#deployment-portal').disabled = !last?.target?.portal; $('#deployment-new').disabled = false; loginAgain.disabled = false; workflow.disabled = false;
       }
     }
   }
@@ -147,7 +178,7 @@
     try { publish.overview = await api('komplaiPublishOverview'); fillApps(); $('#deploy-komplai-suffix').textContent = '.' + publish.overview.address; addressPreview(); return true; }
     catch (error) { if (error.stale) throw error; resetSignin(); publishNotice(error.message, 'error'); return false; }
   }
-  async function chooseProvider(provider) { invalidate(); $('#deploy-provider').value = provider; modes(); if (provider === 'komplai') { const ready = await loadPublish(); go(ready ? 'app' : 'login'); } else await setup.choose(provider); }
+  async function chooseProvider(provider) { invalidate(); pendingApp = null; $('#deploy-provider').value = provider; modes(); if (provider === 'komplai') { const ready = await loadPublish(); if (!ready) go('login'); else if (!showCreatedApp()) go('app'); } else await setup.choose(provider); }
   for (const button of form.querySelectorAll('[data-provider]')) button.onclick = () => busy(() => chooseProvider(button.dataset.provider));
   $('#deployment-other').onclick = () => go('providers'); $('#deployment-guides').onclick = () => go('guides');
   function showOrganisation() {
@@ -170,22 +201,48 @@
   };
   function cancelLogin() { ++publish.generation; publish.loginPending = false; window.harness.komplaiCancel(undefined, dialogOwner); resetSignin(); }
   $('#komplai-publish-cancel').onclick = () => { cancelLogin(); renderStep(); publishNotice('Login blev afbrudt. Du kan prøve igen.'); };
-  $('#komplai-publish-confirm').onclick = () => busy(async () => { const organisation = publish.organisations.find(item => item.id === $('#komplai-publish-org').value); if (!organisation) throw Error('Vælg organisation igen.'); await api('komplaiConnect', { organisationId: organisation.id, publishing: true }); trail = ['destination', 'providers']; if (!await loadPublish()) { go('login', { remember: false }); return; } window.dispatchEvent(new CustomEvent('harness:komplai-connected')); go('app', { remember: false }); });
-  $('#komplai-publish-logout').onclick = () => busy(async () => {
-    ++publish.generation; ++publish.addressCheck; invalidate();
-    await api('komplaiCancel'); await api('komplaiPublishDisconnect');
+  $('#komplai-publish-confirm').onclick = () => busy(async () => {
+    const organisation = publish.organisations.find(item => item.id === $('#komplai-publish-org').value); if (!organisation) throw Error('Vælg organisation igen.');
+    await api('komplaiConnect', { organisationId: organisation.id, publishing: true }); trail = ['destination', 'providers'];
+    if (!await loadPublish()) { go('login', { remember: false }); return; }
+    window.dispatchEvent(new CustomEvent('harness:komplai-connected'));
+    // Login fra kortet: knappen hed «Log ind og kontrollér», så udgivelsen kontrolleres nu, og kortet vises igen.
+    if (publish.afterLogin === 'check' && last?.id && last.config?.provider === 'komplai') { publish.afterLogin = null; trail = []; receipt(await api('deploymentCheck')); await setup.refresh(); return; }
+    if (!showCreatedApp()) go('app', { remember: false });
+  });
+  // Kortet beder om et nyt login, fordi komplai-adgangen er udløbet, tilbagekaldt eller gælder en anden organisation end appens.
+  loginAgain.onclick = () => {
+    if (busyNow) return; $('#deploy-provider').value = 'komplai'; modes(); resetSignin(); publish.afterLogin = 'check'; go('login');
+    publishNotice(last?.checks?.provider?.reason === 'organisation' ? `Appen hører til ${last.target?.owner || 'en anden organisation'}. Log ind, og vælg den organisation.` : 'Udgivelsesadgangen er udløbet eller tilbagekaldt. Log ind med komplai igen.', 'error');
+  };
+  function loggedOut(notice, tone) {
+    publish.logoutFailed = false; pendingApp = null;
     resetSignin(); publish.account = null; publish.organisations = []; publish.slugEdited = false;
     for (const id of ['#deploy-komplai-app', '#komplai-publish-org']) $(id).replaceChildren();
     for (const id of ['#deploy-komplai-search', '#deploy-komplai-name', '#deploy-komplai-slug', '#deploy-komplai-confirm']) $(id).value = '';
     $('#komplai-publish-tile').replaceChildren();
     trail = ['destination', 'providers']; go('login', { remember: false });
-    publishNotice('Du er logget ud af komplai Run. Log ind med den konto, du vil bruge.', 'success');
+    publishNotice(notice, tone);
     window.dispatchEvent(new CustomEvent('harness:komplai-connected'));
+  }
+  $('#komplai-publish-logout').onclick = () => busy(async () => {
+    ++publish.generation; ++publish.addressCheck; invalidate();
+    await api('komplaiCancel');
+    // Kan komplai ikke nås, eller kan adgangen ikke læses, bevares adgangen. Trinnet tilbyder så at fjerne den fra denne computer.
+    try { await api('komplaiPublishDisconnect'); }
+    catch (error) { if (!error.stale) { publish.logoutFailed = true; renderStep(); } throw error; }
+    loggedOut('Du er logget ud af komplai Run. Log ind med den konto, du vil bruge.', 'success');
   }, 'Logger ud …');
-  $('#deploy-komplai-create').onclick = () => { invalidate(); $('#deploy-komplai-app').value = ''; for (const radio of form.querySelectorAll('[name="komplai-visibility"]')) radio.checked = false; if (!$('#deploy-komplai-name').value) $('#deploy-komplai-name').value = context?.projectName || ''; if (!publish.slugEdited) $('#deploy-komplai-slug').value = suggest($('#deploy-komplai-name').value); addressPreview(); go('name'); };
+  forget.onclick = () => busy(async () => {
+    ++publish.generation; ++publish.addressCheck; invalidate();
+    await api('komplaiCancel');
+    const state = await api('komplaiPublishForget');
+    loggedOut(state?.revoked ? 'Du er logget ud af komplai Run. Log ind med den konto, du vil bruge.' : 'Adgangen er fjernet fra denne computer. Den kan stadig være gyldig hos komplai, til den udløber. Log ind med den konto, du vil bruge.', state?.revoked ? 'success' : 'info');
+  }, 'Fjerner adgangen …');
+  $('#deploy-komplai-create').onclick = () => { invalidate(); pendingApp = null; $('#deploy-komplai-app').value = ''; for (const radio of form.querySelectorAll('[name="komplai-visibility"]')) radio.checked = false; if (!$('#deploy-komplai-name').value) $('#deploy-komplai-name').value = context?.projectName || ''; if (!publish.slugEdited) $('#deploy-komplai-slug').value = suggest($('#deploy-komplai-name').value); addressPreview(); go('name'); };
   $('#deploy-komplai-choose').onclick = () => { $('#deploy-komplai-search').value = ''; fillApps(); go('existing'); };
   $('#deploy-komplai-search').oninput = fillApps;
-  $('#deploy-komplai-app').onchange = () => { invalidate(); navigation(); if (chosenApp()) { for (const radio of form.querySelectorAll('[name="komplai-visibility"]')) radio.checked = false; go('files'); } };
+  $('#deploy-komplai-app').onchange = () => { invalidate(); pendingApp = null; navigation(); if (chosenApp()) { for (const radio of form.querySelectorAll('[name="komplai-visibility"]')) radio.checked = false; go('files'); } };
   $('#deploy-komplai-access').onclick = () => busy(async () => { await api('deploymentOpen', { komplaiApp: chosenApp()?.id }); invalidate(); $('#deployment-feedback').textContent = 'Ret adgangen i komplai. Næste gennemgang henter appens aktuelle adgang.'; });
   $('#deploy-komplai-edit-address').onclick = () => { checkAddress(); go('address'); };
   $('#deploy-komplai-name').oninput = () => { if (!publish.slugEdited) $('#deploy-komplai-slug').value = suggest($('#deploy-komplai-name').value); addressPreview(); };
@@ -194,7 +251,13 @@
     const generation = ++publish.addressCheck, slug = $('#deploy-komplai-slug').value, help = $('#deploy-komplai-slug-help');
     if (!slug) { help.textContent = 'Lad feltet stå tomt, så får appen en tilfældig adresse.'; help.dataset.tone = ''; return; }
     help.textContent = 'Kontrollerer adressen …'; help.dataset.tone = ''; await new Promise(resolve => setTimeout(resolve, 250)); if (generation !== publish.addressCheck || !publish.overview) return;
-    try { const r = await api('komplaiPublishAddress', { slug }); if (generation !== publish.addressCheck) return; help.textContent = r.available ? `Appen får adressen ${slug}.${publish.overview.address}` : r.message; help.dataset.tone = r.available ? 'ok' : 'error'; } catch (error) { if (generation === publish.addressCheck) { help.textContent = error.message; help.dataset.tone = 'error'; } }
+    try { const r = await api('komplaiPublishAddress', { slug }); if (generation !== publish.addressCheck) return; help.textContent = r.available ? `Appen får adressen ${slug}.${publish.overview.address}` : ownAddress(slug) || r.message; help.dataset.tone = r.available ? 'ok' : 'error'; } catch (error) { if (generation === publish.addressCheck) { help.textContent = error.message; help.dataset.tone = 'error'; } }
+  }
+  // Adressen tilhører appen, komplai oprettede ved sidste forsøg. Så siges det, så testeren vælger den i stedet for at
+  // oprette endnu en tom app med en anden adresse.
+  function ownAddress(slug) {
+    const app = publish.overview?.apps.find(item => item.id === createdApp);
+    return app && slug && app.slug === slug ? `Adressen bruges af appen «${app.name}», som komplai oprettede ved sidste forsøg. Vælg den under Eksisterende app, eller vælg en anden adresse.` : '';
   }
   // En offentlig app bekræftes med appens navn, som i Run.
   function publicConfirmation() {
@@ -214,19 +277,31 @@
   $('#deployment-change-destination').onclick = () => go('destinationOptions');
   $('#deployment-change-app').onclick = () => busy(async () => { invalidate(); $('#deploy-komplai-search').value = ''; if (await loadPublish()) go('app'); else go('login'); });
   $('#deployment-select-destination').onclick = () => { invalidate(); go('destination'); };
-  const openAccount = () => busy(async () => { publish.account = await api('komplaiPublishState'); if (publish.account.connected) go('account'); else { resetSignin(); go('login'); } });
+  // En udløbet adgang er ikke «Forbundet»: Konto og adgang fører så til login og siger hvorfor.
+  const openAccount = () => busy(async () => {
+    publish.account = await api('komplaiPublishState'); publish.logoutFailed = false;
+    if (publish.account.connected && !publish.account.expired) go('account');
+    else { resetSignin(); go('login'); if (publish.account.expired) publishNotice('Udgivelsesadgangen er udløbet. Log ind med komplai igen.', 'error'); }
+  });
   $('#deployment-account').onclick = openAccount;
   $('#deployment-komplai-account').onclick = openAccount;
-  function back() { invalidate(); const previous = trail.pop(); if (previous) go(previous, { remember: false }); }
+  appAccount.onclick = openAccount;
+  // Tilbage fra organisation eller forbindelse til login afbryder det ventende login, så «Log ind med komplai» står igen.
+  function back() { invalidate(); const previous = trail.pop(); if (previous === 'login' && ['organisation', 'connect'].includes(step)) cancelLogin(); if (previous) go(previous, { remember: false }); }
   $('#deployment-back').onclick = back;
   form.addEventListener('input', event => { if (['hosting-guide-choice', 'komplai-publish-org', 'deploy-komplai-search'].includes(event.target.id)) return; invalidate(); modes(); });
   async function prepareReview() {
     invalidate();
     $('#deployment-progress-label').textContent = komplaiBuild() ? 'Bygger den gemte version …' : 'Forbereder udgivelsen …';
-    if (komplai() && $('#deploy-komplai-app').value) { const selected = $('#deploy-komplai-app').value; publish.overview = await api('komplaiPublishOverview'); $('#deploy-komplai-search').value = ''; fillApps(); if (!publish.overview.apps.some(app => app.id === selected)) { go('existing'); throw Error('Appen findes ikke længere. Vælg en app igen.'); } $('#deploy-komplai-app').value = selected; }
+    // En valgt app, eller appen komplai oprettede ved et afvist forsøg, hentes igen, så næste upload går til den.
+    const selected = komplai() ? $('#deploy-komplai-app').value || pendingApp || '' : '';
+    if (selected) { publish.overview = await api('komplaiPublishOverview'); $('#deploy-komplai-search').value = ''; fillApps(); if (!publish.overview.apps.some(app => app.id === selected)) { go('existing'); throw Error('Appen findes ikke længere. Vælg en app igen.'); } $('#deploy-komplai-app').value = selected; pendingApp = null; }
+    else if (komplai() && publish.overview?.slugs) { const own = ownAddress($('#deploy-komplai-slug').value); if (own) throw Error(own); }
     const r = await api('deploymentReview', input()); review = r.token; context = r.context || context;
+    // Kernen husker kun den oprettede app, så længe den er den valgte destination.
+    if (r.config.provider !== 'komplai' || r.config.appId !== createdApp) createdApp = null;
     appCard('deployment-review-app', r);
-    if (r.config.provider === 'komplai') rows('#deployment-summary', [['Gemt version', view.version(r)], ...(r.built ? [['Bygget', `På din computer fra den gemte version med ${r.built.script}. Filerne kommer fra mappen ${r.built.output}.`]] : []), ['Udgivelse', r.target.created ? 'Opretter en ny app' : 'Erstatter den udgivne version'], ['Hvem kan åbne den', r.config.visibility === 'private' ? 'Kun organisationen. Medlemmer logger ind med komplai.' : 'Alle med linket. Appen bliver offentlig. Undlad fortrolige oplysninger.'], ['Placering', r.target.region], ['Omkostninger', r.cost]]);
+    if (r.config.provider === 'komplai') rows('#deployment-summary', [['Gemt version', view.version(r)], ...(r.built ? [['Bygget', `På din computer fra den gemte version med ${r.built.script}. Filerne kommer fra mappen ${r.built.output}.`]] : []), ['Udgivelse', r.target.created ? 'Opretter en ny app' : chosenApp()?.activeRelease === null ? 'Første version af appen' : 'Erstatter den udgivne version'], ['Hvem kan åbne den', r.config.visibility === 'private' ? 'Kun organisationen. Medlemmer logger ind med komplai.' : 'Alle med linket. Appen bliver offentlig. Undlad fortrolige oplysninger.'], ['Placering', r.target.region], ['Omkostninger', r.cost]]);
     else rows('#deployment-summary', [['Gemt version', view.version(r)], ['Destination', view.destination(r) + (r.config.provider === 'azure' ? ' · erstatter indholdet i testmiljøet' : '')], ...(r.config.mode === 'source' ? [['Build', 'Udbyderen bygger kildekoden og kan køre dens installations- og buildscripts med testmiljøets værdier.']] : []), ['Adgang', `${r.target.access || 'Udbyderen oplyser ikke adgangsreglerne.'} Testpersonens adgang er ikke afprøvet.`], ...(setup.pages() ? [['Udgivelse', 'Starter én GitHub Actions-kørsel og erstatter den offentlige hjemmeside.']] : []), ['Omkostninger', r.cost]]);
     rows('#deployment-details', [['Versionens ID', r.head], ['Destinationens ID', r.target.id || 'Oprettes ved udgivelse'], ['Konto / abonnement', r.config.provider === 'komplai' ? r.target.owner : r.config.scope || r.config.subscription || 'Fra dit eksisterende login'], ['Indhold', `${r.files.length} filer · ${r.bytes} bytes · ${r.hash}`], ['Placering', r.target.region], ['Miljøvariabler', r.target.environmentNote || r.target.environmentKeys?.join(', ') || 'Ingen navne rapporteret. Kontrollér opsætningen hos udbyderen.'], ['Build', r.build], ['Materiale', r.material], ['Udeladte filer', r.excludedFiles?.join(', ') || 'Ingen'], ['Projekt', view.scope(context)]]);
     $('#deployment-files').replaceChildren(...r.files.map(file => { const li = document.createElement('li'); li.textContent = file; return li; }));
@@ -258,16 +333,19 @@
     $('#deployment-verification .deployment-status-symbol').textContent = summary.verification.tone === 'positive' ? '✓' : summary.verification.tone === 'warning' ? '!' : 'i';
     rows('#deployment-receipt', [['Gemt version', view.version(r)], ['Upload påbegyndt', view.time(r.startedAt)], ['Versionens ID', r.head], ['Indholdets fingeraftryk', r.hash], ['Senest registrerede udbyderstatuskode', r.state], ['Adresse', r.url], ['Adgang rapporteret ved upload', r.target.access], ['Seneste kontrol', r.checkedAt ? view.time(r.checkedAt) : 'Ingen kontrol registreret']]);
     const primary = $('#deployment-main-actions'), secondary = $('#deployment-extra-actions');
-    for (const id of ['check', 'open', 'portal', 'new']) { const button = $('#deployment-' + id); button.classList.remove('primary'); secondary.append(button); }
+    for (const id of ['check', 'open', 'portal', 'new', 'login', 'workflow']) { const button = actionButton(id); button.classList.remove('primary'); secondary.append(button); }
+    // Kørslen på GitHub kan altid åbnes under Se detaljer, når statuskontrollen har fundet den; ved en fejl er den hovedknappen.
+    workflow.hidden = !view.workflowRun(r);
     $('#deployment-open').textContent = ['komplai', 'promte', 'github-pages', 'cloudflare'].includes(r.config.provider) ? 'Åbn appen' : 'Åbn testlink'; $('#deployment-portal').textContent = isKomplai ? 'Åbn i komplai' : isPromte ? 'Åbn appen i Promte' : 'Åbn hos udbyderen';
     $('#deployment-check').textContent = isPromte ? 'Kontrollér status' : 'Kontrollér status og startside';
     $('#deployment-check').hidden = !r.id; $('#deployment-open').hidden = !r.url; $('#deployment-portal').hidden = !r.target.portal;
-    const actions = view.mainActions(r); for (const id of actions) primary.append($('#deployment-' + id)); $('#deployment-' + actions[0]).classList.add('primary');
+    const actions = view.mainActions(r); loginAgain.hidden = !actions.includes('login'); for (const id of actions) primary.append(actionButton(id)); actionButton(actions[0]).classList.add('primary');
     $('#deployment-receipt-details').open = false; go('result', { remember: false });
   }
   async function followLastApp() {
     if (last?.config?.provider !== 'komplai') return false;
     $('#deploy-provider').value = 'komplai'; $('#deploy-komplai-search').value = ''; modes(); if (!await loadPublish()) { go('login'); return true; }
+    if (showCreatedApp()) return true;
     const appId = last.appId || last.config.appId;
     if (publish.overview.apps.some(app => app.id === appId)) { $('#deploy-komplai-app').value = appId; trail = ['destination', 'providers', 'app']; go('files', { remember: false }); } else go('app');
     return true;
@@ -283,21 +361,53 @@
     const owner = dialogOwner; dialog.close();
     window.reviewRestoration({ merge: true, chat: owner.chat }, { owner, title: 'Flet arbejdskopiens ændringer ind?', confirm: 'Flet ind i projektet', label: 'Flettet ind fra arbejdskopi' });
   };
+  // komplai oprettede appen, men afviste uploaden. Appen vælges, så næste forsøg opdaterer den i stedet for at oprette
+  // endnu en, og Tilbage fører til appvalget. Kan oversigten ikke hentes nu, vælges appen ved næste gennemgang.
+  async function keepCreatedApp(appId) {
+    pendingApp = appId; trail = ['destination', 'providers', 'app'];
+    try { publish.overview = await api('komplaiPublishOverview'); } catch (error) { if (error.stale) throw error; return; }
+    $('#deploy-komplai-search').value = ''; fillApps();
+    if (publish.overview.apps.some(app => app.id === appId)) { $('#deploy-komplai-app').value = appId; pendingApp = null; }
+  }
+  // Efter Luk: kernen husker appen (createdApp). Udgiv fortsætter til den, så længe den findes i oversigten, med appvalget
+  // som trinnet før, så Tilbage fører dertil (DESIGN.md: trin, hvis svar er kendt, springes over).
+  function showCreatedApp() {
+    const app = publish.overview?.apps.find(item => item.id === createdApp);
+    if (!app) return false;
+    $('#deploy-provider').value = 'komplai'; modes(); $('#deploy-komplai-search').value = ''; fillApps(); $('#deploy-komplai-app').value = app.id;
+    trail = ['destination', 'providers', 'app']; go('files', { remember: false });
+    $('#deployment-feedback').textContent = `Sidste forsøg oprettede appen «${app.name}» hos komplai. Du kan prøve igen herfra.`;
+    return true;
+  }
+  // Ved åbning af Udgiv. Kan komplai ikke nås, eller findes appen ikke længere, vises Udgiv som ellers.
+  async function followCreatedApp() { if (await loadPublish()) showCreatedApp(); }
   $('#deployment-send').onclick = () => busy(async () => {
     const token = review, generation = session; invalidate(); if (!token) return;
+    // Ved en ny komplai-app kan appen være oprettet, selv om komplai bagefter afviste uploaden.
+    const creating = komplai() && !chosenApp(), before = last;
     $('#deployment-feedback').textContent = 'Lukning af vinduet annullerer ikke udgivelsen.';
     try { receipt(await api('deploymentSend', token)); $('#deployment-feedback').textContent = 'Udgivelsens status er gemt.'; }
-    finally { if (generation === session) { const state = await api('deploymentState'); if (state.last) receipt(state.last); await setup.refresh(); } }
+    finally {
+      if (generation === session) {
+        const state = await api('deploymentState'); createdApp = state.createdApp || null;
+        // Uden en ny kvittering afviste udbyderen forsøget, før noget blev uploadet. Testeren bliver i forløbet og kan prøve
+        // igen herfra; den tidligere udgivelses kort vises ikke som svar på forsøget.
+        if (state.last && state.last.startedAt !== before?.startedAt) receipt(state.last);
+        else if (creating && createdApp) await keepCreatedApp(createdApp);
+        await setup.refresh();
+      }
+    }
   }, 'Udgiver …');
   $('#deployment-check').onclick = () => busy(async () => { receipt(await api('deploymentCheck')); await setup.refresh(); });
   $('#deployment-open').onclick = () => busy(async () => { await api('deploymentOpen', 'site'); $('#deployment-feedback').textContent = 'Appen er åbnet i din browser.'; });
   $('#deployment-portal').onclick = () => busy(async () => { await api('deploymentOpen', 'portal'); $('#deployment-feedback').textContent = 'Oversigten er åbnet. Kontrollér udgivelsen dér, før du uploader igen.'; });
+  workflow.onclick = () => busy(async () => { await api('deploymentOpen', 'workflow'); $('#deployment-feedback').textContent = 'Kørslen er åbnet på GitHub i din browser.'; });
   function openDialog(wantStatus = false, provider = null) {
     ++session; ++sourceToken; ++publish.generation; ++publish.addressCheck; busyNow = false;
     dialogOwner = typeof selectedOwner === 'function' ? selectedOwner() : null;
     context = null; $('#deployment-copy').hidden = true;
     dialog.showModal(); invalidate(); trail = []; go('destination', { remember: false }); $('#deployment-technical').open = false; $('#deployment-receipt-details').open = false;
-    busy(async () => { const state = await api('deploymentState'); context = state.context; await loadGuides(); form.reset(); $('#deploy-provider').value = ''; publish.slugEdited = false; publish.overview = null; komplaiSource = null; folderChosen = false;
+    busy(async () => { const state = await api('deploymentState'); context = state.context; await loadGuides(); form.reset(); $('#deploy-provider').value = ''; publish.slugEdited = false; publish.overview = null; komplaiSource = null; folderChosen = false; pendingApp = null; createdApp = state.createdApp || null;
       const savedConfig = state.config || state.last?.config;
       setup.reset(); setup.restore(savedConfig);
       if (savedConfig) { for (const key of ['provider', 'project', 'scope', 'subscription', 'group', 'mode', 'directory', 'frontend', 'api']) if (savedConfig[key] !== undefined) $('#deploy-' + key).value = savedConfig[key] || ''; }
@@ -307,6 +417,8 @@
       go('destination', { remember: false }); receipt(state.last);
       const generation = session; await setup.refresh(wantStatus && state.last?.config?.provider !== 'komplai'); assertCurrent(generation); setup.opened(wantStatus);
       if (provider) await chooseProvider(provider);
+      // Et forsøg, hvor komplai oprettede appen og afviste uploaden, fortsætter, hvor testeren slap. Statusknappen viser kortet.
+      else if (createdApp && !wantStatus) await followCreatedApp();
     });
   }
   // Forhåndsvisningen af en komplai Run-app åbner Udgiv direkte ved komplai, når login mangler.

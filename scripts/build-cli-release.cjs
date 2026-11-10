@@ -3,7 +3,7 @@ const path = require('node:path');
 const { execFile } = require('node:child_process');
 const { promisify } = require('node:util');
 const run = promisify(execFile);
-const { names, sha256, unpack, allowedSource } = require('./cli-release-contract.cjs');
+const { names, sha256, unpack, allowedSource, lockedOpenCode, guideProblem, draftFile, draftProblem } = require('./cli-release-contract.cjs');
 const root = path.resolve(__dirname, '..');
 const git = async (...args) => (await run('git', args, { cwd: root })).stdout.trim();
 async function sourceState(local) {
@@ -27,9 +27,18 @@ async function verifySources(bytes, local = false) {
 }
 async function check(directory, { local = false, commit } = {}) {
   const pkg = JSON.parse(await fs.readFile(path.join(root, 'package.json'))), expected = names(pkg.version);
+  // En udgivelse må ikke sende guider og noter om den forrige CLI med ud, fordi udkastet til næste udgivelse er glemt (fund 45).
+  if (!local) {
+    const draft = await fs.readFile(path.join(root, draftFile), 'utf8').catch(error => { if (error.code === 'ENOENT') return null; throw error; });
+    const problem = draftProblem(draft, pkg.version);
+    if (problem) throw new Error(problem);
+  }
   const listed = (await fs.readdir(directory)).sort();
   if (JSON.stringify(listed) !== JSON.stringify([...expected].sort())) throw new Error('Udgivelsesmappen har manglende eller ekstra filer.');
   const files = new Map(await Promise.all(expected.map(async name => [name, await fs.readFile(path.join(directory, name))])));
+  // En udgivelse må ikke sende guider med en anden motorversion end pakkens. En lokal prøve kontrollerer kun filnavnet.
+  const opencode = local ? null : lockedOpenCode(pkg);
+  for (const name of expected.slice(1, 4)) { const problem = guideProblem(name, files.get(name).toString('utf8'), { tarball: expected[0], opencode }); if (problem) throw new Error(problem); }
   const manifest = JSON.parse(files.get('CLI-RELEASE.json'));
   if (manifest.version !== pkg.version || manifest.package !== expected[0] || !/^[a-f0-9]{40}$/.test(manifest.source?.commit || '')
     || (commit && manifest.source.commit !== commit) || (!local && (manifest.source.publishable !== true || manifest.source.dirty !== false))) throw new Error('CLI-pakkens version eller kildegrundlag kan ikke udgives.');
@@ -56,10 +65,11 @@ async function build(directory, { local = false } = {}) {
   await run(command, args, { cwd: root, maxBuffer: 1024 * 1024 });
   const archive = await fs.readFile(path.join(directory, expected[0]));
   const sources = await verifySources(archive, local);
+  const opencode = local ? null : lockedOpenCode(pkg);
   for (const name of expected.slice(1, 4)) {
     const guide = await fs.readFile(path.join(root, 'cli', name), 'utf8');
-    const packages = guide.match(/aura-harness-\d+\.\d+\.\d+(?:-beta\.\d+)?\.tgz/g) || [];
-    if (!packages.length || packages.some(p => p !== expected[0])) throw new Error(`Opdatér filnavnet i cli/${name} til ${expected[0]}, så webguide og pakke stemmer overens.`);
+    const problem = guideProblem(name, guide, { tarball: expected[0], opencode });
+    if (problem) throw new Error(problem);
     await fs.writeFile(path.join(directory, name), guide);
   }
   if (JSON.stringify(await sourceState(local)) !== JSON.stringify(source)) throw new Error('Git-grundlaget ændrede sig under pakningen.');

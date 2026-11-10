@@ -137,9 +137,18 @@ function isolatedEnv(directory, config, password, { commandIsolation = false, te
   env.OPENCODE_EXPERIMENTAL_OUTPUT_TOKEN_MAX = String(require('./connections.cjs').OUTPUT_CEILING);
   return require('./runtime.cjs').gitEnvironment(env);
 }
-const pluginModules = () => path.join(__dirname, '..', 'node_modules').replace(/app\.asar([/\\])/, 'app.asar.unpacked$1');
+// Plugin-SDK'et findes, som Node selv finder en pakke fra denne fil: i desktop/node_modules under udvikling og i appen (app.asar.unpacked),
+// og i en npm-installeret CLI-pakke i den node_modules, npm har lagt det i (typisk over pakken). require.resolve kan ikke bruges, fordi
+// SDK'ets exports kun har import-betingelser. Kun mapperne over denne fil gennemsøges, ikke NODE_PATH eller globale mapper.
+async function pluginModules() {
+  for (const folder of module.paths) {
+    const candidate = folder.replace(/app\.asar([/\\])/, 'app.asar.unpacked$1');
+    if (await fs.access(path.join(candidate, '@opencode-ai', 'plugin', 'package.json')).then(() => true, () => false)) return candidate;
+  }
+  throw new Error('Plugin-understøttelsen til Auras AI-motor mangler. Installer Aura igen.');
+}
 async function pluginRuntimeFiles() {
-  const seen = new Set(), modules = path.join(__dirname, '..', 'node_modules');
+  const seen = new Set(), modules = await pluginModules();
   async function visit(folder) {
     folder = await fs.realpath(folder); if (seen.has(folder)) return; seen.add(folder);
     const manifest = JSON.parse(await fs.readFile(path.join(folder, 'package.json'), 'utf8'));
@@ -169,7 +178,7 @@ async function pluginRuntimePatterns() {
   return [...patterns];
 }
 async function writePluginRuntime(directory) {
-  const modules = await fs.realpath(pluginModules());
+  const modules = await fs.realpath(await pluginModules());
   const sdk = JSON.parse(await fs.readFile(path.join(modules, '@opencode-ai', 'plugin', 'package.json'), 'utf8'));
   if (sdk.version !== VERSION) throw new Error('Plugin-understøttelsen matcher ikke Auras AI-motor. Installer appen igen.');
   // OpenCode venter på npm-installation før enhver lokal plugin. Den låste SDK følger med appen;
@@ -218,22 +227,31 @@ function createReadGuard({ fs, path, root, references = [], selectedFiles = [], 
     output.args.filePath = actual;
   };
 }
-// Skrivevagten nægter kun ved positivt bevis for en sti uden for projektet. Som plugin giver afvisningen en almindelig
+// Skrivevagten nægter kun ved positivt bevis for en sti uden for projektet, eller når en kæde af links ikke kan følges. Som plugin giver afvisningen en almindelig
 // værktøjsfejl, ikke et godkendelseskort, og den lukker ikke andre ventende kort (beslutning for beta 2).
 function createWriteGuard({ fs, path, root }) {
   const inside = (base, target) => { const rel = path.relative(base, target); return rel === '' || (rel !== '..' && !rel.startsWith('..' + path.sep) && !path.isAbsolute(rel)); };
-  const real = async file => {
+  // En sti, der ikke findes endnu, afgøres af den nærmeste mappe over den, som findes. Et hængende link (fx projekt/ny.txt -> /uden/for/ny.txt)
+  // følges til sit mål, fordi skrivningen lander dér. En løkke af links eller en for lang kæde kan ikke afgøres og giver null.
+  const real = async (file, depth = 0) => {
+    if (depth > 40) return null;
     let current = file; const rest = [];
     for (;;) {
       try { return path.join(await fs.realpath(current), ...rest.reverse()); }
-      catch { const parent = path.dirname(current); if (parent === current) return file; rest.push(path.basename(current)); current = parent; }
+      catch {
+        const link = await fs.readlink(current).catch(() => null);
+        if (link !== null) return real(path.join(path.resolve(path.dirname(current), link), ...rest.reverse()), depth + 1);
+        const parent = path.dirname(current); if (parent === current) return file; rest.push(path.basename(current)); current = parent;
+      }
     }
   };
   const refuse = () => { throw new Error('Skriv ikke uden for projektmappen. Brug mappen .aura/tmp til midlertidige filer, og læg alt andet i projektet.'); };
+  // Den faktiske sti afgør: et link i projektet, der peger ud, nægtes, mens en sti gennem et link til projektet (fx /var/… for
+  // /private/var/… på macOS) går igennem, fordi skrivningen lander i projektet.
   const check = async file => {
     if (typeof file !== 'string' || !file || /[\0\r\n]/.test(file)) return;
-    const resolved = path.resolve(root, file);
-    if (!inside(root, resolved) || !inside(root, await real(resolved))) refuse();
+    const actual = await real(path.resolve(root, file));
+    if (actual === null || !inside(root, actual)) refuse();
   };
   return async (input, output) => {
     if (input.tool === 'write' || input.tool === 'edit') return check(output.args?.filePath);
@@ -249,26 +267,47 @@ function createWriteGuard({ fs, path, root }) {
 // stien er kendt, og søger også i skjulte filer som .env. Vagten fjerner derfor hele blokke for beskyttede filer (også via links)
 // fra resultatet, før modellen ser det, og regner antallet om. Ukendte linjer i resultatet gør, at alt skjules (fail closed).
 // Den indlejres i pluginet som createReadGuard og bruger kun de indbyggede moduler.
-function createGrepGuard({ fs, path, root, classifyPath = classify }) {
+function createGrepGuard({ fs, path, root, classifyPath = classify, engineRoot = null, storeRoot = null }) {
   const refusal = 'Aura skjuler søgeresultater, som ikke kan kontrolleres for beskyttede filer.';
+  const inside = (base, target) => { const rel = path.relative(base, target); return rel === '' || (rel !== '..' && !rel.startsWith('..' + path.sep) && !path.isAbsolute(rel)); };
   const rooted = file => { const rel = path.relative(root, file); return rel && rel !== '..' && !rel.startsWith('..' + path.sep) && !path.isAbsolute(rel) ? rel : file; };
   const hidden = file => { const result = classifyPath(rooted(file)); return result.invalid || result.credentials || result.metadata || result.references; };
   const protectedTarget = async file => {
     if (hidden(file)) return true;
     try { return hidden(await fs.realpath(file)); } catch { return true; }
   };
-  // Et link, der peger ud af projektet, må ikke give indhold uden kort: resultatet skjules, hvis målet ligger uden for projektmappen.
-  const outside = async file => {
-    try { const rel = path.relative(root, await fs.realpath(file)); return rel === '..' || rel.startsWith('..' + path.sep) || path.isAbsolute(rel); } catch { return true; }
+  // Motorens egne data skjules som i createReadGuard, også i en godkendt søgning uden for projektet. Projektmappen (en samtalekopi ligger i
+  // appens mappe), de valgte skills og tool-output, som OpenCode selv beder modellen søge i, er undtaget.
+  const closed = [engineRoot, storeRoot].filter(value => typeof value === 'string' && value);
+  const open = engineRoot ? [path.join(engineRoot, 'config', 'skills'), path.join(engineRoot, 'data', 'opencode', 'tool-output')] : [];
+  const engineData = file => !inside(root, file) && closed.some(base => inside(base, file)) && !open.some(base => inside(base, file));
+  // Søgningens eget mål afgør, hvad der må vises. En søgning i projektet (også uden sti) kan ske uden kort, så alt uden for projektet
+  // skjules, fx gennem et link. Ligger målet uden for projektet, har brugeren godkendt netop det mål på et kort: OpenCode spørger altid,
+  // og «Godkend alt» dækker ikke søgning. Så vises resultaterne inde i målet. Kendes målet ikke, gælder projektets grænse (fail closed).
+  const scope = async requested => {
+    if (typeof requested !== 'string' || !requested || /[\0\r\n]/.test(requested)) return root;
+    try { const real = await fs.realpath(path.resolve(root, requested)); return inside(root, real) ? root : real; } catch { return root; }
+  };
+  // Målet afgøres i tool.execute.before, før OpenCode spørger og før søgningen kører, og gemmes pr. kald. tool.execute.after bruger det
+  // gemte mål og ikke stien, som den ser ud efter søgningen: skiftes en mappe i projektet til et link ud af projektet, efter at søgningen
+  // er godkendt uden kort, viser resultatet stadig kun projektet. Uden et gemt mål gælder projektets grænse.
+  const scopes = new Map(), call = input => `${input?.sessionID}\0${input?.callID}`;
+  const visible = async (file, base) => {
+    if (await protectedTarget(file)) return false;
+    try { const real = await fs.realpath(file); return inside(base, real) && !engineData(real); } catch { return false; }
   };
   const before = async (input, output) => {
     if (input.tool !== 'grep') return;
     const requested = output.args?.path;
-    if (requested === undefined || requested === null || requested === '') return;
-    if (typeof requested !== 'string' || /[\0\r\n]/.test(requested) || await protectedTarget(path.resolve(root, requested))) throw new Error('Aura beskytter denne fil.');
+    if (requested !== undefined && requested !== null && requested !== '' && (typeof requested !== 'string' || /[\0\r\n]/.test(requested) || await protectedTarget(path.resolve(root, requested)))) throw new Error('Aura beskytter denne fil.');
+    if (typeof input.callID !== 'string' || !input.callID) return;
+    scopes.set(call(input), await scope(requested));
+    // Et kald, der aldrig når tool.execute.after (fx en fejl i søgningen), må ikke hobe sig op.
+    if (scopes.size > 100) scopes.delete(scopes.keys().next().value);
   };
   const after = async (input, output) => {
     if (input.tool !== 'grep') return;
+    const base = scopes.get(call(input)) || root; scopes.delete(call(input));
     const text = output?.output;
     if (typeof text !== 'string') { output.output = refusal; return; }
     if (text.trim() === 'No files found') return;
@@ -278,7 +317,7 @@ function createGrepGuard({ fs, path, root, classifyPath = classify }) {
       if (!header) { const found = /^Found \d+ matches( \(more matches available\))?$/.exec(line); if (!found) { output.output = refusal; return; } suffix = found[1] || ''; header = true; continue; }
       if (line === '') { if (!hide) kept.push(line); continue; }
       if (line.startsWith('  Line ')) { if (!hide) { kept.push(line); matches++; } continue; }
-      if (line.endsWith(':') && path.isAbsolute(line.slice(0, -1))) { hide = await protectedTarget(line.slice(0, -1)) || await outside(line.slice(0, -1)); if (!hide) kept.push(line); continue; }
+      if (line.endsWith(':') && path.isAbsolute(line.slice(0, -1))) { hide = !(await visible(line.slice(0, -1), base)); if (!hide) kept.push(line); continue; }
       if (/^\(Results truncated\.[^\n]*\)$/.test(line)) { kept.push(line); continue; }
       output.output = refusal; return;
     }
@@ -293,7 +332,7 @@ async function writeReadGuard(directory, root, references, skills = [], { tempRo
   const pluginPath = path.join(directory, 'read-guard.mjs'), readyPath = path.join(directory, 'read-guard-ready.json'), token = randomBytes(32).toString('hex');
   const selectedFiles = skills.flatMap(skill => skill.files.map(file => path.join(directory, 'config', 'skills', skill.name, file.path)));
   await fs.rm(readyPath, { force: true });
-  const source = `import fs from 'node:fs/promises';\nimport path from 'node:path';\nconst classify = (${createPathClassifier.toString()})(${JSON.stringify(RULES)});\nconst guard = (${createReadGuard.toString()})({ fs, path, root: ${JSON.stringify(root)}, references: ${JSON.stringify(references)}, selectedFiles: ${JSON.stringify(selectedFiles)}, classifyPath: classify, engineRoot: ${JSON.stringify(engineRoot)}, storeRoot: ${JSON.stringify(storeRoot)} });\nconst grepGuard = (${createGrepGuard.toString()})({ fs, path, root: ${JSON.stringify(root)}, classifyPath: classify });\nconst writeGuard = (${createWriteGuard.toString()})({ fs, path, root: ${JSON.stringify(root)} });\nconst tempRoot = ${JSON.stringify(tempRoot)};\nexport const AuraReadProtection = async () => {\n await fs.writeFile(${JSON.stringify(readyPath)}, ${JSON.stringify(JSON.stringify({ token }))}, { mode: 0o600 });\n return {\n 'shell.env': async (_input, output) => {\n  // AI'ens kommandoer bruger projektets .aura/tmp. Sandkassens plugin kommer efter og overskriver miljøet helt.\n  if (tempRoot && !output.env.TMPDIR) output.env = { ...output.env, TMPDIR: tempRoot, TMP: tempRoot, TEMP: tempRoot, NODE_DISABLE_COMPILE_CACHE: '1' };\n },\n 'tool.execute.before': async (input, output) => { await guard(input, output); await writeGuard(input, output); await grepGuard.before(input, output); },\n  'tool.execute.after': async (input, output) => { await grepGuard.after(input, output); }\n };\n};\n`;
+  const source = `import fs from 'node:fs/promises';\nimport path from 'node:path';\nconst classify = (${createPathClassifier.toString()})(${JSON.stringify(RULES)});\nconst guard = (${createReadGuard.toString()})({ fs, path, root: ${JSON.stringify(root)}, references: ${JSON.stringify(references)}, selectedFiles: ${JSON.stringify(selectedFiles)}, classifyPath: classify, engineRoot: ${JSON.stringify(engineRoot)}, storeRoot: ${JSON.stringify(storeRoot)} });\nconst grepGuard = (${createGrepGuard.toString()})({ fs, path, root: ${JSON.stringify(root)}, classifyPath: classify, engineRoot: ${JSON.stringify(engineRoot)}, storeRoot: ${JSON.stringify(storeRoot)} });\nconst writeGuard = (${createWriteGuard.toString()})({ fs, path, root: ${JSON.stringify(root)} });\nconst tempRoot = ${JSON.stringify(tempRoot)};\nexport const AuraReadProtection = async () => {\n await fs.writeFile(${JSON.stringify(readyPath)}, ${JSON.stringify(JSON.stringify({ token }))}, { mode: 0o600 });\n return {\n 'shell.env': async (_input, output) => {\n  // AI'ens kommandoer arver ikke motorens opsætning (gatewayens midlertidige nøgle og adresse) eller motorens adgangskode, heller ikke\n  // en kommando, der kører uden sandkasse. Miljøet lægges oven på motorens eget, så værdierne tømmes. En kommando uden sandkasse kører\n  // dog med brugerens rettigheder og kan stadig læse dem i motorens egen proces (fx med ps på macOS); det forhindrer kun sandkassen.\n  output.env = { ...output.env, OPENCODE_CONFIG_CONTENT: '', OPENCODE_SERVER_PASSWORD: '', OPENCODE_SERVER_USERNAME: '' };\n  // AI'ens kommandoer bruger projektets .aura/tmp. Sandkassens plugin kommer efter og overskriver miljøet helt.\n  if (tempRoot && !output.env.TMPDIR) output.env = { ...output.env, TMPDIR: tempRoot, TMP: tempRoot, TEMP: tempRoot, NODE_DISABLE_COMPILE_CACHE: '1' };\n },\n 'tool.execute.before': async (input, output) => { await guard(input, output); await writeGuard(input, output); await grepGuard.before(input, output); },\n  'tool.execute.after': async (input, output) => { await grepGuard.after(input, output); }\n };\n};\n`;
   await fs.writeFile(pluginPath, source, { mode: 0o600 });
   return { pluginURL: pathToFileURL(pluginPath).href, readyPath, token };
 }

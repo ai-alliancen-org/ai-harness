@@ -1,6 +1,6 @@
 {
  "opencode": "1.19.5",
- "aura": "d0c3fca+ændringer",
+ "aura": "1cfa7a6+ændringer",
  "scenario": "byg-uden-git-soeg",
  "outcome": "idle",
  "case": "webfetch-localhost-sti",
@@ -22,21 +22,21 @@
   "del:completed"
  ],
  "request": {
-  "id": "per_1abd28ee7001GJOaaGXDbYP9oy",
-  "sessionID": "ses_e542d7b68ffezKI5f78zcPRWM1",
+  "id": "per_1c4c68d06001U4cn3jChxnP3Zx",
+  "sessionID": "ses_e3b3979f3ffe5KHrNXt25TaWnK",
   "permission": "webfetch",
   "patterns": [
-   "http://localhost:65270/andet?q=1"
+   "http://localhost:55542/andet?q=1"
   ],
   "metadata": {
-   "url": "http://localhost:65270/andet?q=1",
+   "url": "http://localhost:55542/andet?q=1",
    "format": "markdown"
   },
   "always": [
    "*"
   ],
   "tool": {
-   "messageID": "msg_1abd28ed0001KwKDT30MO9iDYU",
+   "messageID": "msg_1c4c68cff0013XC6hxH44TWir3",
    "callID": "kald-25-0"
   }
  },
@@ -46,21 +46,21 @@
   "input": {}
  },
  "policyInput": {
-  "id": "per_1abd28ee7001GJOaaGXDbYP9oy",
-  "sessionID": "ses_e542d7b68ffezKI5f78zcPRWM1",
+  "id": "per_1c4c68d06001U4cn3jChxnP3Zx",
+  "sessionID": "ses_e3b3979f3ffe5KHrNXt25TaWnK",
   "permission": "webfetch",
   "patterns": [
-   "http://localhost:65270/andet?q=1"
+   "http://localhost:55542/andet?q=1"
   ],
   "metadata": {
-   "url": "http://localhost:65270/andet?q=1",
+   "url": "http://localhost:55542/andet?q=1",
    "format": "markdown"
   },
   "always": [
    "*"
   ],
   "tool": {
-   "messageID": "msg_1abd28ed0001KwKDT30MO9iDYU",
+   "messageID": "msg_1c4c68cff0013XC6hxH44TWir3",
    "callID": "kald-25-0"
   },
   "toolInput": {
@@ -71,11 +71,11 @@
  "recordedAura": {
   "allowed": false,
   "source": null,
-  "label": "Hjemmeside: http://localhost:65270",
-  "target": "http://localhost:65270",
+  "label": "Hjemmeside: http://localhost:55542",
+  "target": "http://localhost:55542",
   "match": {
    "kind": "webfetch",
-   "origin": "http://localhost:65270"
+   "origin": "http://localhost:55542"
   },
   "persistable": true,
   "projectFile": false,

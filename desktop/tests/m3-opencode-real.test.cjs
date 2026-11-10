@@ -23,7 +23,7 @@ async function falskModel(plan) {
     if (!hoved) { kald.push({ hoved, status: 200 }); res.writeHead(200, { 'content-type': 'text/event-stream' }); return res.end(svar('Prøve')); }
     const trin = plan[Math.min(kald.filter(k => k.hoved).length, plan.length - 1)];
     kald.push({ hoved, status: trin.status });
-    if (trin.status !== 200) { res.writeHead(trin.status, { 'content-type': 'application/json', ...(trin.retryAfter ? { 'retry-after': trin.retryAfter } : {}) }); return res.end(JSON.stringify({ error: { message: `falsk ${trin.status}` } })); }
+    if (trin.status !== 200) { res.writeHead(trin.status, { 'content-type': 'application/json', ...(trin.retryAfter ? { 'retry-after': trin.retryAfter } : {}) }); return res.end(JSON.stringify({ error: { message: trin.tekst || `falsk ${trin.status}` } })); }
     res.writeHead(200, { 'content-type': 'text/event-stream' }); res.end(svar('Færdig med prøven.'));
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
@@ -53,6 +53,20 @@ async function kør(t, plan, { grænse = 100_000 } = {}) {
   await engine.send('Sig hej.', 'Prøve.');
   let vagt; const slutning = await Promise.race([færdig, new Promise(resolve => { vagt = setTimeout(() => resolve('hang'), grænse); })]); clearTimeout(vagt);
   return { slutning, fejl, model, hændelser, sekunder: (Date.now() - start) / 1000, engine };
+}
+
+// Skeptikerens fund: en 429 med Retry-After over loftet gav altid kvotekortet («Kontoen hos udbyderen er brugt op»), også ved
+// en almindelig hastighedsgrænse. Med den rigtige OpenCode: gatewayen melder fejlen med det samme, og typen følger udbyderens
+// tekst. I Aura stopper den melding opgaven (ChatSession: engine.error), så prøven venter ikke på OpenCodes egen afslutning.
+for (const [tekst, type] of [['Rate limit reached for requests per minute', 'limit'], ['You exceeded your current quota, please check your plan and billing details.', 'quota']]) {
+  test(`en 429 med Retry-After 300 og «${tekst.slice(0, 30)} …» giver typen ${type}, og udbyderen kaldes kun én gang`, real, async t => {
+    const r = await kør(t, [{ status: 429, retryAfter: '300', tekst }], { grænse: 8_000 });
+    assert.deepEqual(r.model.hovedkald(), [429], 'udbyderen kaldes ikke igen');
+    assert.equal(r.fejl.length, 1, 'gatewayen melder fejlen én gang');
+    assert.equal(r.fejl[0].failure.kind, type);
+    assert.ok(Number.isFinite(r.fejl[0].failure.retryAt), 'tidspunktet følger med');
+    assert.match(r.fejl[0].failure.detail, new RegExp(tekst.slice(0, 20)), 'udbyderens tekst står under Se detaljer');
+  });
 }
 
 for (const [status, retryAfter] of [[429, '1'], [408, null], [500, null], [503, null]]) {

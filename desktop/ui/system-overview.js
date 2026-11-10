@@ -16,7 +16,10 @@
     const details = node('details', undefined, 'overview-details'); details.append(node('summary', 'Se detaljer'));
     details.append(
       section('Teknologier', model.technologies.map(t => row(t.name, `${t.kind} · ${t.source}`)), 'Ingen kendte teknologier fundet.'),
-      section('Eksterne tjenester', model.services.map(s => row(s.name, [s.kind, s.owner && `leverandør ${s.owner}`, s.hq && `hovedsæde ${s.hq}`, s.known ? '' : 'ukendt leverandør', s.host].filter(Boolean).join(' · '))), 'Ingen eksterne tjenester fundet i koden.'),
+      // Hver vært står med, også når flere værter hører til samme leverandør, fx Azure Blob og Azure Service Bus.
+      section('Eksterne tjenester', model.services.map(s => row(s.name, [s.kind, s.owner && `leverandør ${s.owner}`, s.hq && `hovedsæde ${s.hq}`, s.known ? '' : 'ukendt leverandør', (s.hosts || [s.host]).join(', ')].filter(Boolean).join(' · '))), 'Ingen eksterne tjenester fundet i koden.'),
+      // Almindelige links (<a href>) er ingen kald og står derfor ikke i resuméet eller diagrammet.
+      ...((model.links || []).length ? [section('Links i koden (ingen kald)', model.links.map(l => row(l.host, `fundet i ${l.files.join(', ')}`)), '')] : []),
       section('Hosting', model.hosting.map(h => row(h.provider, `fundet i ${h.evidence}`)), 'Ingen hosting fundet i projektets filer.'),
       section('Hemmeligheder appen forventer', model.secrets.map(s => row(s.name, s.files.join(', '))), view.noSecrets(model)));
     root.append(details);

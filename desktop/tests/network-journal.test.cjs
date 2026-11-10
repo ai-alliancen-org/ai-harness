@@ -181,7 +181,8 @@ test('loaded journal records discard untrusted extra fields and invalid metadata
     category: 'catalog', purpose: secret, provider: secret, host: `example.com/${secret}`, locality: 'remote', method: secret,
     headers: { authorization: secret }, error: secret, prompt: secret, receivedBytes: secret, totalMs: -1 }] };
   await fs.writeFile(file, JSON.stringify(saved), { mode: 0o600 });
-  const journal = new NetworkJournal(); await journal.configure({ directory: journalDir }); await journal.flush();
+  // Fast tid: registreringer over 30 dage gamle indlæses ikke (R#39), så prøven må ikke afhænge af dagens dato.
+  const journal = new NetworkJournal({ now: () => Date.parse('2026-10-26T12:00:00Z') }); await journal.configure({ directory: journalDir }); await journal.flush();
   const snapshot = journal.snapshot(); assert.equal(snapshot.records.length, 1); assert.equal(snapshot.persistence.status, 'ready');
   for (const key of ['purpose', 'provider', 'host', 'method', 'receivedBytes', 'totalMs']) assert.equal(snapshot.records[0][key], null);
   assert.equal(JSON.stringify(snapshot).includes(secret), false); assert.equal((await fs.readFile(file, 'utf8')).includes(secret), false);

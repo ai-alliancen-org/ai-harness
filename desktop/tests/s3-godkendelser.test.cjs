@@ -76,11 +76,12 @@ test('fund 10: ? * nul og .. afvises stadig, og en sti med [ ] passer ikke på a
   assert.equal((await policy.allowed(noProject, file)).allowed, true);
   assert.equal((await policy.allowed(noProject, { ...file, metadata: { filepath: path.join(root, 'app/s/page.tsx') } })).allowed, false);
 });
-test('fund 11: Tillad altid på en kommando tilbydes kun, når sandkassen kører', async t => {
+// Fund 11 og brugerens beslutning 10. november 2026 («Fjern funktionen»): en kommando kan ikke huskes, heller ikke med kørende sandkasse.
+test('fund 11: Tillad altid tilbydes aldrig for en kommando, heller ikke når sandkassen kører', async t => {
   const { root, policy, context } = await fixture(t);
   const bash = { id: 'b', permission: 'bash', patterns: ['npm test'], metadata: {}, toolInput: { tool: 'bash', command: 'npm test', workdir: root } };
-  assert.equal((await policy.describe({ ...context, commandSandbox: false }, bash)).persistable, false, 'sandkassen understøttes men kører ikke');
-  assert.equal((await policy.describe({ ...context, commandSandbox: undefined }, bash)).persistable, false);
-  assert.equal((await policy.describe({ ...context, commandSandbox: true }, bash)).persistable, true, 'med kørende sandkasse virker reglen');
-  await assert.rejects(policy.grant({ ...context, commandSandbox: false }, bash, { scope: 'project' }), /én gang/);
+  for (const commandSandbox of [false, undefined, true]) {
+    assert.equal((await policy.describe({ ...context, commandSandbox }, bash)).persistable, false, String(commandSandbox));
+    await assert.rejects(policy.grant({ ...context, commandSandbox }, bash, { scope: 'project' }), /én gang/, String(commandSandbox));
+  }
 });

@@ -22,7 +22,7 @@ npm install --include=optional --ignore-scripts --no-audit --no-fund --no-save .
 ./node_modules/.bin/aura doctor
 ```
 
-npm henter den fastlåste OpenCode-motor. `doctor` skal finde Node, Git og OpenCode 1.19.5. Stop ved fejl. Vejledningen kræver hverken global installation eller `sudo`. Slå ikke Gatekeeper eller arbejdspladsens kontroller fra for at få pakken til at starte. Terminalpakken er ikke den signerede og notariserede desktopinstallation.
+npm henter den fastlåste OpenCode-motor. `doctor` skal finde Node, Git og OpenCode 1.18.33. Stop ved fejl. Vejledningen kræver hverken global installation eller `sudo`. Slå ikke Gatekeeper eller arbejdspladsens kontroller fra for at få pakken til at starte. Terminalpakken er ikke den signerede og notariserede desktopinstallation.
 
 ## Første prøve
 

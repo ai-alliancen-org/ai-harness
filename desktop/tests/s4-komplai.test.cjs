@@ -126,12 +126,19 @@ test('S4-16: en afvisning overskriver ikke kvitteringen for en side, der er live
   await s.deployments.deploy(root, (await s.deployments.review(root, input)).token);
   const live = (await s.store.project(root)).deploymentLast;
   assert.equal(live.id, 'release-1');
-  for (const failure of [() => Response.json({ error: 'storage_limit' }, { status: 507 }), () => Response.json({ error: 'upload_limit' }, { status: 413 }), () => { throw Error('Forbindelsen brød sammen.'); }]) {
+  for (const failure of [() => Response.json({ error: 'storage_limit' }, { status: 507 }), () => Response.json({ error: 'upload_limit' }, { status: 413 })]) {
     s.setUpload(failure);
     await assert.rejects(s.deployments.deploy(root, (await s.deployments.review(root, input)).token));
     const now = (await s.store.project(root)).deploymentLast;
     assert.equal(now.id, 'release-1'); assert.equal(now.state, 'READY'); assert.notEqual(now.state, 'UNKNOWN');
   }
+  // Ændret 9. november 2026 (fund R#28): en tabt forbindelse er ikke en afvisning. komplai kan have aktiveret den nye
+  // version, så den gamle kvittering må ikke stå som udgivet. Kortet siger «Upload ikke bekræftet» (decisions.md, 7. oktober).
+  s.setUpload(() => { throw Error('Forbindelsen brød sammen.'); });
+  await assert.rejects(s.deployments.deploy(root, (await s.deployments.review(root, input)).token), /ikke bekræftet/);
+  const uncertain = (await s.store.project(root)).deploymentLast;
+  assert.equal(uncertain.state, 'UNKNOWN'); assert.equal(uncertain.id, null);
+  assert.equal(view.receiptSummary(uncertain).publication.title, 'Upload ikke bekræftet');
 });
 
 test('S4-16: en afvisning viser komplais egen tekst', async t => {

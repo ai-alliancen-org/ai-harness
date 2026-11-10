@@ -6,9 +6,10 @@
     const lines = [];
     const tech = model.technologies.map(t => t.name);
     lines.push(tech.length ? `Appen bruger ${list(tech)}.` : 'Appen bruger ingen kendte teknologier ud over almindelig HTML.');
-    const outside = model.services.filter(s => s.kind !== 'Hosting');
+    // Alle tjenester, koden kalder, også hos en skyudbyder som Azure eller Vercel. Links og kommentarer er ikke med (core/system-overview.cjs).
+    const outside = model.services;
     if (!outside.length) lines.push('Appen henter ikke noget fra eksterne tjenester, som oversigten kan se.');
-    else lines.push(`Appen kalder ${outside.length === 1 ? 'én ekstern tjeneste' : `${outside.length} eksterne tjenester`}: ${list(outside.map(s => s.name))}.`);
+    else lines.push(`Appen kan kalde ${outside.length === 1 ? 'én ekstern tjeneste' : `${outside.length} eksterne tjenester`}: ${list(outside.map(s => s.name))}.`);
     const ai = model.externalAI || [];
     if (ai.length) lines.push(`Data kan blive sendt til AI-leverandør${ai.length > 1 ? 'er' : ''}: ${list(ai.map(s => `${s.name}${s.hq ? ` (${s.hq})` : ''}`))}.`);
     lines.push(model.hosting.length ? `Appen er sat op til at blive hostet hos ${list(model.hosting.map(h => h.provider))}.` : 'Oversigten kan ikke se, hvor appen hostes. Det bestemmer du, når du udgiver den.');
@@ -21,7 +22,8 @@
   // Et lagdelt diagram: brugeren, appen, de eksterne tjenester og hosting. Kun navne, ingen fantasi om dataflow ud over det, koden viser.
   function diagram(model) {
     const box = (x, y, w, h, title, sub, tone) => `<g><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="10" class="so-box so-${tone}"/><text x="${x + w / 2}" y="${y + 22}" text-anchor="middle" class="so-title">${esc(title)}</text>${sub ? `<text x="${x + w / 2}" y="${y + 40}" text-anchor="middle" class="so-sub">${esc(sub.length > 34 ? sub.slice(0, 33) + '…' : sub)}</text>` : ''}</g>`;
-    const services = model.services.filter(s => s.kind !== 'Hosting').slice(0, 6), hosts = model.hosting.slice(0, 3);
+    // AI-tjenester står først, så de ikke falder ud, når appen kalder mere end seks tjenester (Q:E-4). Resuméet nævner dem alle.
+    const services = [...model.services.filter(s => s.kind === 'AI'), ...model.services.filter(s => s.kind !== 'AI')].slice(0, 6), hosts = model.hosting.slice(0, 3);
     const rows = Math.max(services.length, hosts.length, 1), height = 90 + rows * 66;
     const parts = [box(10, 10, 150, 54, 'Brugeren', 'i browseren', 'user'), box(210, 10, 200, 54, 'Din app', model.technologies.slice(0, 3).map(t => t.name).join(', '), 'app')];
     parts.push(`<path d="M160 37 H210" class="so-line"/>`);

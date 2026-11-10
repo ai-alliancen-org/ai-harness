@@ -56,7 +56,12 @@ function validateArtifact(c,a) {
 }
 class Deployments {
   constructor(store,{providers,github,fetcher,artifact=deploymentArtifact,builder=buildSaved}={}) { this.store=store; this.providers=providers||{komplai:new KomplaiDeployment(store),vercel:new VercelDeployment(),azure:new AzureDeployment(),promte:new PromteDeployment({store}), 'github-pages':new GitHubPagesDeployment(github), cloudflare:new CloudflarePagesDeployment(github)}; this.fetcher=fetcher||((...args)=>fetch(...args));this.pagesFetcher=fetcher||fetchSite;this.artifact=artifact;this.builder=builder;this.builds=new Map();this.reviews=new Map(); }
-  async state(root) { const p=await this.store.project(root); return {config:p.deploymentConfig||null,preference:p.startup?.hosting||'',last:p.deploymentLast||null}; }
+  async state(root) {
+    const p=await this.store.project(root), config=p.deploymentConfig||null, created=p.deploymentCreatedApp?.appId;
+    // createdApp: en app, komplai oprettede ved et forsøg, hvor uploaden blev afvist. Udgiv fortsætter til den, også efter Luk,
+    // så længe den er projektets valgte destination. Gennemgås en anden destination, går det nyeste valg forud.
+    return {config,preference:p.startup?.hosting||'',last:p.deploymentLast||null,createdApp:created&&config?.provider==='komplai'&&config.appId===created?created:null};
+  }
   /** Hvad komplai-udgivelsen bruger: projektets gemte opsætning, ellers en gemt byggemappe, en bygning eller public. */
   async source(root) {
     const saved=(await this.store.project(root)).deploymentConfig;
@@ -103,15 +108,26 @@ class Deployments {
     const a=await this.material(root,r.config), provider=this.providers[r.config.provider], target=await provider.inspect(r.config,a);
     if(a.head!==r.head||a.hash!==r.hash||hash(target)!==r.targetHash) throw Error('Version eller destination har ændret sig. Gennemgå udgivelsen igen.');
     const receipt={config:r.config,target,version:r.version,head:a.head,hash:a.hash,startedAt:new Date().toISOString(),state:'SUBMITTING',id:null,url:null,checks:null,indexHash:r.config.mode!=='source'?a.files.find(f=>f.file===(r.config.provider==='azure'&&r.config.frontend!=='.'?r.config.frontend+'/':'')+'index.html')?.sha256:null};
-    const before=(await this.store.project(root)).deploymentLast, trackingBefore=(await this.store.project(root)).deploymentTrackingSource;
-    await this.store.saveProject(root,{deploymentLast:receipt,deploymentTrackingSource:'manual'});
+    const project=await this.store.project(root), before=project.deploymentLast, trackingBefore=project.deploymentTrackingSource, createdBefore=project.deploymentCreatedApp??null;
+    // Den nye kvittering afløser en app, der ventede på sin første version. Kun en tydelig afvisning giver den tilbage nedenfor,
+    // så en uvis upload altid viser «Upload ikke bekræftet» og ikke et nyt forsøg.
+    await this.store.saveProject(root,{deploymentLast:receipt,deploymentTrackingSource:'manual',deploymentCreatedApp:null});
     // En ny komplai-app gemmes straks, så et nyt forsøg opdaterer den samme app i stedet for at oprette endnu en.
     const onCreated=async appId=>{ receipt.appId=appId; await this.store.saveProject(root,{deploymentConfig:{...r.config,appId,name:undefined,slug:undefined},deploymentLast:receipt}); };
     const onUploaded=async result=>{ Object.assign(receipt,result); await this.store.saveProject(root,{deploymentLast:receipt}); };
     try { Object.assign(receipt,await provider.deploy(r.config,a,target,{onCreated,onUploaded})); }
     catch(error) {
       // Udbyderen sagde tydeligt, at intet er uploadet (fx komplai med travlt). Så er der ingen uvis upload, og den tidligere kvittering bevares.
-      if(!receipt.id&&error?.notUploaded===true){ await this.store.saveProject(root,{deploymentLast:before,deploymentTrackingSource:trackingBefore}); throw Error(error.message); }
+      // Har komplai allerede oprettet en ny app, står den i deploymentConfig (onCreated) og huskes som oprettet uden version, så
+      // Udgiv fortsætter til den, også efter Luk (state().createdApp). Beskeden siger, at næste forsøg bruger den.
+      // En offentlig app er allerede gjort offentlig, og Aura ændrer aldrig en eksisterende apps adgang, så «Vælg Organisationen» kan ikke bruges.
+      if(!receipt.id&&error?.notUploaded===true){
+        // Navnet huskes med, så forhåndsvisningen kan vise den app, næste forsøg går til (komplai-preview.cjs, link()).
+        await this.store.saveProject(root,{deploymentLast:before,deploymentTrackingSource:trackingBefore,deploymentCreatedApp:receipt.appId?{appId:receipt.appId,...(r.config.name?{name:r.config.name}:{})}:createdBefore});
+        if(!receipt.appId) throw Error(error.message);
+        if(['public_app','public_app_capabilities'].includes(error.code)) throw Error('Appen bruger komplai-funktioner, der kun virker for organisationen. komplai har oprettet appen som offentlig uden en version. Skift appens adgang til Organisationen i komplai, eller fjern brugen fra appens komplai.json. Næste forsøg udgiver til den samme app.');
+        throw Error(`${error.message} Appen er oprettet hos komplai uden en version. Næste forsøg udgiver til den samme app.`);
+      }
       if(receipt.id) {
         if(r.config.provider==='promte'&&receipt.state==='PREPARED') receipt.verification='Versionen er oprettet hos Promte, men upload er ikke bekræftet. Kontrollér versionen i Promte før et nyt forsøg.';
         else if(r.config.provider==='promte'&&receipt.state==='UPLOADED') receipt.verification='Promte har modtaget filerne, men den videre behandling er ikke bekræftet. Kontrollér versionen i Promte.';
@@ -119,11 +135,8 @@ class Deployments {
         else if(['github-pages','cloudflare'].includes(r.config.provider)&&receipt.state==='SUBMITTING') receipt.verification='Starten af GitHub-kørslen er ikke bekræftet. Kontrollér status før et nyt forsøg.';
         else receipt.verification='Handlingen er registreret, men resultatet er ikke bekræftet. Kontrollér status hos udbyderen, før du prøver igen.';
       }
-      else if(before?.id&&before.state==='READY'&&(!receipt.appId||receipt.appId===before.appId)&&before.config?.provider===r.config.provider) {
-        // Den sidste kvittering for en side, der er live, overskrives aldrig med UNKNOWN. Kun en note om det uklare forsøg tilføjes.
-        await this.store.saveProject(root,{deploymentLast:{...before,verification:'Et nyt forsøg blev ikke bekræftet. Den tidligere udgivelse står uændret. Kontrollér udbyderens oversigt før et nyt forsøg.'},deploymentTrackingSource:trackingBefore});
-        throw Error('Udgivelsen blev ikke bekræftet. Kontrollér udbyderens oversigt før et nyt forsøg. Dit lokale projekt er bevaret.');
-      }
+      // Uvist udfald: udbyderen kan have modtaget og aktiveret versionen. Den gamle kvittering må derfor ikke stå som den
+      // aktuelle udgivelse; kortet viser «Upload ikke bekræftet» med udbyderens oversigt som vej videre (decisions.md, 7. oktober).
       else { receipt.state='UNKNOWN'; await this.store.saveProject(root,{deploymentLast:receipt}); throw Error('Udgivelsen blev ikke bekræftet. Kontrollér udbyderens oversigt før et nyt forsøg. Dit lokale projekt er bevaret.'); }
     }
     await this.store.saveProject(root,{deploymentLast:receipt});
@@ -160,7 +173,11 @@ class Deployments {
       Object.assign(receipt, result);
       receipt.checks.provider = { status: 'checked', state: receipt.state, ...(receipt.config.provider === 'komplai' && ['public','private'].includes(result.visibility) ? { visibility: result.visibility } : {}) };
       receipt.verification = 'Udbyderens status er kontrolleret; siden er endnu ikke verificeret.';
-    } catch {
+    } catch (error) {
+      // Er udgivelsesadgangen udløbet eller tilbagekaldt, eller gælder den en anden organisation end appens, gemmes kun den
+      // kategori, så kortet kan bede om et nyt login. Fejlteksten gemmes ikke.
+      if (error?.login === true) receipt.checks.provider = { status: 'unknown', reason: 'login' };
+      else if (error?.organisation === true) receipt.checks.provider = { status: 'unknown', reason: 'organisation' };
       if(!await save()) return latest();
       return receipt;
     }

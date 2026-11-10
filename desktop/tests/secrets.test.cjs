@@ -105,7 +105,12 @@ test('rensning er idempotent og tåler ikke-tekst', () => {
   assert.equal(redact(42), '42');
 });
 
-test('1 MB gentaget input behandles på under 200 ms pr. mønster', () => {
+// Vagten mod katastrofal tilbagesporing måler processens egen CPU-tid, ikke vægurets tid, og tager den bedste af højst tre kørsler.
+// Under parallel belastning (fx hele suiten) kunne vægurets tid ellers nå over 200 ms uden en rigtig fejl (spor P, beta 3). Et mønster,
+// der sporer katastrofalt tilbage, bruger CPU-tiden selv og er langsomt hver gang, så vagten fyrer stadig.
+const cpuMs = fn => { const start = process.cpuUsage(); fn(); const used = process.cpuUsage(start); return (used.user + used.system) / 1000; };
+const bestOf = (fn, limit) => { let best = Infinity; for (let i = 0; i < 3 && best >= limit; i++) best = Math.min(best, cpuMs(fn)); return best; };
+test('1 MB gentaget input behandles på under 200 ms CPU-tid pr. mønster', () => {
   const inputs = [
     ...fixtures.map(f => [f[0], f[1]]),
     ...harmless.map((t, i) => ['harmløs ' + i, t]),
@@ -115,9 +120,7 @@ test('1 MB gentaget input behandles på under 200 ms pr. mønster', () => {
   ];
   for (const [name, unit] of inputs) {
     const big = (unit + ' ').repeat(Math.ceil(1024 * 1024 / (unit.length + 1)));
-    const start = process.hrtime.bigint();
-    redact(big);
-    const ms = Number(process.hrtime.bigint() - start) / 1e6;
-    assert.ok(ms < 200, `${name}: ${ms.toFixed(0)} ms`);
+    const ms = bestOf(() => redact(big), 200);
+    assert.ok(ms < 200, `${name}: ${ms.toFixed(0)} ms CPU-tid`);
   }
 });

@@ -1,6 +1,6 @@
 {
  "opencode": "1.19.5",
- "aura": "d0c3fca+ændringer",
+ "aura": "1cfa7a6+ændringer",
  "scenario": "byg-git-soeg",
  "outcome": "idle",
  "case": "bash-lang",
@@ -23,8 +23,8 @@
   "del:completed"
  ],
  "request": {
-  "id": "per_1abd279fa0012QlwBPldPBZhSI",
-  "sessionID": "ses_e542d8d79ffeBga5YF1Pc60yWB",
+  "id": "per_1c4c67f72001Cn8HFTiWDrRc6m",
+  "sessionID": "ses_e3b398532ffeoRuSmwWI1ujThB",
   "permission": "bash",
   "patterns": [
    "npm install --no-audit --no-fund --prefer-offline",
@@ -49,7 +49,7 @@
    "cat *"
   ],
   "tool": {
-   "messageID": "msg_1abd279e400101H4lj110YEfVA",
+   "messageID": "msg_1c4c67f65001Gx4i11RlKqUF58",
    "callID": "kald-12-0"
   }
  },
@@ -62,8 +62,8 @@
   }
  },
  "policyInput": {
-  "id": "per_1abd279fa0012QlwBPldPBZhSI",
-  "sessionID": "ses_e542d8d79ffeBga5YF1Pc60yWB",
+  "id": "per_1c4c67f72001Cn8HFTiWDrRc6m",
+  "sessionID": "ses_e3b398532ffeoRuSmwWI1ujThB",
   "permission": "bash",
   "patterns": [
    "npm install --no-audit --no-fund --prefer-offline",
@@ -88,7 +88,7 @@
    "cat *"
   ],
   "tool": {
-   "messageID": "msg_1abd279e400101H4lj110YEfVA",
+   "messageID": "msg_1c4c67f65001Gx4i11RlKqUF58",
    "callID": "kald-12-0"
   },
   "toolInput": {

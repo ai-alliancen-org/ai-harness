@@ -1,7 +1,8 @@
 // Kun på rigtig Windows i separat, tom testkonto eller Windows Sandbox.
 // Fra desktop: node scripts/verify-windows-nsis-upgrade.cjs OLD.exe NEW.exe
-// --isolated-windows-account --old-version=0.5.0-beta.3 --new-version=0.6.0-beta.1
+// --isolated-windows-account --old-version=0.7.0-beta.2 --new-version=0.7.0-beta.3
 // --old-sha256=GENNEMGAAET_HASH --new-sha256=GENNEMGAAET_HASH --method=installer
+// Den tidligere version skal være 0.7.0-beta.1 eller nyere: nøglen indtastes i nøglevinduet, som verify-upgrade.cjs gør.
 // Gentag fra en tom testkonto med --method=updater for den gamle apps native updater.
 // Begge metoder bruger rigtig NSIS, men stille installation og kontrolleret genåbning.
 const assert = require('node:assert/strict');
@@ -48,7 +49,7 @@ async function verify(argv) {
   await fs.writeFile(path.join(root, 'kun-syntetiske-testdata.json'), JSON.stringify({ purpose: 'Aura Windows-opgraderingsprøve', at: new Date().toISOString() }));
   console.log('Testmateriale: ' + root);
   const { _electron: electron } = require('playwright');
-  let app, page, downloads = 0, modelRequests = 0, unexpectedRequests = 0, info;
+  let app, page, downloads = 0, modelRequests = 0, requestsBeforeUpdate = 0, unexpectedRequests = 0, info;
   const key = 'SYNTHETISK_TESTNOEGLE_KUN_LOKALT';
   const server = http.createServer((req, res) => {
     if (req.url === '/feed' && info) { res.setHeader('content-type', 'application/json'); return res.end(JSON.stringify(info)); }
@@ -80,10 +81,12 @@ async function verify(argv) {
     await fs.mkdir(path.join(project, 'public'), { recursive: true }); await fs.writeFile(path.join(project, 'public/index.html'), original);
     await helpers.openExistingProject(app, page, project);
     await page.frameLocator('#preview').getByRole('heading', { name: 'Bevaret indhold' }).waitFor();
-    const connection = await page.evaluate(value => window.harness.saveConnection(value), { kind: 'compatible', name: 'Bevaret forbindelse', baseURL: serverURL + '/v1', apiKey: key });
-    assert.equal(connection.ok, true); assert.equal(JSON.stringify(connection).includes(key), false);
-    const connectionId = connection.value.connections.at(-1).id;
-    assert.equal((await page.evaluate(id => window.harness.models(id), connectionId)).ok, true); assert.equal(modelRequests, 1);
+    // Siden 0.7 kan en nøgle kun indtastes i det isolerede nøglevindue, så forbindelsen gemmes den vej (og kun den vej).
+    // Nøglevinduet kontrollerer nøglen ved at hente kataloget, så kald tælles i forhold til tallet før opdateringen.
+    const connection = await helpers.addConnection(page, { name: 'Bevaret forbindelse', baseURL: serverURL + '/v1', apiKey: key, app });
+    assert.equal(JSON.stringify(connection).includes(key), false);
+    const connectionId = connection.id, before = modelRequests;
+    assert.equal((await page.evaluate(id => window.harness.models(id), connectionId)).ok, true); assert.ok(modelRequests > before, 'modellisten hentes med den gemte nøgle'); requestsBeforeUpdate = modelRequests;
     assert.equal((await page.evaluate(() => window.harness.saveDesign({ name: 'Bevaret design', color: '#0052cc', links: [] }))).ok, true);
     await page.fill('#prompt', 'Bevar kladden gennem Windows-opdateringen'); await page.evaluate(() => saveChatDraft(true));
     await helpers.assertNoGitWrites(app); await assert.rejects(fs.access(path.join(project, '.git')), { code: 'ENOENT' });
@@ -132,10 +135,10 @@ async function verify(argv) {
     }
     assert.equal(installedVersion(), input.newVersion);
     await launch(); assert.equal(await app.evaluate(({ app }) => app.getVersion()), input.newVersion);
-    assert.equal(modelRequests, 1, 'Opgradering må ikke selv sende en modelanmodning.');
+    assert.equal(modelRequests, requestsBeforeUpdate, 'Opgradering må ikke selv sende en modelanmodning.');
     const state = await page.evaluate(() => window.harness.connectionState());
     assert.equal(state.ok, true); assert.ok(state.value.connections.some(c => c.id === connectionId)); assert.equal(JSON.stringify(state).includes(key), false);
-    assert.equal((await page.evaluate(id => window.harness.models(id), connectionId)).ok, true); assert.equal(modelRequests, 2);
+    assert.equal((await page.evaluate(id => window.harness.models(id), connectionId)).ok, true); assert.equal(modelRequests, requestsBeforeUpdate + 1);
     assert.equal(await fs.readFile(path.join(project, 'public/index.html'), 'utf8'), original);
     await page.frameLocator('#preview').getByRole('heading', { name: 'Bevaret indhold' }).waitFor();
     assert.equal(await page.inputValue('#prompt'), 'Bevar kladden gennem Windows-opdateringen');

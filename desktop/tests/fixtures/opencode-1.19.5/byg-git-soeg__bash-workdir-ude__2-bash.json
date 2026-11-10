@@ -1,6 +1,6 @@
 {
  "opencode": "1.19.5",
- "aura": "d0c3fca+ændringer",
+ "aura": "1cfa7a6+ændringer",
  "scenario": "byg-git-soeg",
  "outcome": "idle",
  "case": "bash-workdir-ude",
@@ -25,8 +25,8 @@
   "del:completed"
  ],
  "request": {
-  "id": "per_1abd27cbf002IW6yNDFKO6Ar1a",
-  "sessionID": "ses_e542d8d79ffeBga5YF1Pc60yWB",
+  "id": "per_1c4c680f7002U2q4B42xagigwf",
+  "sessionID": "ses_e3b398532ffeoRuSmwWI1ujThB",
   "permission": "bash",
   "patterns": [
    "ls"
@@ -38,7 +38,7 @@
    "ls *"
   ],
   "tool": {
-   "messageID": "msg_1abd27ca8001WVtCvG8fzOrAYA",
+   "messageID": "msg_1c4c680e9001VfZZ6uWivuITde",
    "callID": "kald-14-0"
   }
  },
@@ -52,8 +52,8 @@
   }
  },
  "policyInput": {
-  "id": "per_1abd27cbf002IW6yNDFKO6Ar1a",
-  "sessionID": "ses_e542d8d79ffeBga5YF1Pc60yWB",
+  "id": "per_1c4c680f7002U2q4B42xagigwf",
+  "sessionID": "ses_e3b398532ffeoRuSmwWI1ujThB",
   "permission": "bash",
   "patterns": [
    "ls"
@@ -65,7 +65,7 @@
    "ls *"
   ],
   "tool": {
-   "messageID": "msg_1abd27ca8001WVtCvG8fzOrAYA",
+   "messageID": "msg_1c4c680e9001VfZZ6uWivuITde",
    "callID": "kald-14-0"
   },
   "toolInput": {

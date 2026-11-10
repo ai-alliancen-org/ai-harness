@@ -91,19 +91,20 @@ test('uden isolation tillades en kommando, der nævner beskyttede navne, hverken
   assert.equal((await policy.describe({ ...win, mode: 'plan' }, command('node index.js', root))).persistable, false);
 });
 
-test('en gemt kommandoregel bruges uden isolation kun når valget er tændt', async t => {
+// Brugerens beslutning 10. november 2026 («Fjern funktionen»): en kommando kan ikke huskes, heller ikke uden isolation på Windows.
+test('en kommando kan ikke huskes uden isolation, heller ikke når valget er tændt', async t => {
   const { root, policy, win } = await policyFixture(t), p = command('node lokal.cjs', root), noAuto = { ...win, autoCommandsSnapshot: false, autoCommandsUnisolated: false };
-  assert.equal((await policy.describe({ ...win, commandUnisolated: false }, p)).persistable, false, 'uden valget tilbydes «Tillad altid» ikke');
-  assert.equal((await policy.describe(noAuto, p)).persistable, true);
-  await policy.grant(noAuto, p, { scope: 'project' });
-  assert.equal((await policy.allowed(noAuto, p)).source, 'rule');
-  assert.equal((await policy.allowed({ ...noAuto, commandUnisolated: false }, p)).allowed, false, 'reglen virker ikke, når valget er slået fra');
+  for (const ctx of [{ ...win, commandUnisolated: false }, noAuto]) {
+    assert.equal((await policy.describe(ctx, p)).persistable, false, '«Tillad altid» tilbydes ikke');
+    await assert.rejects(policy.grant(ctx, p, { scope: 'project' }), /én gang/);
+  }
+  assert.equal((await policy.allowed(noAuto, p)).allowed, false, 'uden projektets valg tillades kommandoen ikke automatisk');
 });
 
 test('på Mac og Linux er godkendelserne uændrede af den nye tilstand', async t => {
   const { root, policy, win } = await policyFixture(t), mac = { ...win, commandSandboxSupported: true, commandSandbox: true, commandUnisolated: undefined, autoCommandsUnisolated: undefined }, p = command('npm test', root);
   const result = await policy.allowed(mac, p);
-  assert.equal(result.source, 'commands'); assert.equal(result.descriptor.persistable, true);
+  assert.equal(result.source, 'commands'); assert.equal(result.descriptor.persistable, false, 'en kommando huskes ikke (beslutning 10. november 2026)');
   assert.equal('commandProtected' in result.descriptor, false); assert.equal('unisolated' in result.descriptor, false);
   assert.equal((await policy.allowed({ ...mac, commandSandbox: false }, p)).allowed, false, 'uden sandkasse tillades intet, når Windows-valget ikke er tændt');
   assert.equal((await policy.allowed(mac, command('cat .env', root))).allowed, true, 'sandkassen tager sig af beskyttede navne, som før');

@@ -1,6 +1,6 @@
 {
  "opencode": "1.19.5",
- "aura": "d0c3fca+ændringer",
+ "aura": "1cfa7a6+ændringer",
  "scenario": "byg-uden-git-soeg",
  "outcome": "idle",
  "case": "doom-loop",
@@ -26,8 +26,8 @@
   "del:completed"
  ],
  "request": {
-  "id": "per_1abd28f7d001jF0dWqJEh8dRSE",
-  "sessionID": "ses_e542d7b68ffezKI5f78zcPRWM1",
+  "id": "per_1c4c68d56001Hzsplznu3XmYa5",
+  "sessionID": "ses_e3b3979f3ffe5KHrNXt25TaWnK",
   "permission": "doom_loop",
   "patterns": [
    "read"

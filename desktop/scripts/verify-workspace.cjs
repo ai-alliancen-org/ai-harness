@@ -228,23 +228,46 @@ const helpers = require('./ui-test-helpers.cjs');
     await page.waitForFunction(() => document.querySelector('#changes-files .file-row[data-file="public/index.html"] .by-tag')?.textContent === 'AI’en og andre');
     passed('Hele samtalen markerer en fil som AI’en og andre, når brugeren har rettet den bagefter');
 
-    // 980 × 720, større tekst og reduceret bevægelse.
+    // 980 × 720, større tekst og reduceret bevægelse. I en smal arbejdsflade står de seks faner på én linje og ruller sidelæns
+    // (beslutningen 3. november 2026). Den valgte fane skal altid stå helt synligt (DESIGN.md), og de andre skal kunne nås.
     const layout = async () => page.evaluate(() => {
-      const tabs = [...document.querySelectorAll('.work-tab')].map(el => el.getBoundingClientRect());
+      const strip = document.querySelector('.work-tabs'), box = strip.getBoundingClientRect();
+      const tabs = [...document.querySelectorAll('.work-tab:not([hidden])')].map(el => el.getBoundingClientRect());
+      const chosen = document.querySelector('.work-tab[aria-selected="true"]').getBoundingClientRect();
       const surface = document.querySelector('#work-surface').getBoundingClientRect(), send = document.querySelector('#send').getBoundingClientRect(), prompt = document.querySelector('#prompt').getBoundingClientRect();
-      return { width: innerWidth, height: innerHeight, overflowX: document.documentElement.scrollWidth > innerWidth || surface.right > innerWidth + 1 || surface.bottom > innerHeight + 1, rows: new Set(tabs.map(r => Math.round(r.top))).size, tabsInside: tabs.every(r => r.left >= surface.left - 1 && r.right <= surface.right + 1 && r.bottom <= surface.bottom), sendVisible: send.bottom <= innerHeight && send.right <= innerWidth && send.width > 0, promptHeight: Math.round(prompt.height), collapsed: document.body.classList.contains('sidebar-collapsed') };
+      return { width: innerWidth, height: innerHeight, overflowX: document.documentElement.scrollWidth > innerWidth || surface.right > innerWidth + 1 || surface.bottom > innerHeight + 1, rows: new Set(tabs.map(r => Math.round(r.top))).size, stripInside: box.left >= surface.left - 1 && box.right <= surface.right + 1 && box.bottom <= surface.bottom, selectedVisible: chosen.width > 0 && chosen.left >= box.left - 1 && chosen.right <= box.right + 1, scrollable: strip.scrollWidth > strip.clientWidth + 1, sendVisible: send.bottom <= innerHeight && send.right <= innerWidth && send.width > 0, promptHeight: Math.round(prompt.height), collapsed: document.body.classList.contains('sidebar-collapsed') };
     });
+    // Som knappen Se Aktivitet og filhenvisningerne: fanen vælges uden at få fokus, så kun Auras egen kode kan rulle den frem.
+    const choose = async name => { await page.evaluate(name => window.workspace.show(name), name); await page.waitForTimeout(100); return layout(); };
+    // Musehjulet ruller striben sidelæns, også når en fane ikke har nogen synlig del at klikke på.
+    const wheel = async () => {
+      const box = await page.locator('.work-tabs').boundingBox(), before = await page.locator('.work-tabs').evaluate(el => el.scrollLeft);
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2); await page.mouse.wheel(before > 0 ? -400 : 400, 0);
+      await page.waitForFunction(before => Math.abs(document.querySelector('.work-tabs').scrollLeft - before) > 4, before, { timeout: 5000 });
+    };
     await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(w => w.webContents.getURL().startsWith('harness://')).setSize(980, 720)); await page.waitForTimeout(600);
     await page.click('#tab-preview');
     let measured = await layout();
-    assert.equal(measured.overflowX, false); assert.equal(measured.rows, 1); assert.ok(measured.tabsInside); assert.ok(measured.sendVisible); assert.ok(measured.promptHeight >= 50);
+    assert.equal(measured.overflowX, false); assert.equal(measured.rows, 1); assert.ok(measured.stripInside); assert.ok(measured.selectedVisible); assert.ok(measured.sendVisible); assert.ok(measured.promptHeight >= 50);
     await capture('980x720.png');
+    assert.ok((await choose('activity')).selectedVisible, 'Aktivitet står helt synligt, når den vælges uden fokus');
+    assert.ok((await choose('preview')).selectedVisible, 'Forhåndsvisning står helt synligt igen');
+    await page.focus('#tab-preview'); await page.keyboard.press('End'); assert.equal(await selected(), 'activity'); assert.ok((await layout()).selectedVisible, 'End viser Aktivitet');
+    await page.keyboard.press('Home'); assert.equal(await selected(), 'preview'); assert.ok((await layout()).selectedVisible, 'Home viser Forhåndsvisning');
+    // Et museklik på den synlige del af en delvist skjult fane vælger den og viser hele fanen. page.click ruller selv elementet frem
+    // og beviser derfor intet; her klikkes på et punkt, der allerede kan ses.
+    const partial = await page.evaluate(() => { const strip = document.querySelector('.work-tabs').getBoundingClientRect(); const tab = [...document.querySelectorAll('.work-tab:not([hidden])')].find(el => { const r = el.getBoundingClientRect(); return r.right > strip.right + 1 && r.left < strip.right - 8; }); if (!tab) return null; const r = tab.getBoundingClientRect(); return { name: tab.dataset.tab, x: Math.min(r.right, strip.right) - 4, y: r.top + r.height / 2 }; });
+    if (partial) { await page.mouse.click(partial.x, partial.y); assert.equal(await selected(), partial.name); assert.ok((await layout()).selectedVisible, `${partial.name} står helt synligt efter klik`); await page.click('#tab-preview'); }
+    if (measured.scrollable) await wheel();
     for (const name of ['changes', 'code', 'activity']) { await page.click(`#tab-${name}`); await capture(`980x720-${name}.png`); }
+    await page.click('#tab-preview');
     const results = { '980': measured };
     for (const zoom of [1.25, 1.5]) {
       await app.evaluate(({ BrowserWindow }, zoom) => BrowserWindow.getAllWindows().find(w => w.webContents.getURL().startsWith('harness://')).webContents.setZoomFactor(zoom), zoom); await page.waitForTimeout(600);
       measured = await layout(); results[zoom] = measured;
-      assert.equal(measured.overflowX, false, `vandret rulning ved ${zoom}`); assert.ok(measured.tabsInside, `faner uden for ved ${zoom}`); assert.ok(measured.sendVisible, `Send skjult ved ${zoom}`);
+      assert.equal(measured.overflowX, false, `vandret rulning ved ${zoom}`); assert.ok(measured.stripInside, `fanestriben uden for ved ${zoom}`); assert.ok(measured.selectedVisible, `den valgte fane skjult ved ${zoom}`); assert.ok(measured.sendVisible, `Send skjult ved ${zoom}`);
+      for (const name of ['code', 'activity', 'preview']) assert.ok((await choose(name)).selectedVisible, `${name} skjult, når den vælges ved ${zoom}`);
+      if (measured.scrollable) await wheel();
       await capture(`980x720-zoom-${zoom * 100}.png`);
     }
     assert.equal(results[1.5].collapsed, true, 'sidepanelet er foldet sammen ved stor tekst');
@@ -253,12 +276,24 @@ const helpers = require('./ui-test-helpers.cjs');
     await page.keyboard.press('Escape'); assert.equal(await page.evaluate(() => document.body.classList.contains('sidebar-overlay')), false);
     assert.equal(await page.evaluate(() => document.activeElement.id), 'sidebar-toggle');
     await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(w => w.webContents.getURL().startsWith('harness://')).webContents.setZoomFactor(1)); await page.waitForTimeout(400);
-    passed('980 × 720 uden vandret rulning med fanerne på én linje; ved 125 % og 150 % tekst er faner og Send synlige, og sidepanelet foldes sammen');
+    passed('980 × 720 uden vandret rulning med fanerne på én linje; den valgte fane står altid helt synligt, også ved 125 % og 150 % tekst, og de andre kan nås med mus, musehjul og tastatur; Send er synlig, og sidepanelet foldes sammen');
 
     // Sidepanelet kan foldes sammen af brugeren og huskes.
     await page.click('#sidebar-toggle');
     assert.equal(await page.evaluate(() => document.body.classList.contains('sidebar-collapsed')), true);
     assert.equal(await page.locator('#sidebar-toggle').getAttribute('aria-expanded'), 'false');
+    // N:C1-4 og Q:C1-6: med sammenfoldet sidepanel er arbejdsfladen ca. 493 px ved 980 × 720, bredere end grænsen for den smalle
+    // flade (430 px), men smallere end de seks faner. De står stadig på én linje, og kan striben rulles, viser en fadet kant det.
+    await page.waitForTimeout(400);
+    const folded = await layout();
+    assert.equal(folded.rows, 1, `fanerne står på én linje med sammenfoldet sidepanel: ${JSON.stringify(folded)}`);
+    assert.ok(folded.stripInside && folded.selectedVisible && !folded.overflowX, JSON.stringify(folded));
+    const edge = await page.locator('.work-tabs').evaluate(el => { const style = getComputedStyle(el); return { attachments: style.backgroundAttachment, images: style.backgroundImage, wrap: style.flexWrap }; });
+    assert.equal(edge.wrap, 'nowrap');
+    if (folded.scrollable) assert.ok(/local.*local.*scroll.*scroll/.test(edge.attachments.replace(/\s/g, '')) && (edge.images.match(/linear-gradient/g) || []).length === 4, `den fadede kant viser flere faner: ${JSON.stringify(edge)}`);
+    assert.ok((await choose('activity')).selectedVisible, 'Aktivitet står helt synligt med sammenfoldet sidepanel');
+    await page.screenshot({ path: path.join(root, 'sidepanel-foldet-faner.png'), animations: 'disabled' });
+    await page.click('#tab-preview');
     assert.equal(await page.getByRole('button', { name: 'Nyt projekt' }).isVisible(), true);
     await page.click('#settings-toggle'); await page.locator('#settings-menu').waitFor();
     const menu = await page.evaluate(() => { const m = document.querySelector('#settings-menu').getBoundingClientRect(), t = document.querySelector('#settings-toggle').getBoundingClientRect(); return { inside: m.left >= 0 && m.top >= 0 && m.bottom <= innerHeight, near: Math.abs(m.left - t.left) < 4 && m.bottom <= t.top + 1 }; });

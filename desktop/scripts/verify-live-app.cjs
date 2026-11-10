@@ -39,6 +39,8 @@ async function check(title, action) { await action(); checks.push(title); note(`
 function controlledHTML(heading) {
   return `<!doctype html><html lang="da"><meta charset="utf-8"><title>Mødelokaler</title><h1>${heading}</h1><label for="n">Antal deltagere</label><input id="n" type="number" min="1" value="1"><ul><li data-cap="4">Birk</li><li data-cap="8">Bøg</li><li data-cap="12">Ask</li></ul><p id="none" hidden>Ingen lokaler passer.</p><script>n.oninput=()=>{for(const li of document.querySelectorAll('li'))li.hidden=+li.dataset.cap<+n.value;document.getElementById('none').hidden=[...document.querySelectorAll('li')].some(li=>!li.hidden)};n.oninput()</script></html>`;
 }
+// En plan tæller kun med alle fire afsnit; ellers bliver svaret i samtalen uden plan (Byg videre), som desktop/README.md beskriver.
+const controlledPlan = ['## Det bygger vi', 'Tre fiktive mødelokaler i public/index.html med et dansk talfilter.', '## Sådan skal det se ud', 'Overskriften Mødelokaler, feltet Antal deltagere og listen Birk, Bøg og Ask.', '## Teknik og data', 'Kun public/index.html med lidt JavaScript. Ingen pakker, server eller netopslag.', '## Det skal du prøve', 'Skriv 5, 9 og 99 i Antal deltagere. Ved 99 står Ingen lokaler passer.'].join('\n');
 async function startControlledServer() {
   const written = new Set();
   server = http.createServer(async (req, res) => {
@@ -50,7 +52,7 @@ async function startControlledServer() {
       id: `write_${stage}`, type: 'function', function: { name: 'write', arguments: JSON.stringify({ filePath: path.join(project, 'public/index.html'), content: controlledHTML(stage === 'rettelse' ? 'Find dit mødelokale' : 'Mødelokaler') }) }
     } : null;
     if (tool) written.add(stage);
-    const chunk = { id: 'controlled', object: 'chat.completion.chunk', created: 1, model: body.model, choices: [{ index: 0, delta: tool ? { role: 'assistant', tool_calls: [{ index: 0, ...tool }] } : { role: 'assistant', content: stage === 'plan' ? 'Plan: Byg de tre mødelokaler i public/index.html med dansk talfilter. Prøv 5, 9 og 99 deltagere. Ingen installation.' : 'Ændringen er skrevet. Prøv filtreringen.' }, finish_reason: null }] };
+    const chunk = { id: 'controlled', object: 'chat.completion.chunk', created: 1, model: body.model, choices: [{ index: 0, delta: tool ? { role: 'assistant', tool_calls: [{ index: 0, ...tool }] } : { role: 'assistant', content: stage === 'plan' ? controlledPlan : 'Ændringen er skrevet. Prøv filtreringen.' }, finish_reason: null }] };
     res.setHeader('content-type', 'text/event-stream');
     res.write('data: ' + JSON.stringify(chunk) + '\n\n');
     res.write('data: ' + JSON.stringify({ ...chunk, choices: [{ index: 0, delta: {}, finish_reason: tool ? 'tool_calls' : 'stop' }], usage: { prompt_tokens: 20, completion_tokens: 10, total_tokens: 30 } }) + '\n\n'); res.end('data: [DONE]\n\n');
@@ -64,6 +66,11 @@ async function answerApprovals() {
       await box.locator('textarea').fill('Følg den konkrete idé: lokal HTML/CSS/JavaScript, de tre fiktive lokaler og filteret. Ingen installation eller deling.');
       await box.getByRole('button', { name: 'Svar', exact: true }).click(); continue;
     }
+    // Kortsamlingen (beslutning 10. november 2026): efter fem kort i én opgave spørger Aura én gang om resten af opgaven i
+    // projektmappen. Prøven tillader kun HTML, CSS og JavaScript i public/, så den svarer nej og vurderer hvert kort for sig.
+    const each = box.getByRole('button', { name: 'Nej, spørg hver gang', exact: true });
+    // Kortet bliver til almindelige kort; listen ovenfor er så forældet, og næste runde i runUntilDone svarer på dem.
+    if (await each.count()) { approvals.push({ stage, kind: 'kortsamling', answer: 'nej, spørg hver gang' }); await each.click(); return; }
     const once = box.getByRole('button', { name: 'Tillad én gang', exact: true });
     const target = await box.locator('.action-target').textContent().catch(() => '');
     // UI tilbyder Tillad én gang alene for projektinterne rettelser; begræns også til public/.
@@ -166,7 +173,7 @@ async function main() {
     // Standardtilstanden er Samtale; prøvens planforløb kræver Planlæg.
     await helpers.selectMode(page, 'plan');
     await runUntilDone('plan', () => page.click('#send'));
-    await check('Plan uden filændring', async () => { assert.equal(reviews.at(-1).files.length, 0); assert(await page.isVisible('#plan-card')); });
+    await check('Plan uden filændring', async () => { assert.equal(reviews.at(-1).files.length, 0); assert(await page.isVisible('#plan-card'), 'Planlæg skal give plankortet; svaret skal have de fire afsnit.'); });
     await fs.writeFile(path.join(out, 'plan.txt'), await page.locator('#plan-text').textContent()); await shot('plan');
     await runUntilDone('bygning', () => page.click('#build-plan'));
     await check('Bygget preview filtrerer 1, 5, 9 og 99 deltagere', () => tryFilter('Mødelokaler'));

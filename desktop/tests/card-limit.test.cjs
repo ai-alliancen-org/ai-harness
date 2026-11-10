@@ -86,3 +86,45 @@ test('uden standarderne ville det lange forløb give mange flere kort (vagten ka
   const { kort } = await antalKort(t, { defaults: false, forloeb: LANGT_FLAD, grepGuard: true, mode: 'build' });
   assert.ok(kort > MAX_KORT, `kun ${kort} kort uden standarder`);
 });
+
+// Kortsamlingen (brugerens beslutning 10. november 2026, afløser «højst fem kort pr. opgave» i docs/decisions.md): et projekt uden automatik,
+// fx et åbnet eller ældre projekt, får det lange forløb ad den rigtige vej gennem ChatSession. Efter fem kort spørger Aura én gang, om resten af
+// opgaven må fortsætte i projektmappen. Efter et ja kommer kun kort for det, samlingen ikke dækker: her kommandoer uden sandkasse og en læsning
+// uden for projektet. Motoren er falsk og husker kun svarene; forespørgslerne er de optagne fra OpenCode 1.19.5.
+test('et projekt uden automatik: fem kort, så ét spørgsmål om resten af opgaven, og efter ja kun kort uden for projektmappen', async t => {
+  const { WorkspaceRegistry } = require('../core/workspaces.cjs'), sandbox = require('../core/command-sandbox.cjs');
+  const directory = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), 'aura-kortgraense-samling-'))), events = [];
+  let engine = null;
+  const registry = new WorkspaceRegistry({ directory: path.join(directory, 'data'), profiles: path.join(__dirname, '../../profiles'), safeStorage: { isEncryptionAvailable: () => true, encryptString: value => Buffer.from(value), decryptString: value => value.toString() }, emit: event => events.push(event), engineFactory: () => (engine = { active: false, grepGuard: true, session: { id: 's' }, pending: new Map(), replies: [], start: async () => { engine.active = true; }, send: async () => {}, reply: async (id, allow) => { engine.replies.push({ id, allow }); engine.pending.delete(id); }, abort: async () => {}, close: async () => {} }) });
+  t.after(async () => { await registry.close(); await fs.rm(directory, { recursive: true, force: true }); });
+  const projekt = path.join(directory, 'projekt'), ekstern = path.join(directory, 'ekstern');
+  for (const folder of [path.join(projekt, 'src'), path.join(projekt, 'public'), ekstern]) await fs.mkdir(folder, { recursive: true });
+  t.mock.method(sandbox, 'support', async () => ({ available: false, platform: 'darwin', reason: 'Prøven har ingen sandkasse.' }));
+  const bench = await registry.select({ root: projekt, name: 'Kortgrænse' });
+  const saved = await bench.saveConnection({ kind: 'compatible', name: 'Prøve', baseURL: 'http://127.0.0.1:1/v1' }), connection = await bench.connection(saved.connections[0].id);
+  bench.selection = async () => ({ connection, model: { id: 'test' }, route: null });
+  bench.skills.context = async () => ({ rules: '', skills: [], titles: [], features: {}, integrations: [] });
+  // Arbejd direkte: samme godkendelser i projektet som Byg, men uden en valgt plan.
+  const disclosure = await bench.prepare({ connectionID: connection.id, modelID: 'test', mode: 'free', text: 'Byg' });
+  await bench.send({ text: 'Byg', fingerprint: disclosure.fingerprint, contextBinding: disclosure.contextBinding });
+  const chat = bench.chat, kortliste = [];
+  let n = 0;
+  for (const navn of [...LANGT_FLAD, 'byg-git-filer__read-ude-absolut__1-external_directory']) {
+    const recorded = JSON.parse((await fs.readFile(path.join(FIXTURES, navn + '.json'), 'utf8')).replaceAll('${ROOT:rel/}', bench.project.root.slice(1)).replaceAll('${ROOT}', bench.project.root).replaceAll('${OUTSIDE}', ekstern));
+    const request = { ...recorded.request, id: `${recorded.request.id}-${++n}`, ...(recorded.request.tool ? { tool: { ...recorded.request.tool, callID: `kald-${n}` } } : {}) };
+    if (recorded.toolPartAtAsk && request.tool) chat.runTools.set(`del-${n}`, { id: `del-${n}`, callID: request.tool.callID, tool: recorded.toolPartAtAsk.tool, state: { status: recorded.toolPartAtAsk.status, input: recorded.toolPartAtAsk.input } });
+    const before = events.length; engine.pending.set(request.id, request);
+    await chat.event({ type: 'permission.asked', properties: request });
+    const card = events.slice(before).find(event => event.type === 'permission.asked' && event.properties?.id === request.id)?.properties;
+    if (!card) continue;
+    kortliste.push({ navn, collect: Boolean(card.policy.collect) });
+    await chat.reply({ id: request.id, allow: true, ...(card.policy.collect ? { ids: [request.id], scope: 'collect' } : {}) });
+  }
+  const spoerg = kortliste.findIndex(item => item.collect);
+  assert.equal(spoerg, 5, `spørgsmålet er det sjette kort: ${kortliste.map(item => item.navn).join(', ')}`);
+  assert.equal(kortliste.filter(item => item.collect).length, 1, 'Aura spørger én gang');
+  const efter = kortliste.slice(spoerg + 1).map(item => item.navn);
+  assert.ok(efter.every(navn => /__\d-bash$|external_directory$/.test(navn)), `efter ja kommer kun kommandoer uden sandkasse og mappen udenfor: ${efter.join(', ')}`);
+  assert.ok(efter.includes('byg-git-filer__read-ude-absolut__1-external_directory'), 'mappen uden for projektet spørger stadig efter ja');
+  assert.ok(kortliste.length < LANGT_FLAD.length, `${kortliste.length} kort på ${LANGT_FLAD.length + 1} forespørgsler`);
+});

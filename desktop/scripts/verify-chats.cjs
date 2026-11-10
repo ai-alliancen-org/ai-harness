@@ -130,7 +130,7 @@ const helpers = require('./ui-test-helpers.cjs');
     assert.match(await fs.readFile(path.join(project, 'public/index.html'), 'utf8'), /Velkommen til foreningen/);
     checks.push('paletten skifter til samtalen med søgning og Enter; godkendelse i den rigtige samtale');
 
-    // Samtale B arbejder, mens A er åben. Andre projekter kan ikke åbnes imens; B får "nyt resultat", når den er færdig.
+    // Samtale B arbejder, mens A er åben. Nyt projekt og Åbn projekt kan bruges imens; B får "nyt resultat", når den er færdig.
     await row('Planlæg en kontaktside').click();
     await page.waitForFunction(() => document.querySelector('#prompt').value === 'Planlæg en kontaktside. opgave-b');
     assert.equal(await page.isDisabled('#send'), false);
@@ -142,14 +142,16 @@ const helpers = require('./ui-test-helpers.cjs');
     await page.locator('#messages').filter({ hasText: 'Forsiden er klar' }).waitFor();
     await row('Planlæg en kontaktside').locator('.chat-meta.is-running').filter({ hasText: 'arbejder' }).waitFor();
     assert.equal(await page.locator('#messages').textContent().then(text => text.includes('Kontaktside')), false, 'B’s svar vises ikke i A');
-    const otherProject = page.locator('#project-list .project-entry:not(.is-current) .project-name');
-    if (await otherProject.count()) assert.equal(await otherProject.first().isDisabled(), true, 'et andet projekt kan ikke åbnes, mens en samtale arbejder');
+    // Siden 0.6.0-beta.1 (5ffe905) kan et andet projekt åbnes, mens en samtale arbejder; se README og DESIGN.md. Den gamle vagt
+    // her kunne ikke slå til, fordi prøven først åbner et andet projekt længere nede.
+    assert.equal(await page.locator('#open').isEnabled(), true, 'Åbn projekt kan bruges, mens en samtale arbejder');
+    assert.equal(await page.locator('#new').isEnabled(), true, 'Nyt projekt kan bruges, mens en samtale arbejder');
     releaseB();
     await row('Planlæg en kontaktside').locator('.chat-meta.is-unread').filter({ hasText: 'nyt resultat' }).waitFor({ timeout: 60000 });
     await row('Planlæg en kontaktside').click();
     await page.locator('#messages').filter({ hasText: 'En kontaktside med formular' }).waitFor();
     assert.equal(await row('Planlæg en kontaktside').locator('.chat-meta.is-unread').count(), 0, 'markeringen forsvinder, når samtalen åbnes');
-    checks.push('en samtale arbejder i baggrunden med egen status og eget svar; projektskift låst imens; nyt resultat markeres');
+    checks.push('en samtale arbejder i baggrunden med egen status og eget svar; Nyt projekt og Åbn projekt kan bruges imens; nyt resultat markeres');
 
     // Paletten: piletaster og Enter udfører appens egen handling og flytter fokus til fanen.
     options = await palette('ændring');

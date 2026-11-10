@@ -3,7 +3,7 @@
 // Del 1 læser kun fixtures og VERSION og består derfor på enhver Aura-kode, indtil der optages igen. Den beskriver, hvad
 // motoren sender og gør, men fixtures er optaget gennem Auras egen opsætning (skrivevagt, beskyttede stier, regler), så nogle
 // påstande beskriver Auras opsætning på optagetidspunktet, og skrives om, når der optages igen. 1.19.5-sættet er optaget på
-// Aura d0c3fca med ucommittede ændringer; README.md i mappen forklarer, hvad der adskiller det fra 1.18.33-sættet, og at
+// Aura d0c3fca med ucommittede ændringer, og enkelte dele igen på 1cfa7a6 (feltet aura viser hvilke); README.md i mappen forklarer, hvad der adskiller det fra 1.18.33-sættet, og at
 // forskellen er målt som Auras og ikke motorens. En ny OpenCode-version kræver nye optagelser: testen fejler, indtil
 // fixtures passer til VERSION i core/engine.cjs.
 const { test } = require('node:test');
@@ -56,6 +56,8 @@ test('alle sæt er optaget, og INDEX.json passer til filerne', () => {
   assert.deepEqual(Object.keys(gentagelse), ['afvist-med-besked', 'once', 'uden-flag'], RECORD);
   // 1.18.33-sættet havde 156. Auras skrivevagt svarer nu på skrivninger uden for projektet, før OpenCode spørger (se testen
   // nedenfor), så de forespørgsler findes ikke længere. Samme Aura med 1.18.33 gav samme antal (målt som A/B, README.md).
+  // Tallene her og nedenfor er bundgrænser mod en optagelse, der har mistet forløb. De kan ikke opdage en manglende skrivevagt, for en
+  // optagelse uden vagt giver flere forespørgsler. Det gør påstanden om skrivevagten nedenfor og plugin-prøven i tests/write-guard.test.cjs.
   assert.ok(forloeb.length >= 100, `for få forløbsoptagelser: ${forloeb.length}`);
   assert.deepEqual(index.entries.filter(entry => entry.file).map(entry => entry.file).sort(), forloeb.map(fx => fx.file));
   for (const fx of forloeb) assert.ok(index.scenarios[fx.scenario], fx.file);
@@ -63,7 +65,9 @@ test('alle sæt er optaget, og INDEX.json passer til filerne', () => {
 
 test('Auras skrivevagt svarer på skrivninger uden for projektet, før OpenCode spørger', () => {
   // I 1.18.33-sættet (optaget før vagten) spurgte OpenCode først om mappen og så om filen. Her når skrivningen aldrig så langt.
-  // Er vagten væk, eller spørger OpenCode igen, fejler denne påstand, og optagelsen skal gennemgås.
+  // Påstanden læser kun optagelsen og fyrer derfor først ved næste optagelse: er vagten væk, eller spørger OpenCode igen, fejler den,
+  // og optagelsen skal gennemgås (kørt mod 1.18.33-sættet, som er optaget før vagten, fejler den). At vagten sidder i pluginet, prøves
+  // ved hver kodeændring i tests/write-guard.test.cjs.
   const outside = index.entries.filter(entry => /(^|-)ude-|^write-uden-for-repo$|^write-original-projekt$|^write-soeskende-i-repo$|^patch-to-filer$/.test(entry.case) && /^(write|edit|patch)/.test(entry.case) && !['plan-git', 'samtale-git'].includes(entry.scenario));
   assert.ok(outside.length >= 15, `for få skrivninger uden for projektet: ${outside.length}`);
   for (const entry of outside) {
@@ -103,7 +107,7 @@ test('OpenCode sender kun former, kontrakten kender', () => {
 
 test('mappeadgang er "<mappe>/*" med filepath og parentDir, eller kommandoformen med directories', () => {
   const folders = requests.filter(item => item.permission === 'external_directory');
-  assert.ok(folders.length >= 40, `for få mappeforespørgsler: ${folders.length}`);
+  assert.ok(folders.length >= 50, `for få mappeforespørgsler: ${folders.length}`);
   for (const r of folders) {
     assert.deepEqual(r.always, r.patterns, r.kilde);
     if (r.metadata.directories) {
@@ -155,6 +159,20 @@ test('søgningens mønster er søgeordet, og værktøjets input står i metadata
   for (const fx of forloeb.filter(item => item.request.permission === 'grep')) {
     assert.ok(['pending', 'running'].includes(fx.toolPartAtAsk?.status), fx.file);
     if (fx.toolPartAtAsk.status === 'running') assert.equal(fx.toolPartAtAsk.input.pattern, fx.request.metadata.pattern, fx.file);
+  }
+});
+
+// Spørgsmål A-6 fra første runde: byg-git-soeg og byg-uden-git-soeg var optaget før rettelsen af søgevagten (fund 3), så en godkendt søgning
+// uden for projektet og i motorens gemte output gav "No files found". De er optaget igen 10. november 2026 med den rettede vagt. Påstanden
+// beskriver Auras opsætning ved optagelsen; vagtens egne grænser prøves i tests/m1-soegning.test.cjs.
+test('Auras søgevagt efter et ja: en godkendt søgning uden for projektet og i motorens gemte output viser resultaterne', () => {
+  for (const scenario of ['byg-git-soeg', 'byg-uden-git-soeg']) {
+    const result = name => forloeb.find(fx => fx.scenario === scenario && fx.case === name && fx.askIndex === 1)?.toolResult?.[0];
+    for (const name of ['grep-sti-ude', 'grep-sti-ude-relativ']) assert.match(result(name) || '', /^Found [1-9]\d* matches\n\$\{OUTSIDE\}\/fil\.txt:\n {2}Line 1: Ekstern fil\n/, `${scenario}/${name}`);
+    assert.match(result('grep-tool-output') || '', /^Found 1 matches\n\$\{RUNTIME\}\/data\/opencode\/tool-output\/tool_[^:\n]+:\n {2}Line 39999: 39999\n/, `${scenario}/grep-tool-output`);
+    // Vagten skjuler stadig beskyttede filer, og en søgning i projektet viser intet uden for projektet.
+    assert.equal(result('grep-hemmelighed'), 'No files found', `${scenario}/grep-hemmelighed`);
+    for (const name of ['grep-uden-sti', 'grep-sti-inde-relativ', 'grep-sti-inde-absolut']) assert.doesNotMatch(result(name) || '', /\$\{(?:OUTSIDE|RUNTIME|STORE)\}/, `${scenario}/${name}`);
   }
 });
 
@@ -272,6 +290,19 @@ test('Auras opsætning på d816a9e: HEADs sandkasse omskriver kommandoen, før O
     assert.doesNotMatch(r.partAtAsk.input.command, /^exec /, 'værktøjets input har stadig den oprindelige kommando');
   }
   assert.ok(run.requests.some(r => r.partAtAsk.input.command === 'cd .. && ls'), 'cd .. blev kørt uden mappeforespørgsel');
+});
+
+test('HEADs sandkasse kører de isolerede kommandoer og spærrer det, den skal', () => {
+  // Formen ovenfor kan bestå, selv om hver isoleret kommando fejlede: 1.19.5-optagelsen fra 5. november gav EADDRINUSE for alle fire
+  // (fund 2 i gennemgangen af beta 3), og det blev ikke set. Derfor påstås udfaldet også.
+  const run = politik.sandkasse, step = name => run.results.find(r => r.step === name);
+  for (const r of run.results) assert.doesNotMatch(`${r.output || ''} ${r.error || ''}`, /ikke kørt uden beskyttelse/, `${r.step}: kommandobeskyttelsen kunne ikke starte`);
+  assert.equal(step('pipe')?.status, 'completed'); assert.equal(step('pipe').output.trim(), 'HEJ');
+  assert.match(step('ls')?.output || '', /^total \d+/, 'ls -la kørte i projektet');
+  assert.match(step('git-status-diff')?.output || '', /nothing to commit|On branch/, 'git kan læse projektets .git i sandkassen');
+  // cd .. kommer ikke ud af projektet: sandkassen nægter at læse mappen over.
+  assert.match(step('cd-ud')?.output || '', /Operation not permitted/);
+  assert.equal(step('workdir-ude')?.status, 'error'); assert.match(step('workdir-ude').error, /arbejdsmappe ligger uden for projektet/);
 });
 
 test('afvisninger: gentagelsesvagten stopper opgaven, en enkelt afvisning med besked gør ikke, og én afvisning afviser de ventende', () => {

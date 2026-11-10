@@ -30,7 +30,7 @@ npm.cmd install --include=optional --ignore-scripts --no-audit --no-fund --no-sa
 .\node_modules\.bin\aura.cmd doctor
 ```
 
-`doctor` skal finde Node, Git og OpenCode 1.19.5. Stop ved fejl, og send fejlteksten. Brug ikke en anden tilfældig Aura-pakke som erstatning. Kommandoen `aura.cmd` undgår PowerShells eventuelle blokering af npm-genererede `.ps1`-filer.
+`doctor` skal finde Node, Git og OpenCode 1.18.33. Stop ved fejl, og send fejlteksten. Brug ikke en anden tilfældig Aura-pakke som erstatning. Kommandoen `aura.cmd` undgår PowerShells eventuelle blokering af npm-genererede `.ps1`-filer.
 
 ## 3. Første projekt i PowerShell
 

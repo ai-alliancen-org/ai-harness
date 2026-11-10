@@ -1,6 +1,6 @@
 {
  "opencode": "1.19.5",
- "aura": "d0c3fca+ændringer",
+ "aura": "1cfa7a6+ændringer",
  "scenario": "byg-uden-git-soeg",
  "outcome": "idle",
  "case": "webfetch",
@@ -22,21 +22,21 @@
   "del:completed"
  ],
  "request": {
-  "id": "per_1abd28ec3001lqncVsn3z5pQw5",
-  "sessionID": "ses_e542d7b68ffezKI5f78zcPRWM1",
+  "id": "per_1c4c68cf80015nfZCgvTkMZFS1",
+  "sessionID": "ses_e3b3979f3ffe5KHrNXt25TaWnK",
   "permission": "webfetch",
   "patterns": [
-   "http://127.0.0.1:65270/side"
+   "http://127.0.0.1:55542/side"
   ],
   "metadata": {
-   "url": "http://127.0.0.1:65270/side",
+   "url": "http://127.0.0.1:55542/side",
    "format": "text"
   },
   "always": [
    "*"
   ],
   "tool": {
-   "messageID": "msg_1abd28eb7001ZcpQFyhuPB8MvP",
+   "messageID": "msg_1c4c68cf00015g9EVHdgIg0BPp",
    "callID": "kald-24-0"
   }
  },
@@ -46,21 +46,21 @@
   "input": {}
  },
  "policyInput": {
-  "id": "per_1abd28ec3001lqncVsn3z5pQw5",
-  "sessionID": "ses_e542d7b68ffezKI5f78zcPRWM1",
+  "id": "per_1c4c68cf80015nfZCgvTkMZFS1",
+  "sessionID": "ses_e3b3979f3ffe5KHrNXt25TaWnK",
   "permission": "webfetch",
   "patterns": [
-   "http://127.0.0.1:65270/side"
+   "http://127.0.0.1:55542/side"
   ],
   "metadata": {
-   "url": "http://127.0.0.1:65270/side",
+   "url": "http://127.0.0.1:55542/side",
    "format": "text"
   },
   "always": [
    "*"
   ],
   "tool": {
-   "messageID": "msg_1abd28eb7001ZcpQFyhuPB8MvP",
+   "messageID": "msg_1c4c68cf00015g9EVHdgIg0BPp",
    "callID": "kald-24-0"
   },
   "toolInput": {
@@ -71,11 +71,11 @@
  "recordedAura": {
   "allowed": false,
   "source": null,
-  "label": "Hjemmeside: http://127.0.0.1:65270",
-  "target": "http://127.0.0.1:65270",
+  "label": "Hjemmeside: http://127.0.0.1:55542",
+  "target": "http://127.0.0.1:55542",
   "match": {
    "kind": "webfetch",
-   "origin": "http://127.0.0.1:65270"
+   "origin": "http://127.0.0.1:55542"
   },
   "persistable": true,
   "projectFile": false,

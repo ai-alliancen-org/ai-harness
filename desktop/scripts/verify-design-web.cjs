@@ -31,7 +31,7 @@ const { openProject } = require('../core/projects.cjs');
   const deadline=Date.now()+90000;while(bench.running&&Date.now()<deadline)await new Promise(r=>setTimeout(r,100));
   assert.equal(bench.running,false);assert.ok(results.some(r=>r.includes('designelementer')),'Forsiden skal indeholde undersidehenvisninger');
   assert.ok(results.some(r=>r.includes('#2f3234')),'Undersidens faktiske farvedata skal nå værktøjsresultatet');
-  assert.ok(permissions.length>=2);assert.deepEqual(await fs.readdir(project),[]);
+  assert.ok(permissions.length>=2);assert.deepEqual((await fs.readdir(project)).filter(x=>x!=='.aura'),[]);
   console.log(JSON.stringify({status:'bestået',root,checks:['rigtig OpenCode webfetch','godkendt Gentofte-forside','underside fundet i resultat og hentet','faktiske farvedata i værktøjsresultat'],model:'Kontrolleret lokal testmodel; ingen ekstern AI-model'}));
  }finally{await bench.close();server.closeAllConnections();await new Promise(r=>server.close(r));}
 })().catch(e=>{console.error(e);process.exitCode=1;});

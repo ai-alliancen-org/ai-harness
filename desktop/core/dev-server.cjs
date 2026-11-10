@@ -76,12 +76,17 @@ async function inspect(root, config = {}) {
   const [project, diagnostics] = await Promise.all([inspectRuntime(root, config), inspectPreviewDependencies(root, config)]);
   return { ...project, diagnostics };
 }
+// Overgang fra beta 2 (fund 24 og Q:C2-4, beta 3): dengang talte netlisten med i samtykkets fingeraftryk. Det gamle fingeraftryk
+// beregnes med projektets aktuelle netliste og formlen fra core/project-runtime.cjs i beta 2. ai-preview.cjs lader et samtykke til det
+// gælde, når pakker, opstart og netliste er de samme som dengang, og skriver det om til det nye. Uden netliste er de to ens.
+const legacyDigest = detected => detected.config.network ? createHash('sha256').update(JSON.stringify({ config: detected.config, files: detected.files })).digest('hex') : null;
+const legacy = value => value ? { legacyFingerprint: value } : {};
 async function inspectRuntime(root, config = {}) {
-  const detected = await detectServices(root, config);
-  if (detected.config.mode === 'static') return { kind: 'static', supported: false, installed: true, reason: 'Enkel hjemmeside viser projektets public-mappe uden en projektserver.', runtimeConfig: detected.config, services: [], fingerprint: detected.fingerprint };
+  const detected = await detectServices(root, config), old = legacyDigest(detected);
+  if (detected.config.mode === 'static') return { kind: 'static', supported: false, installed: true, reason: 'Enkel hjemmeside viser projektets public-mappe uden en projektserver.', runtimeConfig: detected.config, services: [], fingerprint: detected.fingerprint, ...legacy(old) };
   const normal = await inspectFramework(root);
-  if (!detected.config.services?.length && ['vite', 'astro'].includes(normal.kind) && normal.supported) return { ...normal, runtimeConfig: detected.config, services: [], fingerprint: createHash('sha256').update(normal.fingerprint + detected.fingerprint).digest('hex') };
-  if (!detected.services.length || !detected.config.services?.length && /anden pakkehåndtering|flere arbejdsområder/.test(normal.reason || '')) return { ...normal, runtimeConfig: detected.config, services: [], fingerprint: detected.fingerprint };
+  if (!detected.config.services?.length && ['vite', 'astro'].includes(normal.kind) && normal.supported) return { ...normal, runtimeConfig: detected.config, services: [], fingerprint: createHash('sha256').update(normal.fingerprint + detected.fingerprint).digest('hex'), ...legacy(old && createHash('sha256').update(normal.fingerprint + old).digest('hex')) };
+  if (!detected.services.length || !detected.config.services?.length && /anden pakkehåndtering|flere arbejdsområder/.test(normal.reason || '')) return { ...normal, runtimeConfig: detected.config, services: [], fingerprint: detected.fingerprint, ...legacy(old) };
   const services = [], installs = [], fingerprints = [detected.fingerprint];
   for (const service of detected.services) {
     const cwd = await serviceDirectory(root, service.cwd);
@@ -111,7 +116,7 @@ async function inspectRuntime(root, config = {}) {
     services.push({ ...service, cwd: service.cwd || '.', installed, python, ...(typeof declaredScript === 'string' ? { declaredScript } : {}) });
   }
   const dependencies = [...new Set(services.flatMap(service => service.python ? ['Python'] : ['Node.js']))];
-  return { kind: 'services', label: services.length === 1 ? services[0].label : `${services.length} lokale tjenester`, supported: true, installed: services.every(s => s.installed), fingerprint: createHash('sha256').update(JSON.stringify(fingerprints)).digest('hex'), reason: '', runtimeConfig: detected.config, services, installs, dependencies, script: services.map(s => s.command.join(' ')).join('\n') };
+  return { kind: 'services', label: services.length === 1 ? services[0].label : `${services.length} lokale tjenester`, supported: true, installed: services.every(s => s.installed), fingerprint: createHash('sha256').update(JSON.stringify(fingerprints)).digest('hex'), ...legacy(old && createHash('sha256').update(JSON.stringify([old, ...fingerprints.slice(1)])).digest('hex')), reason: '', runtimeConfig: detected.config, services, installs, dependencies, script: services.map(s => s.command.join(' ')).join('\n') };
 }
 async function nodeRuntime() {
   const candidates = runtime.get() ? [runtime.get().node] : (process.env.PATH || '').split(path.delimiter).filter(p => path.isAbsolute(p)).map(p => path.join(p, process.platform === 'win32' ? 'node.exe' : 'node'));
@@ -165,6 +170,9 @@ class DevServer {
   configure(config = {}) { if (active(this.state)) throw Error('Stop forhåndsvisningen, før opstarten ændres.'); this.config = normalizeRuntimeConfig(config); this.review = null; return this.config; }
   async runtimeConfig() { return normalizeRuntimeConfig(this.getRuntimeConfig ? await this.getRuntimeConfig(this.root) : this.config); }
   snapshot() { return { root: this.root, state: this.state, url: this.url || null, output: this.output, message: this.message || '', kind: this.kind, services: this.services || [], runtimeConfig: this.activeConfig || null }; }
+  // Brugerens samtykke til en adresse gælder straks, også mens serveren kører. Kun netlisten skiftes; tjenesterne og opstarten er
+  // de gennemgåede. Uden en kørende opstart er der intet at skifte: næste start læser netlisten fra lageret.
+  useNetwork(network) { if (this.activeConfig) this.activeConfig = { ...this.activeConfig, network: normalizeRuntimeConfig({ network }).network }; return this.snapshot(); }
   update(state, message = '') { this.state = state; this.message = message; this.emit(this.snapshot()); }
   async activate(root) { await this.stop(); this.review = null; this.root = root; this.url = null; this.output = ''; this.kind = null; this.update('idle'); }
   async status() { return { ...this.snapshot(), project: this.root ? await inspect(this.root, await this.runtimeConfig()).catch(error => ({ kind: 'unknown', supported: false, reason: error.message })) : null }; }

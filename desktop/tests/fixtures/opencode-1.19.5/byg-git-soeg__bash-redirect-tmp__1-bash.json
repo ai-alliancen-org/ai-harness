@@ -1,6 +1,6 @@
 {
  "opencode": "1.19.5",
- "aura": "d0c3fca+ændringer",
+ "aura": "1cfa7a6+ændringer",
  "scenario": "byg-git-soeg",
  "outcome": "idle",
  "case": "bash-redirect-tmp",
@@ -23,20 +23,20 @@
   "del:completed"
  ],
  "request": {
-  "id": "per_1abd27e5f001F1deIcz3mVq7TN",
-  "sessionID": "ses_e542d8d79ffeBga5YF1Pc60yWB",
+  "id": "per_1c4c681f2001inbDDxUvrLvvGk",
+  "sessionID": "ses_e3b398532ffeoRuSmwWI1ujThB",
   "permission": "bash",
   "patterns": [
-   "echo hej > ${SYSTMP}/aura-kontrakt-86963.txt"
+   "echo hej > ${SYSTMP}/aura-kontrakt-43149.txt"
   ],
   "metadata": {
-   "command": "echo hej > ${SYSTMP}/aura-kontrakt-86963.txt"
+   "command": "echo hej > ${SYSTMP}/aura-kontrakt-43149.txt"
   },
   "always": [
    "echo *"
   ],
   "tool": {
-   "messageID": "msg_1abd27e4e001bWQaublNWMwe53",
+   "messageID": "msg_1c4c681e8001ilNeYURJYLQRQN",
    "callID": "kald-20-0"
   }
  },
@@ -44,33 +44,33 @@
   "status": "running",
   "tool": "bash",
   "input": {
-   "command": "echo hej > ${SYSTMP}/aura-kontrakt-86963.txt",
+   "command": "echo hej > ${SYSTMP}/aura-kontrakt-43149.txt",
    "description": "Skriver i systemets temp"
   }
  },
  "policyInput": {
-  "id": "per_1abd27e5f001F1deIcz3mVq7TN",
-  "sessionID": "ses_e542d8d79ffeBga5YF1Pc60yWB",
+  "id": "per_1c4c681f2001inbDDxUvrLvvGk",
+  "sessionID": "ses_e3b398532ffeoRuSmwWI1ujThB",
   "permission": "bash",
   "patterns": [
-   "echo hej > ${SYSTMP}/aura-kontrakt-86963.txt"
+   "echo hej > ${SYSTMP}/aura-kontrakt-43149.txt"
   ],
   "metadata": {
-   "command": "echo hej > ${SYSTMP}/aura-kontrakt-86963.txt"
+   "command": "echo hej > ${SYSTMP}/aura-kontrakt-43149.txt"
   },
   "always": [
    "echo *"
   ],
   "tool": {
-   "messageID": "msg_1abd27e4e001bWQaublNWMwe53",
+   "messageID": "msg_1c4c681e8001ilNeYURJYLQRQN",
    "callID": "kald-20-0"
   },
   "toolInput": {
-   "command": "echo hej > ${SYSTMP}/aura-kontrakt-86963.txt",
+   "command": "echo hej > ${SYSTMP}/aura-kontrakt-43149.txt",
    "description": "Skriver i systemets temp",
    "tool": "bash",
    "input": {
-    "command": "echo hej > ${SYSTMP}/aura-kontrakt-86963.txt",
+    "command": "echo hej > ${SYSTMP}/aura-kontrakt-43149.txt",
     "description": "Skriver i systemets temp"
    }
   }
@@ -78,11 +78,11 @@
  "recordedAura": {
   "allowed": false,
   "source": null,
-  "label": "Kommando: echo hej > ${SYSTMP}/aura-kontrakt-86963.txt",
-  "target": "echo hej > ${SYSTMP}/aura-kontrakt-86963.txt",
+  "label": "Kommando: echo hej > ${SYSTMP}/aura-kontrakt-43149.txt",
+  "target": "echo hej > ${SYSTMP}/aura-kontrakt-43149.txt",
   "match": {
    "kind": "bash",
-   "command": "echo hej > ${SYSTMP}/aura-kontrakt-86963.txt",
+   "command": "echo hej > ${SYSTMP}/aura-kontrakt-43149.txt",
    "cwd": "${ROOT}"
   },
   "persistable": false,

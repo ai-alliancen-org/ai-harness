@@ -48,8 +48,14 @@ const helpers = require('./ui-test-helpers.cjs');
       await page.click('#deploy-button'); await page.waitForSelector('#deployment-result:not([hidden])'); await idle();
       assert.equal(await page.textContent('#deployment-result-app-name'), 'Huskeliste hos komplai');
       assert.equal(await page.inputValue('#deploy-provider'), 'komplai');
+      // Kvitteringen har højst fire synlige kontroller med Luk: højst to hovedknapper og Se detaljer (AGENTS.md). Konto og adgang og
+      // Udgiv et andet sted ligger under Se detaljer.
+      const choices = await page.locator('#deployment-dialog').evaluate(dialog => [...dialog.querySelectorAll('button,select,input[type=checkbox],input[type=radio],summary')].filter(el => el.checkVisibility()).length);
+      assert.ok(choices <= 4, `Kvitteringen har ${choices} synlige kontroller.`);
+      assert.equal(await page.locator('#deployment-komplai-account').isVisible(), false); assert.equal(await page.locator('#deployment-another').isVisible(), false);
       await assertReceiptPreserved();
     };
+    const details = () => page.locator('#deployment-receipt-details > summary').click();
     const chooseAzure = async screenshot => {
       await page.waitForSelector('[data-deploy-step="providers"]:not([hidden])');
       assert.equal(await page.locator('[data-provider="azure"]').isEnabled(), true);
@@ -62,7 +68,7 @@ const helpers = require('./ui-test-helpers.cjs');
       await assertReceiptPreserved(); await page.screenshot({ path: path.join(root, screenshot) });
     };
 
-    await openReceipt(); await page.click('#deployment-komplai-account');
+    await openReceipt(); await details(); await page.click('#deployment-komplai-account');
     await page.waitForSelector('[data-deploy-step="account"]:not([hidden])'); await idle();
     await page.click('#komplai-publish-logout');
     await page.waitForSelector('[data-deploy-step="login"]:not([hidden])'); await idle();
@@ -75,13 +81,13 @@ const helpers = require('./ui-test-helpers.cjs');
     await page.locator('#deployment-dialog [data-close]').click(); await openReceipt();
     await page.screenshot({ path: path.join(root, 'komplai-kvittering-bevaret.png') });
     // Den direkte udbydervej virker også, efter at komplai-adgangen er fjernet.
-    await page.click('#deployment-another'); await chooseAzure('azure-via-andet-sted.png');
+    await details(); await page.click('#deployment-another'); await chooseAzure('azure-via-andet-sted.png');
     const probe = await app.evaluate(() => globalThis.providerSwitchProbe);
     assert.equal(probe.connected, false); assert.equal(probe.cancelled, 1); assert.equal(probe.disconnected, 1);
     assert.equal(probe.calls.filter(call => call.channel === 'deployment:setup').length, 2);
     for (const call of probe.calls) if (call.owner?.root) assert.equal(call.owner.root, project);
     await helpers.assertNoGitWrites(app); assert.deepEqual(errors, []);
-    const report = { status: 'bestået', root, routes: ['Komplai-kvittering → Konto og adgang → Log ud → Tilbage → Azure', 'Bevaret Komplai-kvittering → Udgiv et andet sted → Azure'], disconnected: probe.disconnected, savedReceiptUnchanged: true, limitations: ['Kontrolleret konto- og udbydergrænse', 'Ingen rigtig konto, fjernapp eller udgivelse ændret', 'Ingen modelkald eller Git-skrivninger'] };
+    const report = { status: 'bestået', root, routes: ['Komplai-kvittering → Se detaljer → Konto og adgang → Log ud → Tilbage → Azure', 'Bevaret Komplai-kvittering → Se detaljer → Udgiv et andet sted → Azure'], disconnected: probe.disconnected, savedReceiptUnchanged: true, limitations: ['Kontrolleret konto- og udbydergrænse', 'Ingen rigtig konto, fjernapp eller udgivelse ændret', 'Ingen modelkald eller Git-skrivninger'] };
     await fs.writeFile(path.join(root, 'rapport.json'), JSON.stringify(report, null, 2) + '\n'); console.log(JSON.stringify(report));
   } finally { await app?.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

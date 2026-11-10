@@ -34,7 +34,8 @@ async function installFixture(app, mode, project) {
         if (!organisation.publishing || input.organisationId !== organisation.id || input.acceptPublishing !== true || Object.keys(input).length !== 2) throw Error('Uventet udgivelsesadgang.');
         return Response.json({ id: 'syntetisk-grant', secret: 'komp_publish_grant_' + 'a'.repeat(64), address: 'komplai.run', expiresAt: '2099-01-01T00:00:00Z' });
       }
-      if (method === 'DELETE' && ['/v1/aura/session', '/v1/aura/publishing/session'].includes(route)) return Response.json({ revoked: true });
+      // komplaiLogoutOffline: komplai kan ikke nås, når testeren logger ud (fund K1).
+      if (method === 'DELETE' && ['/v1/aura/session', '/v1/aura/publishing/session'].includes(route)) { if (globalThis.komplaiLogoutOffline) throw Error('Ingen forbindelse i prøven.'); return Response.json({ revoked: true }); }
       throw Error('Uventet testkald: ' + method + ' ' + route);
     };
     shell.openExternal = async value => {
@@ -62,9 +63,9 @@ async function installFixture(app, mode, project) {
     if (await page.locator('#deployment-dialog').evaluate(el => el.open)) {
       const choices = await page.locator('#deployment-dialog :is(button,select,summary,input[type=checkbox],input[type=radio]):visible').count();
       const providers = await page.locator('[data-deploy-step="providers"]').isVisible();
-      // Udbyderne vises tre ad gangen med Flere udbydere, Tilbage og Luk.
-      if (providers) assert.deepEqual(await page.locator('#deployment-dialog button:visible').evaluateAll(items => items.map(item => item.dataset.provider || item.id || 'luk').sort()), ['deployment-back', 'deployment-more-providers', 'komplai', 'luk', 'promte', 'vercel']);
-      assert(providers ? choices === 6 : choices <= 4, `${mode}: ${choices} synlige kontroller`); screens.push({ mode, choices, providers });
+      // Alle seks udbydere står på samme skærm med Tilbage og Luk (DESIGN.md:171, udtrykkelig undtagelse fra fire valg).
+      if (providers) assert.deepEqual(await page.locator('#deployment-dialog button:visible').evaluateAll(items => items.map(item => item.dataset.provider || item.id || 'luk').sort()), ['azure', 'cloudflare', 'deployment-back', 'github-pages', 'komplai', 'luk', 'promte', 'vercel']);
+      assert(providers ? choices === 8 : choices <= 4, `${mode}: ${choices} synlige kontroller`); screens.push({ mode, choices, providers });
     } else screens.push({ mode });
     await page.screenshot({ path: path.join(root, mode + '.png') });
   };
@@ -80,12 +81,10 @@ async function installFixture(app, mode, project) {
     if (captureName) await capture(page, captureName + '-del');
     await page.click('#deployment-other');
     const cards = page.locator('[data-deploy-step="providers"] [data-provider]:visible');
-    // Seks ligestillede udbydere i alfabetisk rækkefølge, tre ad gangen; ingen er fremhævet.
-    assert.deepEqual(await cards.evaluateAll(items => items.map(item => item.dataset.provider)), ['azure', 'cloudflare', 'github-pages']);
+    // Seks ligestillede udbydere i alfabetisk rækkefølge på én skærm; ingen er fremhævet.
+    assert.deepEqual(await cards.evaluateAll(items => items.map(item => item.dataset.provider)), ['azure', 'cloudflare', 'github-pages', 'komplai', 'promte', 'vercel']);
     assert.equal(await cards.evaluateAll(items => items.some(item => item.matches('.primary, [aria-pressed="true"]') || /anbefalet/i.test(item.innerText))), false);
-    await page.click('#deployment-more-providers');
-    assert.deepEqual(await cards.evaluateAll(items => items.map(item => item.dataset.provider)), ['komplai', 'promte', 'vercel']);
-    assert.equal(await cards.evaluateAll(items => items.some(item => item.matches('.primary, [aria-pressed="true"]') || /anbefalet/i.test(item.innerText))), false);
+    assert.equal(await page.locator('#deployment-more-providers').count(), 0);
     assert.equal(await app.evaluate(() => globalThis.komplaiFixtureCalls.length), calls, 'Indgangen og udbydervalget må ikke kontakte en tjeneste.');
     if (captureName) await capture(page, captureName + '-udbydere');
     await page.click('[data-provider="komplai"]');
@@ -148,6 +147,13 @@ async function installFixture(app, mode, project) {
         assert.deepEqual(errors, []); continue;
       }
       await page.waitForSelector('[data-deploy-step="connect"]:not([hidden])');
+      if (mode === 'publish') {
+        // Tilbage fra forbindelsen til login viser «Log ind med komplai» igen og ikke kun Afbryd.
+        await page.click('#deployment-back'); await page.waitForSelector('[data-deploy-step="login"]:not([hidden])');
+        assert.equal(await page.locator('#komplai-publish-login').isVisible(), true); assert.equal(await page.locator('#komplai-publish-cancel').isVisible(), false);
+        await capture(page, 'login-efter-tilbage');
+        await page.click('#komplai-publish-login'); await page.waitForSelector('[data-deploy-step="connect"]:not([hidden])');
+      }
       assert.equal(await page.locator('#komplai-publish-org').isVisible(), false);
       assert.match(await page.locator('#komplai-publish-tile').innerText(), /Prøveorganisation/);
       assert.equal(await page.locator('#komplai-publish-ai-row').count(), 0);
@@ -162,6 +168,8 @@ async function installFixture(app, mode, project) {
       await chooseRun(page, app); await page.click('#komplai-publish-login');
       await page.waitForSelector('[data-deploy-step="connect"]:not([hidden])'); await page.click('#komplai-publish-confirm');
       await page.waitForSelector('[data-deploy-step="app"]:not([hidden])');
+      // Konto og adgang kan nås fra appvalget, så en tester i den forkerte organisation kan logge ud derfra (N:D2-3).
+      assert.equal(await page.isVisible('#deploy-komplai-account'), true, 'Konto og adgang står ved appvalget');
       const before = (await page.evaluate(() => window.harness.komplaiPublishState())).value;
       assert.equal(before.connected, true); assert.equal(before.organisationId, 'syntetisk-org');
       assert.equal((await app.evaluate(() => globalThis.komplaiFixtureCalls)).filter(c => c.route === '/v1/aura/publishing/connect').length, 1);
@@ -198,13 +206,29 @@ async function installFixture(app, mode, project) {
       assert.equal(await page.locator('[name="komplai-visibility"]:checked').count(), 0);
       await page.check('[name="komplai-visibility"][value="private"]');
       await page.click('#deployment-file-options'); await page.click('#deployment-change-destination');
-      await page.locator('#deployment-account-options > summary').click(); await page.click('#deployment-account'); await page.click('#komplai-publish-logout');
-      await page.locator('#komplai-publish-feedback').filter({ hasText: 'Du er logget ud' }).waitFor();
-      await capture(page, mode + '-run-logget-ud');
+      await page.locator('#deployment-account-options > summary').click(); await page.click('#deployment-account');
+      if (mode === 'publish') {
+        // K1: uden net kan Log ud ikke tilbagekalde adgangen. Den bevares, og trinnet tilbyder at fjerne den fra denne computer
+        // alene. Kræver kanalen komplai:publish-forget i main.cjs og preload.cjs.
+        await app.evaluate(() => { globalThis.komplaiLogoutOffline = true; });
+        await page.click('#komplai-publish-logout');
+        await page.locator('#deployment-feedback').filter({ hasText: 'kunne ikke kontaktes' }).waitFor();
+        assert.equal((await page.evaluate(() => window.harness.komplaiPublishState())).value.connected, true, 'adgangen bevares, til testeren vælger');
+        assert.equal(await page.locator('#komplai-publish-forget').isVisible(), true);
+        await capture(page, 'run-log-ud-uden-net');
+        await page.click('#komplai-publish-forget');
+        await page.locator('#komplai-publish-feedback').filter({ hasText: 'fjernet fra denne computer' }).waitFor();
+        await capture(page, 'run-fjernet-lokalt');
+      } else {
+        await page.click('#komplai-publish-logout');
+        await page.locator('#komplai-publish-feedback').filter({ hasText: 'Du er logget ud' }).waitFor();
+        await capture(page, mode + '-run-logget-ud');
+      }
       assert.equal((await page.evaluate(() => window.harness.komplaiPublishState())).value.connected, false);
       const restartedCalls = await app.evaluate(() => globalThis.komplaiFixtureCalls);
       assert.equal(restartedCalls.filter(c => c.route === '/api/publish/native').length, 1);
-      assert.equal(restartedCalls.filter(c => c.route === '/v1/aura/publishing/session' && c.method === 'DELETE').length, 1);
+      // Ved «Fjern kun fra denne computer» prøver Aura at tilbagekalde én gang til, før adgangen fjernes lokalt.
+      assert.equal(restartedCalls.filter(c => c.route === '/v1/aura/publishing/session' && c.method === 'DELETE').length, mode === 'publish' ? 2 : 1);
       assert.equal(restartedCalls.some(c => /oauth|\/connect$|\/models|\/releases/.test(c.route)), false);
       const state = (await page.evaluate(() => window.harness.connectionState())).value;
       assert.equal(state.connections.some(c => c.kind === 'komplai'), false);
@@ -215,5 +239,5 @@ async function installFixture(app, mode, project) {
       console.error('Prøvemappe:', root); throw error;
     } finally { await app?.close(); }
   }
-  console.log(JSON.stringify({ status: 'bestået', root, screens, checks: ['AI-udbydere og IPC uden komplai-inferens', 'Run via PKCE og IPC, også når organisationen tilbyder AI', 'AI-only organisation giver ingen Run-adgang', 'ingen AI-vilkår eller samtidig AI-tilslutning', 'tidligere modelvalg skifter ikke automatisk udbyder', 'projekt og kladde bevares', 'oprydning af tidligere AI-token bevarer Run', 'Run bevares efter rigtig Electron-genstart', 'logout tilbagekalder Run-adgang', 'ingen modelkald eller udgivelse'], limitations: ['syntetisk identitetsudsteder og API', 'nøglering simuleret', 'ingen Windows-prøve'] }));
+  console.log(JSON.stringify({ status: 'bestået', root, screens, checks: ['AI-udbydere og IPC uden komplai-inferens', 'seks udbydere på én skærm', 'Run via PKCE og IPC, også når organisationen tilbyder AI', 'Tilbage til login viser Log ind med komplai igen', 'AI-only organisation giver ingen Run-adgang', 'ingen AI-vilkår eller samtidig AI-tilslutning', 'tidligere modelvalg skifter ikke automatisk udbyder', 'projekt og kladde bevares', 'oprydning af tidligere AI-token bevarer Run', 'Run bevares efter rigtig Electron-genstart', 'logout tilbagekalder Run-adgang', 'uden net kan adgangen fjernes fra denne computer alene', 'ingen modelkald eller udgivelse'], limitations: ['syntetisk identitetsudsteder og API', 'nøglering simuleret', 'ingen Windows-prøve'] }));
 })().catch(error => { console.error(error); process.exitCode = 1; });

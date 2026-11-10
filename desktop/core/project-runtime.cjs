@@ -147,7 +147,10 @@ async function detectServices(root, config = {}) {
     else if (/\bFastAPI\s*\(/.test(files['main.py'] || '')) services = [{ id: 'web', label: 'Python med FastAPI', command: ['python3', '-m', 'uvicorn', 'main:app', '--host', '{host}', '--port', '{port}'], cwd: '.' }];
     else if (/\bFlask\s*\(/.test(files['app.py'] || '')) services = [{ id: 'web', label: 'Python med Flask', command: ['python3', '-m', 'flask', '--app', 'app', 'run', '--host', '{host}', '--port', '{port}', '--no-reload'], cwd: '.' }];
   }
-  return { config: c, services: c.mode === 'static' ? [] : services, files, fingerprint: createHash('sha256').update(JSON.stringify({ config: c, files })).digest('hex') };
+  // Samtykket til start dækker pakker og opstart, ikke netlisten: den styrer kun, hvad siden må hente i forhåndsvisningen,
+  // og den ændres af brugeren selv, fx med Tillad. Uden netliste er fingeraftrykket det samme som før (fund 24, beta 3).
+  const { network, ...startup } = c;
+  return { config: c, services: c.mode === 'static' ? [] : services, files, fingerprint: createHash('sha256').update(JSON.stringify({ config: startup, files })).digest('hex') };
 }
 
 async function inspectPreviewDependencies(root, config = {}) {

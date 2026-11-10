@@ -10,7 +10,10 @@ const rootPath = path.join(__dirname, '..', '..');
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 async function until(check, description) { for (let i=0;i<300;i++) { if (await check()) return; await pause(100); } throw new Error(`Kontrollen nåede ikke frem til: ${description}`); }
 (async () => {
- const root = await fs.mkdtemp(path.join(os.tmpdir(),'harness-agent-'));
+ // Den kanoniske sti, som Aura selv bruger (openProject tager realpath). På macOS er os.tmpdir() under /var, et link til /private/var.
+ // Skrivevagten lader den faktiske sti afgøre, men OpenCodes egen mappekontrol er leksikalsk og ville spørge om en /var-sti. Mocken skriver
+ // derfor med denne sti.
+ const root = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(),'harness-agent-')));
  const project = path.join(root,'projekt'); await fs.mkdir(path.join(project,'public'),{recursive:true});
  await fs.writeFile(path.join(project,'public/index.html'),'<h1>Før</h1>');
  let mode='write', permission='allow'; const requests=[], events=[];
@@ -20,7 +23,9 @@ async function until(check, description) { for (let i=0;i<300;i++) { if (await c
   const body=JSON.parse(raw);requests.push(body);
   if(mode==='wait') return;
   const isToolRun=Boolean(body.tools?.length);
-  const hasResult=body.messages.some(m=>m.role==='tool');
+  // Kun værktøjssvar efter brugerens seneste besked tæller. Plan og byg deler AI-session (decisions.md, 25.10.), så Byg-kaldets historik
+  // rummer planlægningens værktøjssvar; ellers ville byggetrinnet aldrig få sit write-kald.
+  const hasResult=body.messages.slice(body.messages.findLastIndex(m=>m.role==='user')+1).some(m=>m.role==='tool');
   // En plan tæller kun med alle fire afsnit; ellers bliver svaret i samtalen uden plan.
   const planning=JSON.stringify(body.messages).includes('PLANLÆGNING:');
   const tool=isToolRun&&!hasResult?{id:'call_test',type:'function',function:{name:'write',arguments:JSON.stringify({filePath:path.join(project,'public/index.html'),content:'<h1>Bygget gennem agenten</h1>'})}}:null;
@@ -47,7 +52,10 @@ async function until(check, description) { for (let i=0;i<300;i++) { if (await c
   assert.equal(await fs.readFile(path.join(project,'public/index.html'),'utf8'),'<h1>Før</h1>');
   assert.ok(bench.chat.plan?.text, 'Planen skal kunne godkendes');
   assert.doesNotMatch(bench.chat.plan.text,/Arbejdsnote før værktøjskald/);
-  assert.match(bench.chat.plan.context,/Arbejdsnote før værktøjskald/);
+  // Planen sendes kun én gang i Byg (plan.text), og context rummer kun brugerens egne svar (decisions.md: «Planen sendes kun én gang i Byg,
+  // og brugerens egne svar bevares»). AI'ens arbejdsnote når Byg gennem den fælles AI-session; det prøves længere nede.
+  assert.match(bench.chat.plan.context,/Planlæg en startside/,'Brugerens egne svar fra afklaringen bevares');
+  assert.doesNotMatch(bench.chat.plan.context,/Det bygger vi/,'Planen sendes kun én gang i Byg');
   const planRequests=requests.filter(r=>r.tools?.length);
   assert.ok(planRequests.length);
   assert.ok(planRequests.every(r=>!r.tools.some(t=>['write','edit','bash'].includes(t.function.name))), 'Skrive- og shellværktøjer må ikke udbydes i planlægning');
@@ -69,6 +77,9 @@ async function until(check, description) { for (let i=0;i<300;i++) { if (await c
   assert.ok(requests.some(r=>JSON.stringify(r).includes(planID)), 'Den godkendte plan følger med til bygning');
   assert.ok(requests.some(r => r.messages.some(m => typeof m.content === 'string' && m.content.includes(projectGuidance) && m.content.includes(planID))), 'Byggesessionen skal modtage både projektvejledningen og den godkendte plan');
   assert.ok(events.some(e=>e.type==='message.part.updated'));
+  // Planlægningens arbejdsnote skal stå i Byg-kaldets historik før byggebeskeden (fælles AI-session eller overdragelse). Mocken skriver
+  // samme note i Byggets eget værktøjstrin, så kun det, der står før brugerens seneste besked, tæller.
+  assert.ok(requests.some(r=>JSON.stringify(r).includes(planID)&&JSON.stringify(r.messages.slice(0,r.messages.findLastIndex(m=>m.role==='user'))).includes('Arbejdsnote før værktøjskald')),'Planlægningens arbejdsnote når Byg');
   // Grundreglerne og appens regler står i systemprompten; skillsene fra biblioteket kan hentes efter behov.
   assert.ok(requests.some(r=>JSON.stringify(r).includes('FÆLLES-GRUNDLAG-02') && JSON.stringify(r).includes('APPENS REGLER')), 'grundregler og appens regler når modellen');
   assert.ok(requests.some(r=>JSON.stringify(r).includes('<name>harness-git-og-samarbejde</name>')), 'bibliotekets skills vises for modellen');
@@ -78,7 +89,7 @@ async function until(check, description) { for (let i=0;i<300;i++) { if (await c
   const declined=await bench.prepare({...selection,mode:'free',text:'Prøv igen.'});await bench.send({text:'Prøv igen.',fingerprint:declined.fingerprint,contextBinding:declined.contextBinding});await until(()=>!bench.running,'afvist handling');assert.equal(bench.chat.plan,null,'Direkte arbejde ugyldiggør tidligere plan');
   assert.equal(await fs.readFile(path.join(project,'public/index.html'),'utf8'),'<h1>Bevar</h1>');
   await bench.close();mode='wait';const canceled=await bench.prepare({...selection,mode:'free',text:'Vent på svar.'});await bench.send({text:'Vent på svar.',fingerprint:canceled.fingerprint,contextBinding:canceled.contextBinding});await pause(1000);await bench.stop();assert.equal(bench.running,false);
-  console.log(JSON.stringify({status:'bestået',root,checks:['planlægning afviser fremprovokeret skriveforsøg','plan og afklaring følger til bygning','forældet plan afvises','afslutning viser faktiske filændringer','rigtig OpenCode-motor','kontrolleret modelserver','krævet datagennemgang','værktøjskald og godkendelse','rigtig filændring','preview fra disk','afvist ændring bevaret','stop'],model:'Simuleret kompatibel API, ikke en ekstern AI-model'}));
+  console.log(JSON.stringify({status:'bestået',root,checks:['planlægning afviser fremprovokeret skriveforsøg','plan og afklaring følger til bygning','planen sendes én gang, og arbejdsnoten når Byg gennem sessionen','forældet plan afvises','afslutning viser faktiske filændringer','rigtig OpenCode-motor','kontrolleret modelserver','krævet datagennemgang','værktøjskald og godkendelse','rigtig filændring','preview fra disk','afvist ændring bevaret','stop'],model:'Simuleret kompatibel API, ikke en ekstern AI-model'}));
  }catch(error){console.error(error);console.error(JSON.stringify(events.filter(e=>/error|permission/.test(e.type))));process.exitCode=1;}
  finally {await bench.close();await preview?.close();server.closeAllConnections();await new Promise(resolve=>server.close(resolve));}
 })();

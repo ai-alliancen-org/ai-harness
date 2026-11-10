@@ -45,7 +45,7 @@
   },
   "byg-git-soeg": {
    "kilde": "scripts/record-opencode-contract.cjs forloeb",
-   "aura": "d0c3fca+ændringer",
+   "aura": "1cfa7a6+ændringer",
    "mode": "build",
    "git": true,
    "copy": false,
@@ -65,7 +65,7 @@
   },
   "byg-uden-git-soeg": {
    "kilde": "scripts/record-opencode-contract.cjs forloeb",
-   "aura": "d0c3fca+ændringer",
+   "aura": "1cfa7a6+ændringer",
    "mode": "build",
    "git": false,
    "copy": false,
@@ -1064,7 +1064,7 @@
    "case": "bash-redirect-tmp",
    "permission": "bash",
    "patterns": [
-    "echo hej > ${SYSTMP}/aura-kontrakt-86963.txt"
+    "echo hej > ${SYSTMP}/aura-kontrakt-43149.txt"
    ],
    "sequence": [
     "del:pending",
@@ -1074,7 +1074,7 @@
     "del:running",
     "del:completed"
    ],
-   "recordedLabel": "Kommando: echo hej > ${SYSTMP}/aura-kontrakt-86963.txt",
+   "recordedLabel": "Kommando: echo hej > ${SYSTMP}/aura-kontrakt-43149.txt",
    "recordedAllowed": false
   },
   {
@@ -1120,7 +1120,7 @@
    "case": "webfetch",
    "permission": "webfetch",
    "patterns": [
-    "http://127.0.0.1:65252/side"
+    "http://127.0.0.1:55522/side"
    ],
    "sequence": [
     "del:pending",
@@ -1129,7 +1129,7 @@
     "svar:once",
     "del:completed"
    ],
-   "recordedLabel": "Hjemmeside: http://127.0.0.1:65252",
+   "recordedLabel": "Hjemmeside: http://127.0.0.1:55522",
    "recordedAllowed": false
   },
   {
@@ -1138,7 +1138,7 @@
    "case": "webfetch-localhost-sti",
    "permission": "webfetch",
    "patterns": [
-    "http://localhost:65252/andet?q=1"
+    "http://localhost:55522/andet?q=1"
    ],
    "sequence": [
     "del:pending",
@@ -1147,7 +1147,7 @@
     "svar:once",
     "del:completed"
    ],
-   "recordedLabel": "Hjemmeside: http://localhost:65252",
+   "recordedLabel": "Hjemmeside: http://localhost:55522",
    "recordedAllowed": false
   },
   {
@@ -1224,7 +1224,7 @@
     "del:completed"
    ],
    "toolResult": [
-    "<path>${RUNTIME}/data/opencode/tool-output/tool_1abd27e9b0014qopneZJdeYxB3</path> <type>file</type> <content> 39990: 39990 39991: 39991 39992: 39992 39993: 39993 39994: 39994 (Showing lines 39990-3999"
+    "<path>${RUNTIME}/data/opencode/tool-output/tool_1c4c68218001KMjI8WtIURkI0o</path> <type>file</type> <content> 39990: 39990 39991: 39991 39992: 39992 39993: 39993 39994: 39994 (Showing lines 39990-3999"
    ]
   },
   {
@@ -2066,7 +2066,7 @@
    "case": "bash-redirect-tmp",
    "permission": "bash",
    "patterns": [
-    "echo hej > ${SYSTMP}/aura-kontrakt-86963.txt"
+    "echo hej > ${SYSTMP}/aura-kontrakt-43149.txt"
    ],
    "sequence": [
     "del:pending",
@@ -2076,7 +2076,7 @@
     "del:running",
     "del:completed"
    ],
-   "recordedLabel": "Kommando: echo hej > ${SYSTMP}/aura-kontrakt-86963.txt",
+   "recordedLabel": "Kommando: echo hej > ${SYSTMP}/aura-kontrakt-43149.txt",
    "recordedAllowed": false
   },
   {
@@ -2122,7 +2122,7 @@
    "case": "webfetch",
    "permission": "webfetch",
    "patterns": [
-    "http://127.0.0.1:65270/side"
+    "http://127.0.0.1:55542/side"
    ],
    "sequence": [
     "del:pending",
@@ -2131,7 +2131,7 @@
     "svar:once",
     "del:completed"
    ],
-   "recordedLabel": "Hjemmeside: http://127.0.0.1:65270",
+   "recordedLabel": "Hjemmeside: http://127.0.0.1:55542",
    "recordedAllowed": false
   },
   {
@@ -2140,7 +2140,7 @@
    "case": "webfetch-localhost-sti",
    "permission": "webfetch",
    "patterns": [
-    "http://localhost:65270/andet?q=1"
+    "http://localhost:55542/andet?q=1"
    ],
    "sequence": [
     "del:pending",
@@ -2149,7 +2149,7 @@
     "svar:once",
     "del:completed"
    ],
-   "recordedLabel": "Hjemmeside: http://localhost:65270",
+   "recordedLabel": "Hjemmeside: http://localhost:55542",
    "recordedAllowed": false
   },
   {
@@ -2226,7 +2226,7 @@
     "del:completed"
    ],
    "toolResult": [
-    "<path>${RUNTIME}/data/opencode/tool-output/tool_1abd28e530011JopKMEyCuPz6L</path> <type>file</type> <content> 39990: 39990 39991: 39991 39992: 39992 39993: 39993 39994: 39994 (Showing lines 39990-3999"
+    "<path>${RUNTIME}/data/opencode/tool-output/tool_1c4c68ca6001yN592uFt1xcfT2</path> <type>file</type> <content> 39990: 39990 39991: 39991 39992: 39992 39993: 39993 39994: 39994 (Showing lines 39990-3999"
    ]
   },
   {

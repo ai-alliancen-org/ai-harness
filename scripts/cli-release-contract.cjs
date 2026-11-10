@@ -6,8 +6,37 @@ function names(version) {
   if (!versionPattern.test(version)) throw new Error('Ugyldig CLI-version.');
   return [`aura-harness-${version}.tgz`, 'WINDOWS.md', 'LINUX.md', 'MACOS.md', 'CLI-RELEASE.json', 'SHA256SUMS.txt'];
 }
+// Den OpenCode-version, npm-pakken låser. Alle motorpakkerne skal have samme version.
+function lockedOpenCode(pkg) {
+  const versions = [...new Set(Object.entries(pkg?.optionalDependencies || {}).filter(([name]) => /^opencode-/.test(name)).map(([, version]) => version))];
+  if (versions.length !== 1 || !/^\d+\.\d+\.\d+$/.test(versions[0])) throw new Error('Motorpakkerne i package.json skal have præcis samme OpenCode-version.');
+  return versions[0];
+}
+// Platformsguiderne følger med udgivelsen ordret. Filnavnet skal være pakkens, og guiden skal nævne den OpenCode-version,
+// pakken låser, og ingen anden; ellers melder doctor noget andet end vejledningen (fund 52). opencode er null for en lokal
+// prøve, som må bygges, før guiderne er skrevet om til næste udgivelse. Returnerer en forklaring eller null.
+function guideProblem(name, text, { tarball, opencode = null }) {
+  const packages = text.match(/aura-harness-\d+\.\d+\.\d+(?:-beta\.\d+)?\.tgz/g) || [];
+  if (!packages.length || packages.some(p => p !== tarball)) return `Opdatér filnavnet i cli/${name} til ${tarball}, så webguide og pakke stemmer overens.`;
+  if (opencode === null) return null;
+  const versions = [...text.matchAll(/OpenCode (\d+\.\d+\.\d+)/g)].map(match => match[1]);
+  if (!versions.length || versions.some(version => version !== opencode)) return `cli/${name} skal nævne OpenCode ${opencode}, som pakken låser, så doctor og vejledningen siger det samme.`;
+  return null;
+}
+// Teksterne til næste CLI-udgivelse ligger i et udkast, indtil versionen løftes. Udkastet nævner den udgivne version, som
+// guiderne og udgivelsesnoterne stadig beskriver. Er package.json løftet, mens udkastet findes, ville udgivelsen sende tekster
+// om den forrige CLI med ud, fx adgangssætningslageret i stedet for nøgleringen (fund 45). text er udkastets indhold, eller
+// null når det ikke findes. Returnerer en forklaring eller null.
+const draftFile = 'docs/releases/cli-naeste-udkast.md';
+function draftProblem(text, version) {
+  if (text === null || text === undefined) return null;
+  const base = /Gælder ikke den udgivne CLI (\d+\.\d+\.\d+(?:-beta\.\d+)?)\./.exec(text)?.[1];
+  if (!base) return `${draftFile} skal nævne den udgivne CLI, det bygger på («Gælder ikke den udgivne CLI VERSION.»), så udgivelseskontrollen kan se, om versionen er løftet.`;
+  if (base === version) return null;
+  return `Versionen er ${version}, men ${draftFile} findes stadig. Teksterne dér beskriver CLI'en efter ${base}: flyt dem ind i de tre platformsguider, cli/README.md og docs/releases/cli-beta.md, og slet udkastet i samme commit.`;
+}
 function allowedSource(name) {
-  return /^(LICENSE|README\.md|package\.json|cli\/[\w-]+\.(cjs|md)|desktop\/core\/[\w-]+\.(?:cjs|mjs)|desktop\/ui\/(?:conversation-mode|plan-view)\.js|desktop\/runtime-lock\.json|scripts\/harness\.cjs)$/.test(name)
+  return /^(LICENSE|README\.md|package\.json|cli\/[\w-]+\.(cjs|md)|desktop\/core\/[\w-]+\.(?:cjs|mjs)|desktop\/ui\/(?:approval-view|conversation-mode|plan-view)\.js|desktop\/runtime-lock\.json|scripts\/harness\.cjs)$/.test(name)
     || /^profiles\/[a-zA-Z0-9_/-]+\.(md|json|txt)$/.test(name);
 }
 // Læs de faktiske npm-arkivfiler uden at udpakke eller udføre dem.
@@ -58,4 +87,4 @@ function validateRelease(release, files, version) {
     if (!bytes || a.size !== bytes.length || a.digest !== `sha256:${sha256(bytes)}`) throw new Error(`CLI-filens SHA-256 eller størrelse stemmer ikke: ${a.name}`);
   }
 }
-module.exports = { repository, names, sha256, allowedSource, unpack, releaseFiles, validateRelease };
+module.exports = { repository, names, sha256, allowedSource, unpack, releaseFiles, validateRelease, lockedOpenCode, guideProblem, draftFile, draftProblem };

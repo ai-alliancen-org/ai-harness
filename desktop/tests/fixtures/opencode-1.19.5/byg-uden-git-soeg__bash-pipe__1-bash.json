@@ -1,6 +1,6 @@
 {
  "opencode": "1.19.5",
- "aura": "d0c3fca+ændringer",
+ "aura": "1cfa7a6+ændringer",
  "scenario": "byg-uden-git-soeg",
  "outcome": "idle",
  "case": "bash-pipe",
@@ -23,8 +23,8 @@
   "del:completed"
  ],
  "request": {
-  "id": "per_1abd28d72001XHkpnM0pWKHD2y",
-  "sessionID": "ses_e542d7b68ffezKI5f78zcPRWM1",
+  "id": "per_1c4c68c27001v7nVE7Hb9jDpVi",
+  "sessionID": "ses_e3b3979f3ffe5KHrNXt25TaWnK",
   "permission": "bash",
   "patterns": [
    "git status --short",
@@ -38,7 +38,7 @@
    "head *"
   ],
   "tool": {
-   "messageID": "msg_1abd28d62001g71Q8x9NZgCOeQ",
+   "messageID": "msg_1c4c68c1d001hhK9zKgstiDT6s",
    "callID": "kald-19-0"
   }
  },
@@ -51,8 +51,8 @@
   }
  },
  "policyInput": {
-  "id": "per_1abd28d72001XHkpnM0pWKHD2y",
-  "sessionID": "ses_e542d7b68ffezKI5f78zcPRWM1",
+  "id": "per_1c4c68c27001v7nVE7Hb9jDpVi",
+  "sessionID": "ses_e3b3979f3ffe5KHrNXt25TaWnK",
   "permission": "bash",
   "patterns": [
    "git status --short",
@@ -66,7 +66,7 @@
    "head *"
   ],
   "tool": {
-   "messageID": "msg_1abd28d62001g71Q8x9NZgCOeQ",
+   "messageID": "msg_1c4c68c1d001hhK9zKgstiDT6s",
    "callID": "kald-19-0"
   },
   "toolInput": {

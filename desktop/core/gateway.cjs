@@ -1,6 +1,6 @@
 const http = require('node:http');
 const { randomBytes } = require('node:crypto');
-const { usesResponses, assertSupported } = require('./connections.cjs');
+const { usesResponses, assertSupported, ollamaRoot } = require('./connections.cjs');
 const network = require('./network-journal.cjs');
 const { StreamProgress } = require('./stream-progress.cjs');
 const { redact } = require('./secrets.cjs');
@@ -10,7 +10,8 @@ const IDLE_LIMIT = 120_000, TOTAL_LIMIT = 20 * 60_000;
 // Skyudbydere beholder de 120 sekunder. Grænsen ligger under det samlede loft.
 const LOCAL_IDLE_LIMIT = 10 * 60_000;
 const idleLimitFor = connection => ['ollama', 'compatible'].includes(connection?.kind) ? LOCAL_IDLE_LIMIT : IDLE_LIMIT;
-// Udbyderens egen fejltekst vises kun bag Se detaljer. Den læses begrænset, renses for nøgler og afkortes, og den styrer aldrig fejltypen.
+// Udbyderens egen fejltekst vises kun bag Se detaljer. Den læses begrænset, renses for nøgler og afkortes. Fejltypen afgøres af
+// statuskoden; kun ved en 429 afgør teksten, om kontoens kvote eller kredit er brugt op (QUOTA_TEXT).
 const DETAIL_LIMIT = 500, DETAIL_READ_BYTES = 8000;
 async function upstreamDetail(response, key) {
   let text = '';
@@ -23,8 +24,27 @@ async function upstreamDetail(response, key) {
   if (key && key.length >= 6) text = text.split(key).join('[skjult]');
   return redact(text.replace(/\s+/g, ' ').trim()).slice(0, DETAIL_LIMIT);
 }
+// Udbyderens egen tekst, når kontoens kvote eller kredit er brugt op, fx OpenAI's insufficient_quota, der kommer som HTTP 429.
+// Den samme tekst bruges i chat-session.cjs (sessionFailure), så gatewayen og OpenCodes endelige fejl giver samme type.
+const QUOTA_TEXT = /insufficient[ _-]?quota|exceeded your current quota|credit balance|billing|payment required/i;
 // Fejl, der opstår her, før kaldet når udbyderen. De er ikke netfejl og låser ikke forbindelsen.
 class LocalError extends Error {}
+// OpenCode venter højst så længe mellem to forsøg. Et længere Retry-After ville holde opgaven i Arbejder i op til en time.
+const RETRY_AFTER_LIMIT = 120;
+// Retry-After i sekunder eller som HTTP-dato. Mangler det, eller kan det ikke læses, er svaret null.
+function retryAfterSeconds(value, now = Date.now()) {
+  if (typeof value !== 'string' || !value.trim()) return null;
+  const seconds = Number(value);
+  if (Number.isFinite(seconds)) return seconds >= 0 ? Math.ceil(seconds) : null;
+  const at = Date.parse(value);
+  return Number.isFinite(at) ? Math.max(0, Math.ceil((at - now) / 1000)) : null;
+}
+// Hvornår udbyderen tager imod igen, i almindeligt dansk, fx «kl. 15.10 (om cirka 45 min)».
+function acceptsAgain(at, now = Date.now()) {
+  const date = new Date(at), minutes = Math.max(1, Math.ceil((at - now) / 60_000));
+  const day = date.toDateString() === new Date(now).toDateString() ? '' : `${date.toLocaleDateString('da-DK', { weekday: 'long', day: 'numeric', month: 'long' })} `;
+  return `${day}kl. ${date.toLocaleTimeString('da-DK', { hour: '2-digit', minute: '2-digit' })}${minutes < 120 ? ` (om cirka ${minutes} min)` : ''}`;
+}
 // Kun agentmotoren får en midlertidig adgangskode. Den rigtige modelnøgle bliver i hovedprocessen.
 async function startGateway(connection, model, key, route, onFailure = () => {}, { idleLimit = idleLimitFor(connection), totalLimit = TOTAL_LIMIT, onProgress = () => {}, root = '', effort: initialEffort = null } = {}) {
   // Brugerens valgte indsats kan skifte mellem beskeder uden at starte en ny modelsession.
@@ -33,8 +53,11 @@ async function startGateway(connection, model, key, route, onFailure = () => {},
   const token = randomBytes(32).toString('hex');
   const active = new Set();
   let failed = false, stopped = false;
+  // 'network', når gatewayen senest selv sendte en netfejl videre som 502, fordi udbyderen ikke kunne nås. Giver OpenCode op
+  // efter sine genforsøg, ser ChatSession det, så kortet siger forbindelse og ikke udbyderens server (fund 12).
+  let forwarded = null;
   // Fejlen får en type, så appen kan vise den rigtige vej videre, fx nøgle, kvote eller forbindelse.
-  function fail(message, kind, status, detail) { if (!failed && !stopped) { failed = true; onFailure(message, { kind, status: status || null, ...(detail ? { detail } : {}) }); } }
+  function fail(message, kind, status, detail, extra = {}) { if (!failed && !stopped) { failed = true; onFailure(message, { kind, status: status || null, ...(detail ? { detail } : {}), ...extra }); } }
   let origin;
   const server = http.createServer(async (req, res) => {
     if (req.headers.host !== new URL(origin).host || (req.headers.authorization !== `Bearer ${token}` && req.headers['x-api-key'] !== token)) { res.writeHead(401); return res.end(); }
@@ -42,7 +65,7 @@ async function startGateway(connection, model, key, route, onFailure = () => {},
     const controller = new AbortController(); active.add(controller);
     res.on('close', () => { controller.abort(); active.delete(controller); });
     // Et langt svar må gerne tage tid, så længe der kommer data. Stilstand i to minutter afbryder kaldet.
-    const idle = new AbortController(), total = AbortSignal.timeout(totalLimit); let idleTimer, reachedUpstream = false, observedResponse;
+    const idle = new AbortController(), total = AbortSignal.timeout(totalLimit); let idleTimer, reachedUpstream = false, observedResponse, sentBody = false;
     const touch = () => { clearTimeout(idleTimer); idleTimer = setTimeout(() => idle.abort(), idleLimit); };
     try {
       const responses = usesResponses(connection);
@@ -72,7 +95,8 @@ async function startGateway(connection, model, key, route, onFailure = () => {},
         else if (responses || connection.kind === 'openrouter') body.reasoning = { ...(body.reasoning || {}), effort };
         else body.reasoning_effort = effort;
       }
-      const base = connection.kind === 'ollama' ? `${connection.baseURL}/v1` : connection.baseURL;
+      // Ollamas OpenAI-adresse ligger under /v1 på serverens rod, også for en forbindelse, der er gemt med /v1 i beta.2.
+      const base = connection.kind === 'ollama' ? `${ollamaRoot(connection.baseURL)}/v1` : connection.baseURL;
       const headers = { 'content-type': 'application/json' };
       if (anthropic) { headers['anthropic-version'] = '2023-06-01'; if (key) headers['x-api-key'] = key; }
       else if (key) { if (connection.kind === 'azure') headers['api-key'] = key; else headers.authorization = `Bearer ${key}`; }
@@ -80,26 +104,40 @@ async function startGateway(connection, model, key, route, onFailure = () => {},
       const progress = new StreamProgress({ emit: onProgress, root });
       reachedUpstream = true;
       const response = observedResponse = await network.observedFetch(`${base}${responses ? '/responses' : anthropic ? '/messages' : '/chat/completions'}`, { method: 'POST', headers, body: JSON.stringify(body), signal: AbortSignal.any([controller.signal, idle.signal, total]), redirect: 'error' }, { category: 'model', purpose: 'model-response', provider: connection.kind, timeoutSignal: idle.signal });
+      // Udbyderen svarede: en senere 502 fra OpenCode skyldes ikke en netfejl i gatewayen.
+      forwarded = null;
       if (!response.ok) {
         const detail = await upstreamDetail(response, key);
         network.finishResponse(response, { outcome: 'failed', error: { status: response.status } });
         // Forbigående fejl (408, 429 og 5xx) videresendes, så OpenCode genforsøger (docs/decisions.md). Aura låser
         // ikke forbindelsen og viser ingen fejl, så et nyt forsøg kan lykkes. Retry-After følger med.
         if (response.status === 408 || response.status === 429 || response.status >= 500) {
+          const wait = retryAfterSeconds(response.headers.get('retry-after'));
+          // Beder udbyderen om at vente længere end loftet, tager den først imod igen senere. OpenCodes genforsøg med loftet
+          // ville holde opgaven i Arbejder i op til 10 minutter og fejle alligevel. Svaret er derfor endeligt med det samme, og
+          // kortet siger, hvornår udbyderen tager imod igen (Q:B1-4). Kun udbyderens tekst om opbrugt kvote eller kredit giver
+          // kvotekortet; en almindelig hastighedsgrænse giver grænsekortet («Vent lidt, og prøv igen»).
+          if (response.status === 429 && wait !== null && wait > RETRY_AFTER_LIMIT) {
+            const retryAt = Date.now() + wait * 1000;
+            const message = `Udbyderen tager først imod igen ${acceptsAgain(retryAt)}. Aura venter ikke så længe, så opgaven er stoppet. Din besked er bevaret.`;
+            fail(message, QUOTA_TEXT.test(detail) ? 'quota' : 'limit', 429, detail, { retryAt });
+            res.writeHead(429, { 'content-type': 'application/json' });
+            return res.end(JSON.stringify({ error: { message, type: 'api_error' } }));
+          }
           // Et langt Retry-After ville holde opgaven i Arbejder i op til en time uden forklaring. Loft: 120 sekunder.
-          const wait = Number(response.headers.get('retry-after'));
-          res.writeHead(response.status, { 'content-type': 'application/json', ...(Number.isFinite(wait) && wait >= 0 && response.headers.get('retry-after') ? { 'retry-after': String(Math.min(Math.ceil(wait), 120)) } : {}) });
+          res.writeHead(response.status, { 'content-type': 'application/json', ...(wait !== null ? { 'retry-after': String(Math.min(wait, RETRY_AFTER_LIMIT)) } : {}) });
           return res.end(JSON.stringify({ error: { message: `Modelserveren svarede midlertidigt (HTTP ${response.status}).${detail ? ` Udbyderens svar: ${detail}` : ''}`, type: 'api_error' } }));
         }
-        const advice = { 401: 'API-nøglen blev afvist. Kontrollér eller udskift den under AI-forbindelser.', 403: 'Din konto har ikke adgang til modellen. Kontrollér adgangen hos udbyderen.', 402: 'Udbyderen afviste kaldet på grund af saldo eller kvote. Kontrollér kontoen; appen vælger ikke en betalt erstatning.', 404: 'Modellen eller adressen blev ikke fundet. Hent modellisten igen, og kontrollér forbindelsen.', 429: 'Udbyderens forbrugsgrænse er nået. Prøv igen, når kvoten er tilgængelig.' }[response.status] || 'Kontrollér forbindelsen og modelvalget, og prøv igen.';
+        // 429 videresendes ovenfor og når aldrig hertil. Typen for en vedvarende 429 kommer fra OpenCodes endelige fejl (sessionFailure).
+        const advice = { 401: 'API-nøglen blev afvist. Kontrollér eller udskift den under AI-forbindelser.', 403: 'Din konto har ikke adgang til modellen. Kontrollér adgangen hos udbyderen.', 402: 'Udbyderen afviste kaldet på grund af saldo eller kvote. Kontrollér kontoen; appen vælger ikke en betalt erstatning.', 404: 'Modellen eller adressen blev ikke fundet. Hent modellisten igen, og kontrollér forbindelsen.' }[response.status] || 'Kontrollér forbindelsen og modelvalget, og prøv igen.';
         const message = `Modelserveren afviste kaldet (HTTP ${response.status}). ${advice}`;
-        const kind = { 401: 'key', 403: 'access', 402: 'quota', 404: 'notfound', 429: 'limit' }[response.status] || (response.status >= 500 ? 'server' : 'rejected');
+        const kind = { 401: 'key', 403: 'access', 402: 'quota', 404: 'notfound' }[response.status] || (response.status >= 500 ? 'server' : 'rejected');
         fail(message, kind, response.status, detail);
         res.writeHead(response.status, { 'content-type': 'application/json' }); return res.end(JSON.stringify({ error: { message, type: 'api_error' } }));
       }
       res.writeHead(200, { 'content-type': response.headers.get('content-type') || 'application/json', 'cache-control': 'no-store' });
       const sse = (response.headers.get('content-type') || '').includes('text/event-stream');
-      for await (const chunk of response.body) { network.observeResponseChunk(response, chunk); touch(); if (res.destroyed) break; res.write(chunk); try { progress.write(chunk, sse); } catch { /* Fremdrift må ikke afbryde svaret. */ } }
+      for await (const chunk of response.body) { network.observeResponseChunk(response, chunk); touch(); if (res.destroyed) break; res.write(chunk); sentBody = true; try { progress.write(chunk, sse); } catch { /* Fremdrift må ikke afbryde svaret. */ } }
       try { progress.end(sse); } catch { /* Selve svaret er allerede sendt videre. */ }
       network.finishResponse(response, { outcome: controller.signal.aborted ? 'cancelled' : 'completed' });
       res.end();
@@ -113,8 +151,11 @@ async function startGateway(connection, model, key, route, onFailure = () => {},
       if (idle.signal.aborted) fail(`Modellen svarede ikke i ${idleLimit >= 60_000 ? `${Math.round(idleLimit / 60_000)} min` : `${Math.max(1, Math.round(idleLimit / 1000))} s`}, så forbindelsen blev afbrudt. Din besked er bevaret.`, 'idle');
       // En netfejl, før modellen har svaret (forbindelse nægtet, DNS, afbrudt), er forbigående: den sendes videre som 502, så OpenCode kan
       // prøve igen, og forbindelsen låses ikke. En strøm, der afbrydes midt i svaret, er stadig endelig, fordi svaret er ufuldstændigt.
-      else if (reachedUpstream && !res.headersSent && !controller.signal.aborted) { /* videresendes som 502 nedenfor */ }
+      else if (reachedUpstream && !res.headersSent && !controller.signal.aborted) { forwarded = 'network'; /* videresendes som 502 nedenfor */ }
       else if (res.headersSent && total.aborted && !controller.signal.aborted) fail(`Svaret tog mere end ${Math.max(1, Math.round(totalLimit / 60_000))} min i alt, så Aura afbrød det. Din besked er bevaret. Prøv igen med en mindre opgave.`, 'total');
+      // Motoren holdt op med at vente, før modellen havde sendt noget, fx ved OpenCodes egen grænse for svarhovedet. Det er en
+      // model, der ikke svarer, ikke en afbrudt internetforbindelse (fund 11). Stop i Aura sætter stopped, og så vises intet kort.
+      else if (reachedUpstream && controller.signal.aborted && !sentBody) fail('Modellen svarede ikke i tide, så AI-motoren holdt op med at vente. Din besked er bevaret.', 'idle');
       else fail('Modelforbindelsen blev afbrudt. Din besked er bevaret. Kontrollér forbindelsen, og prøv igen.', 'network');
       // En afbrudt strøm må ikke ligne et færdigt modelsvar for agentmotoren.
       if (res.headersSent) { res.destroy(); return; }
@@ -124,6 +165,6 @@ async function startGateway(connection, model, key, route, onFailure = () => {},
   });
   await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
   origin = `http://127.0.0.1:${server.address().port}`;
-  return { url: `${origin}/v1`, token, setImages: value => { images = structuredClone(value || []); }, setEffort: value => { effort = value || null; }, abort: () => { stopped = true; for (const controller of active) controller.abort(); }, close: () => new Promise(resolve => { stopped = true; for (const controller of active) controller.abort(); server.close(resolve); server.closeAllConnections(); }) };
+  return { url: `${origin}/v1`, token, forwardedFailure: () => forwarded, setImages: value => { images = structuredClone(value || []); }, setEffort: value => { effort = value || null; }, abort: () => { stopped = true; for (const controller of active) controller.abort(); }, close: () => new Promise(resolve => { stopped = true; for (const controller of active) controller.abort(); server.close(resolve); server.closeAllConnections(); }) };
 }
-module.exports = { startGateway, idleLimitFor };
+module.exports = { startGateway, idleLimitFor, QUOTA_TEXT };

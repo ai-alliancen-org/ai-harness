@@ -16,6 +16,8 @@ npm run package:cli -- dist/cli-proeve --local
 
 `test:cli-live` kræver Python 3 og rigtig OpenCode. Den bruger en lokal modelserver, ikke en betalt AI. Pakkeprøven skal også køres mod den installerede npm-pakke: `node cli/tests/verify-cli.cjs /absolut/sti/node_modules/aura-harness/cli/aura.cjs`. Udelad `HARNESS_OPENCODE_PATH`, så prøven bruger pakkens egen motor.
 
+På Windows kører `npm run test:cli` også prøverne af API-nøglen gennem DPAPI og den rigtige `powershell.exe` (`cli/tests/f-windows-dpapi.test.cjs`). På macOS og Linux springes de over. Windows-nøglen er derfor kun afprøvet, når de har bestået på en Windows-maskine.
+
 Pakkescriptet læser filerne i det faktiske arkiv, afviser ekstra eller manglende filer og sammenligner hver fil med kildekoden. Symlinks og uventede filtyper afvises. En lokal prøve kan indeholde ukommittede filer og markeres med `publishable: false`. Den må ikke uploades som en officiel udgivelse.
 
 En udgivelse indeholder præcis:
@@ -31,7 +33,7 @@ Kontrollér, at Komplai ikke tilbydes som AI-forbindelse, heller ikke efter gen�
 
 ## Fra gennemgang til GitHub
 
-1. Brugeren gennemgår, committer og pusher kode og dokumentation. Rodens `package.json` og `package-lock.json` skal have samme version. Filnavnet i de tre platformsguides skal følge versionen; pakningen afviser gamle filnavne. Pakkerne i `dist/` skal ikke committes.
+1. Brugeren gennemgår, committer og pusher kode og dokumentation. Rodens `package.json` og `package-lock.json` skal have samme version. Filnavnet og OpenCode-versionen i de tre platformsguides skal følge pakken; en udgivelsespakning afviser gamle filnavne og en anden OpenCode-version end den, `package.json` låser. Teksterne til næste udgivelse står i [udkastet](releases/cli-naeste-udkast.md): flyt dem ind i guiderne og udgivelsesnoterne, og slet udkastet i samme commit. Så længe udkastet findes, afviser `npm run test:cli` og udgivelseskontrollen en løftet version. Pakkerne i `dist/` skal ikke committes.
 2. Brugeren opretter og pusher tagget `cli-vVERSION` på det samme commit, som den manuelle kørsel startes fra på `main`. Workflowet opretter ikke tags. Brug aldrig et eksisterende tag til ændrede filer.
 3. Start **Byg og udgiv terminalbeta** på `main` efter godkendelse af den konkrete kørsel. Angiv tagget. Uden `offentliggoer` bygges kun et midlertidigt Actions-artefakt. Med `offentliggoer` oprettes en ny kladde, filerne uploades, hentes og kontrolleres, og først derefter offentliggøres betaen.
 4. Kontrollen kræver det rigtige offentlige repository, tag på kørslens commit, en ren arbejdsmappe, fulgte kildefiler, komplet arkiv og matchende SHA-256. `download-cli-draft.cjs` finder kladden i releaseoversigten og henter den samt filerne via deres ID'er. Opslag på `releases/tags/TAG` kan ikke bruges til denne kladde. GitHubs midlertidige `untagged-…`-adresser accepteres kun ved kladdekontrol; den offentlige side kræver stadig versionstaggede adresser. Uploadede filer kontrolleres igen mod den udvalgte kildekode. En lokal prøve med `publishable: false` afvises. En ny kontrol før offentliggørelse afviser ændrede filer eller udgivelsesnoter.

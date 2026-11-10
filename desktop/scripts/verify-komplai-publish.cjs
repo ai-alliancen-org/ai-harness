@@ -155,7 +155,8 @@ const digest = data => createHash('sha256').update(data).digest('hex');
     await page.emulateMedia({ reducedMotion: 'reduce' }); await helpers.skipIntroduction(page); await helpers.enableSharing(page);
     await page.click('#open'); await page.waitForSelector('#workspace:not([hidden])');
     const idle = () => page.waitForFunction(() => !document.querySelector('#deployment-fields').disabled);
-    const selectProvider = async id => { if (!await page.locator(`[data-provider="${id}"]`).isVisible()) await page.click('#deployment-more-providers'); await page.click(`[data-provider="${id}"]`); await idle(); };
+    // Alle seks udbydere står på samme skærm (DESIGN.md:171), så komplai Run vælges direkte.
+    const selectProvider = async id => { await page.click(`[data-provider="${id}"]`); await idle(); };
     const state = async () => (await page.evaluate(() => window.harness.deploymentState())).value;
     const capture = async name => {
       // Lad det synlige trin og compositorens næste billede følge DOM-opdateringen.
@@ -169,8 +170,8 @@ const digest = data => createHash('sha256').update(data).digest('hex');
       const image = await app.evaluate(async ({ BrowserWindow }) => (await BrowserWindow.getAllWindows().find(w => w.webContents.getURL().startsWith('harness://')).webContents.capturePage()).toPNG().toString('base64'));
       await fs.writeFile(path.join(root, name + '.png'), Buffer.from(image, 'base64'));
       const providers = await page.locator('[data-deploy-step="providers"]').isVisible();
-      if (providers) { const visible = await page.locator('[data-deploy-step="providers"] [data-provider]:visible').evaluateAll(items => items.map(item => item.dataset.provider)); assert.equal(visible.length, 3); assert.ok([['azure', 'cloudflare', 'github-pages'], ['komplai', 'promte', 'vercel']].some(expected => JSON.stringify(expected) === JSON.stringify(visible))); assert.equal(await page.locator('#deployment-more-providers').isVisible(), true); }
-      screens.push(await page.locator('#deployment-dialog').evaluate((dialog, { name, providers }) => ({ name, providers, details: [...dialog.querySelectorAll('#deployment-receipt-details[open], #deployment-technical[open]')].some(el => el.checkVisibility()), heading: document.getElementById(dialog.getAttribute('aria-labelledby')).textContent, words: dialog.innerText.trim().split(/\s+/).length, choices: [...dialog.querySelectorAll('button,select,input[type=checkbox],input[type=radio],summary')].filter(el => el.checkVisibility()).length, fields: [...dialog.querySelectorAll('input:not([type=checkbox]):not([type=radio]):not([type=hidden])')].filter(el => el.checkVisibility()).length, overflow: dialog.scrollWidth > dialog.clientWidth + 1 }), { name, providers }));
+      if (providers) { const visible = await page.locator('[data-deploy-step="providers"] [data-provider]:visible').evaluateAll(items => items.map(item => item.dataset.provider)); assert.deepEqual(visible, ['azure', 'cloudflare', 'github-pages', 'komplai', 'promte', 'vercel']); assert.equal(await page.locator('#deployment-more-providers').count(), 0); }
+      screens.push(await page.locator('#deployment-dialog').evaluate((dialog, { name, providers }) => ({ name, providers, result: !document.querySelector('#deployment-result').hidden, app: !dialog.querySelector('[data-deploy-step="app"]').hidden, appAccount: dialog.querySelector('#deploy-komplai-account')?.checkVisibility() === true, details: [...dialog.querySelectorAll('#deployment-receipt-details[open], #deployment-technical[open]')].some(el => el.checkVisibility()), heading: document.getElementById(dialog.getAttribute('aria-labelledby')).textContent, words: dialog.innerText.trim().split(/\s+/).length, choices: [...dialog.querySelectorAll('button,select,input[type=checkbox],input[type=radio],summary')].filter(el => el.checkVisibility()).length, fields: [...dialog.querySelectorAll('input:not([type=checkbox]):not([type=radio]):not([type=hidden])')].filter(el => el.checkVisibility()).length, overflow: dialog.scrollWidth > dialog.clientWidth + 1 }), { name, providers }));
     };
     const reveal = async selector => { if (!await page.locator(selector).isVisible()) await page.locator('#deployment-receipt-details > summary').click(); };
     const check = async () => { await reveal('#deployment-check'); await page.click('#deployment-check'); await idle(); };
@@ -182,7 +183,7 @@ const digest = data => createHash('sha256').update(data).digest('hex');
     assert.equal(await page.inputValue('#deploy-provider'), '');
     assert.doesNotMatch(await page.locator('[data-deploy-step="destination"]').innerText(), /komplai|Vercel|Azure/i);
     await page.click('#deployment-other'); await capture('udbydere');
-    assert.deepEqual(await page.locator('[data-deploy-step="providers"] [data-provider]').evaluateAll(items => items.map(item => item.dataset.provider)), ['azure', 'cloudflare', 'github-pages']);
+    assert.deepEqual(await page.locator('[data-deploy-step="providers"] [data-provider]').evaluateAll(items => items.map(item => item.dataset.provider)), ['azure', 'cloudflare', 'github-pages', 'komplai', 'promte', 'vercel']);
     assert.equal(calls.length, 0, 'Der må ikke ske netkald, før brugeren vælger en udbyder.');
     await selectProvider('komplai'); await idle(); await capture('login');
     assert.equal(await page.isVisible('#deployment-next'), false);
@@ -195,7 +196,11 @@ const digest = data => createHash('sha256').update(data).digest('hex');
     await page.click('#deployment-back'); assert.equal(await page.locator('#deployment-heading').textContent(), 'Hvor vil du udgive?');
     failOverview = false; await selectProvider('komplai'); await idle();
     assert.equal(calls.filter(call => call.route === '/api/v1/aura/publishing/connect').length, 1, 'Fejlet oversigt kræver ikke et nyt grant.');
-    assert.match(await page.locator('#komplai-publish-org-name').innerText(), /Prøveorganisation B/); await capture('appvalg'); await page.click('#deployment-back'); assert.equal(await page.locator('#deployment-heading').textContent(), 'Hvor vil du udgive?'); await selectProvider('komplai'); await idle(); assert.equal(await page.isVisible('#deploy-komplai-create'), true);
+    assert.match(await page.locator('#komplai-publish-org-name').innerText(), /Prøveorganisation B/); await capture('appvalg');
+    assert.equal(await page.isVisible('#deploy-komplai-account'), true, 'Konto og adgang kan nås fra appvalget');
+    await page.click('#deploy-komplai-account'); await idle(); assert.equal(await page.locator('#deployment-heading').textContent(), 'Konto og adgang');
+    assert.doesNotMatch(await page.locator('#deployment-account-access').textContent(), /Forbundet/, 'kontotrinnet siger kun det, Aura ved'); await capture('konto-fra-appvalg');
+    await page.click('#deployment-back'); assert.equal(await page.locator('#deployment-heading').textContent(), 'Hvilken app vil du udgive til?'); await page.click('#deployment-back'); assert.equal(await page.locator('#deployment-heading').textContent(), 'Hvor vil du udgive?'); await selectProvider('komplai'); await idle(); assert.equal(await page.isVisible('#deploy-komplai-create'), true);
     assert.equal((await page.evaluate(() => window.harness.connectionState())).value.connections.length, 0);
     assert.equal(await page.locator('[name="komplai-visibility"]:checked').count(), 0);
     await page.click('#deploy-komplai-create'); await page.fill('#deploy-komplai-name', 'Ny prøveapp'); await capture('ny-app');
@@ -212,9 +217,15 @@ const digest = data => createHash('sha256').update(data).digest('hex');
     assert.equal(receipt.state, 'READY'); assert.equal(uploads[0].type, 'application/zip'); assert.equal(uploads[0].visibility, 'private');
     for (const [file, data] of originalFiles) assert.deepEqual(uploads[0].files.get(file), data);
     assert.equal(uploads[0].files.size, originalFiles.size); assert.equal(receipt.head, head);
-    assert.equal(await page.locator('#deployment-result-app-name').textContent(), 'Ny prøveapp'); assert.equal(await page.locator('#deployment-state').textContent(), 'Udgivet'); assert.equal(await page.locator('#deployment-verification h4').textContent(), 'Startside ikke kontrolleret'); await capture('upload-modtaget');
+    // Brugerens valg 5. november: komplai-adressen kontrolleres kun ved tryk på Kontrollér, så kortet siger «Uploadet» indtil da.
+    assert.equal(await page.locator('#deployment-result-app-name').textContent(), 'Ny prøveapp'); assert.equal(await page.locator('#deployment-state').textContent(), 'Uploadet, adressen er ikke kontrolleret endnu'); assert.equal(await page.locator('#deployment-verification h4').textContent(), 'Startside ikke kontrolleret'); await capture('upload-modtaget');
+    // Kvitteringen viser højst to hovedknapper og Se detaljer; Konto og adgang og Udgiv et andet sted ligger under Se detaljer (AGENTS.md).
+    for (const id of ['#deployment-komplai-account', '#deployment-another']) assert.equal(await page.locator(id).isVisible(), false, id + ' står ikke i første lag');
+    await page.locator('#deployment-receipt-details > summary').click();
+    for (const id of ['#deployment-komplai-account', '#deployment-another']) assert.equal(await page.locator(id).isVisible(), true, id + ' står under Se detaljer');
+    await page.locator('#deployment-receipt-details > summary').click();
     await check(); receipt = (await state()).last;
-    assert.equal(receipt.checks.site.http, 401); assert.match(receipt.verification, /kræver login med komplai/); assert.equal(await page.locator('#deployment-result-access').textContent(), 'Kun organisationen'); assert.equal(await page.locator('#deployment-verification').isVisible(), false); await capture('privat-resultat');
+    assert.equal(receipt.checks.site.http, 401); assert.match(receipt.verification, /kræver login med komplai/); assert.equal(await page.locator('#deployment-state').textContent(), 'Udgivet'); assert.equal(await page.locator('#deployment-result-access').textContent(), 'Kun organisationen'); assert.equal(await page.locator('#deployment-verification').isVisible(), false); await capture('privat-resultat');
     await page.locator('#deployment-receipt-details > summary').click(); await capture('privat-detaljer'); await page.locator('#deployment-receipt-details > summary').click();
     // Faktisk anonymt filmatch må modsige et privat flag i metadata.
     exposePrivate = true; await check(); assert.equal((await state()).last.checks.content.status, 'matched');
@@ -254,11 +265,14 @@ const digest = data => createHash('sha256').update(data).digest('hex');
     await page.fill('#deploy-komplai-confirm', 'Offentlig prøve'); await page.click('#deployment-next'); await review(); await send(); assert.equal(apps.size, 3); assert.equal(uploads.at(-1).visibility, 'public');
     assert.deepEqual(creations.at(-1), { name: 'Offentlig prøve', visibility: 'private', slug: 'offentlig-proeve' });
     assert.deepEqual(changes.at(-1), { id: uploads.at(-1).appId, visibility: 'public', confirmPublic: 'Offentlig prøve' });
-    // Afvist upload bevarer den tidligere version og dens adgang.
+    // Afvist upload bevarer den tidligere version og dens adgang. komplai sagde nej, så intet er uploadet: den tidligere
+    // kvittering bevares (fund 16), og testeren bliver på filtrinnet med komplais egen tekst og kan prøve igen derfra.
     await next(createdId); await review();
-    const previous = apps.get(createdId).activeRelease; outcome = 'afvist'; await send();
+    const kept = (await state()).last, previous = apps.get(createdId).activeRelease; outcome = 'afvist'; await send();
     assert.equal(apps.get(createdId).activeRelease, previous); assert.equal(apps.get(createdId).visibility, 'private');
-    assert.equal((await state()).last.state, 'UNKNOWN'); assert.equal(await page.isVisible('#deployment-portal'), true); await capture('afvist-upload');
+    assert.deepEqual((await state()).last, kept); assert.match(await page.locator('#deployment-feedback').textContent(), /plads til apps er brugt/);
+    assert.equal(await page.locator('[data-deploy-step="files"]').isVisible(), true); assert.equal(await page.isVisible('#deployment-result'), false); await capture('afvist-upload');
+    await page.keyboard.press('Escape'); await page.click('#deploy-button'); await idle(); assert.equal(await page.isVisible('#deployment-result'), true);
     // En enkelt selvstændig HTML-fil prøver den anden wire-formatgren. Dette er syntetisk materiale.
     await fs.rm(path.join(project, 'public'), { recursive: true }); await fs.mkdir(path.join(project, 'public'));
     const html = Buffer.from('<!doctype html><html lang="da"><meta charset="utf-8"><title>Isoleret HTML-prøve</title><h1>En lille blomst</h1><p>Kun syntetisk testmateriale.</p></html>');
@@ -283,7 +297,10 @@ const digest = data => createHash('sha256').update(data).digest('hex');
     await next(); assert.equal(await page.inputValue('#deploy-komplai-app'), createdId); assert.equal(uploads.length, before + 1);
     await capture('eksisterende-app-980-150'); await page.click('#deployment-back'); await capture('appvalg-980-150'); await page.locator('#deploy-komplai-create').focus(); await page.keyboard.press('Enter'); await capture('ny-app-980-150'); await page.click('#deployment-next'); await capture('adgang-980-150'); await page.locator('[name=\"komplai-visibility\"][value=\"private\"]').focus(); await page.keyboard.press('Space'); assert.equal(await page.locator('#deployment-heading').evaluate(el => el.matches(':focus-visible') && getComputedStyle(el, '::before').width === '3px'), true, 'Tastaturfokus på overskriften markeres diskret.'); await capture('filer-980-150'); await review(); await capture('gennemgang-980-150'); await page.locator('#deployment-technical > summary').click(); await page.locator('#deployment-details').scrollIntoViewIfNeeded(); await capture('gennemgang-detaljer-980-150'); await page.keyboard.press('Escape'); assert.equal(await page.evaluate(() => document.activeElement.id), 'deploy-button');
     assert.equal(JSON.stringify(await state()).includes(grant), false); assert.doesNotMatch(await fs.readFile(path.join(appdata, 'harness/settings.json'), 'utf8'), /komp_publish_grant_|syntetisk-login/);
-    assert.deepEqual(errors, []); assert.deepEqual(serverErrors, []); assert(screens.every(screen => !screen.overflow)); assert(screens.every(screen => screen.details || (screen.providers ? screen.choices === 6 : screen.choices <= 4)), 'Højst fire synlige kontroller; udbydertrinnet har tre valg, sidemenu samt Tilbage og Luk: ' + JSON.stringify(screens));
+    // Forløbets trin og kvitteringen har højst fire synlige kontroller med Tilbage og Luk; kvitteringen viser højst to hovedknapper og
+    // Se detaljer (AGENTS.md). Udbydertrinnet viser seks udbydere samt Tilbage og Luk (DESIGN.md:171). Appvalget har to hovedvalg og
+    // linket Konto og adgang (N:D2-3) ud over Tilbage og Luk; det er den eneste undtagelse og tælles kun, når linket står der.
+    assert.deepEqual(errors, []); assert.deepEqual(serverErrors, []); assert(screens.every(screen => !screen.overflow)); assert(screens.every(screen => screen.details || (screen.providers ? screen.choices === 8 : screen.app ? screen.choices <= 4 + Number(screen.appAccount) : screen.choices <= 4)), 'For mange synlige kontroller: ' + JSON.stringify(screens));
     assert.equal(calls.some(call => /chat\/completions|\/aura\/connect$|\/models/.test(call.route)), false);
     // Den eneste ændring af adgang er den bekræftede offentliggørelse af den nye app før dens første version.
     assert.equal(changes.length, 1); assert.equal(calls.filter(call => call.method === 'PATCH').length, changes.length);

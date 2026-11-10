@@ -62,7 +62,13 @@ const { execFileSync } = require('node:child_process');
     assert.ok(plan.includes('Grundreglerne tilføjes nederst i AGENTS.md. Dine egne regler bevares.'), plan.join(' | '));
     assert.ok(plan.includes('CLAUDE.md oprettes med en henvisning til AGENTS.md.'), plan.join(' | '));
     assert.ok(plan.includes('12 skills lægges i .claude/skills.'), plan.join(' | '));
-    assert.match(await page.textContent('#tools-notes'), /\.gitignore udelader \.claude\/skills\/ \(20 filer\)/);
+    // Antallet udledes af profiles/ (SKILL.md og references/*.md i grundskillsene), ikke af core/library.cjs, så en fejl i indlæseren stadig
+    // fanges, og en ny reference ikke gør prøven forældet. De to designreferencer fra a15245f (decisions.md, 25. oktober) gav 22 i stedet for 20.
+    const profileRoot = path.join(__dirname, '../../profiles');
+    const catalog = JSON.parse(await fs.readFile(path.join(profileRoot, 'catalog.json'), 'utf8'));
+    let baseFiles = 0;
+    for (const skill of catalog.skills.filter(skill => !skill.integration)) baseFiles += 1 + (await fs.readdir(path.join(profileRoot, 'skills', skill.name, 'references')).catch(() => [])).filter(file => file.endsWith('.md')).length;
+    assert.match(await page.textContent('#tools-notes'), new RegExp(`\\.gitignore udelader \\.claude/skills/ \\(${baseFiles} filer\\)`));
     assert.equal(await page.isVisible('#tools-operations'), false, 'filerne står bag Se de præcise ændringer');
     assert.equal(await page.textContent('#tools-install'), 'Installer');
     assert.equal(await page.textContent('#tools-skills-status'), 'Skills: 12 af 12 valgt');
@@ -117,6 +123,11 @@ const { execFileSync } = require('node:child_process');
     // Den nye reference skal følge med helt ud i brugerens projekt, uden tab af indhold.
     const agentReference = 'skills/harness-sikkerhedsgennemgang/references/agentadgang.md';
     assert.equal(await fs.readFile(path.join(project, '.claude', agentReference), 'utf8'), await fs.readFile(path.join(__dirname, '../../profiles', agentReference), 'utf8'));
+    // Det samme for designmetoden fra #23, som beslutningen lagde i designskillen som to nye referencer.
+    for (const name of ['designmetode.md', 'moenstre-og-tilstande.md']) {
+      const designReference = `skills/harness-design-og-tilgaengelighed/references/${name}`;
+      assert.equal(await fs.readFile(path.join(project, '.claude', designReference), 'utf8'), await fs.readFile(path.join(__dirname, '../../profiles', designReference), 'utf8'));
+    }
     assert.equal(JSON.parse(await fs.readFile(path.join(project, '.harness/installation.json'), 'utf8')).skills.length, 10);
     assert.match(await fs.readFile(path.join(project, '.harness/LAES-MIG.md'), 'utf8'), /9 af 12 skills til arbejdet fra idé til drift samt integrationen Adresser\.[\s\S]*Integrationer, der kan vælges til i Aura-appen: CVR, Promte, Komplai Run\./);
 

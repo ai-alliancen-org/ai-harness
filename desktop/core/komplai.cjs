@@ -20,9 +20,11 @@ function organisation(entry) {
 async function json(url, { key, body, method = body ? 'POST' : 'GET', signal, fetcher = fetch } = {}) {
   let response;
   try { response = await fetcher(url, { method, redirect: 'error', signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(15000)]) : AbortSignal.timeout(15000), headers: { Accept: 'application/json', ...(key ? { Authorization: `Bearer ${key}` } : {}), ...(body ? { 'Content-Type': 'application/json' } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}) }); }
-  catch { throw new Error(signal?.aborted ? 'Login blev afbrudt.' : 'komplai kunne ikke kontaktes. Prøv igen, når forbindelsen virker.'); }
-  const bodyText = await readBounded(response, 2_000_000);
-  let data; try { data = JSON.parse(bodyText); } catch { throw new Error('Svaret fra komplai kunne ikke læses.'); }
+  // unreachable og unreadable skelner et kald, der ikke kom igennem, fra et svar, der ikke kunne læses (fx ved fjernelse i workbench.cjs).
+  catch { throw Object.assign(new Error(signal?.aborted ? 'Login blev afbrudt.' : 'komplai kunne ikke kontaktes. Prøv igen, når forbindelsen virker.'), { unreachable: !signal?.aborted }); }
+  let data;
+  try { const bodyText = await readBounded(response, 2_000_000); try { data = JSON.parse(bodyText); } catch { throw new Error('Svaret fra komplai kunne ikke læses.'); } }
+  catch (error) { throw Object.assign(error, { unreadable: true }); }
   if (!response.ok) { const error = new Error(messages[data.error] || (response.status === 401 ? messages.invalid_token : response.status === 403 ? messages.insufficient_scope : 'komplai kunne ikke gennemføre handlingen. Prøv igen.')); error.status = response.status; if (typeof data.error === 'string' && /^[a-z_]{1,50}$/.test(data.error)) error.code = data.error; throw error; }
   return data;
 }
@@ -108,8 +110,9 @@ class KomplaiLogin {
     try {
       const previous = (await store.read()).hosting?.komplai;
       await store.update(state => { state.hosting = { ...state.hosting, komplai: { secret: store.encrypt(result.secret), grantId: result.id, organisationId: organisation.id, organisationName: organisation.name, address: result.address, expiresAt: result.expiresAt } }; });
-      // En erstattet adgang tilbagekaldes, så den ikke ligger tilbage på serveren.
-      if (previous?.secret) await revokePublishing(store.decrypt(previous), this.baseURL, this.fetcher).catch(() => {});
+      // En erstattet adgang tilbagekaldes, så den ikke ligger tilbage på serveren. Kan den gamle adgang ikke læses på denne
+      // computer, kan den ikke tilbagekaldes herfra; den nye adgang gælder alligevel og må ikke rulles tilbage.
+      if (previous?.secret) await Promise.resolve().then(() => revokePublishing(store.decrypt(previous), this.baseURL, this.fetcher)).catch(() => {});
     } catch (error) { await revokePublishing(result.secret, this.baseURL, this.fetcher).catch(() => {}); throw error; }
     return publishingState(store);
   }
@@ -134,10 +137,19 @@ async function publishingState(store, now = Date.now()) {
 /** Log ud tilbagekalder på serveren før den lokale sletning. Ved netværksfejl bevares adgangen, så det kan prøves igen. En adgang, komplai selv afviser, er allerede væk og slettes lokalt. */
 async function disconnectPublishing(store, baseURL = API, fetcher = fetch, { force = false } = {}) {
   const saved = (await store.read()).hosting?.komplai;
-  // «Fjern alligevel»: er komplai ikke til at nå, fjernes kun den lokale adgang. Den kan så stadig være gyldig hos komplai.
-  if (saved?.secret) { try { await revokePublishing(store.decrypt(saved), baseURL, fetcher); } catch (error) { if (!force) throw error; } }
+  let revoked = !saved?.secret;
+  // «Fjern kun fra denne computer» (force): kan komplai ikke nås, eller kan adgangen ikke læses, fjernes kun den lokale
+  // adgang. Den kan så stadig være gyldig hos komplai, til den udløber, og svaret siger det med revoked: false.
+  if (saved?.secret) {
+    try {
+      let secret;
+      try { secret = store.decrypt(saved); } catch { throw new Error('Udgivelsesadgangen kan ikke læses på denne computer, så Aura kan ikke tilbagekalde den hos komplai. Du kan fjerne den fra denne computer.'); }
+      await revokePublishing(secret, baseURL, fetcher); revoked = true;
+    } catch (error) { if (!force) throw error; }
+  }
   await store.update(state => { if (state.hosting) delete state.hosting.komplai; });
-  return publishingState(store);
+  const state = await publishingState(store);
+  return force ? { ...state, revoked } : state;
 }
 async function disconnect(connection, key) {
   return gone(() => json(`${connection.baseURL.replace(/\/v1$/, '')}/session`, { method: 'DELETE', key }));

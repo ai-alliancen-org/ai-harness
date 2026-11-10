@@ -147,7 +147,7 @@ test('planlægning vælger den skrivebeskyttede agent og beholder de samme ekspl
 });
 
 
-test('planen bruger kun sidste agentsvar; tidligere arbejdsnoter bevares som kontekst', () => {
+test('planen bruger kun sidste agentsvar; planningReply samler arbejdsnoterne, men planens kontekst bruger dem ikke (planen sendes én gang i Byg)', () => {
  const { planningReply } = require('../core/workbench.cjs');
  const roles = new Map([['u', 'user'], ['a1', 'assistant'], ['a2', 'assistant']]);
  const parts = new Map([

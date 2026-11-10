@@ -1,6 +1,9 @@
 // Appens AI og det fælles skillbibliotek i den rigtige OpenCode-motor med appens egne tilladelser.
 // En kontrolleret modelserver beder om skills og filer i en fast rækkefølge. Prøven viser, hvad motoren faktisk tillader:
 // kun aktive skills, skillens referencer uden spørgsmål, udvalgte private referencer og intet andet fra references/ eller .git/.
+// Auras læsevagt (createReadGuard i core/engine.cjs) svarer før OpenCodes egen regel for references/, .env og .git, så de afvises med
+// vagtens tekst. Den kræves præcist: OpenCodes regel alene fanger hverken store og små bogstaver eller links (docs/afproevning-0.6.md),
+// og trinnene med .ENV og links til .env og references afvises kun af vagten.
 // Den køres i et projekt med Git og i et uden, fordi OpenCode sammenligner stier med Git-roden.
 const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
@@ -22,6 +25,10 @@ async function scenario(root, { git, mode }) {
   await fs.writeFile(path.join(project, 'references/andet.md'), 'PRIVAT-REFERENCE');
   await fs.writeFile(path.join(project, '.env'), 'HEMMELIG=1');
   await fs.writeFile(path.join(project, 'AGENTS.md'), '# Projektets egne regler\nPROJEKT-AGENTS-MARKOER\n');
+  // Almindelige navne, der er links til .env og references. OpenCodes egen regel ser kun navnet, så kun Auras læsevagt afviser dem.
+  await fs.symlink('.env', path.join(project, 'genvej-env'));
+  await fs.symlink(path.join('references', 'andet.md'), path.join(project, 'genvej-reference.md'));
+  await fs.symlink('references', path.join(project, 'genvej-references'));
   if (git) execFileSync('git', ['init', '-q'], { cwd: project });
   // Kun Design og tilgængelighed samt Kodekvalitet og afprøvning er slået til.
   const store = new Store(path.join(root, `data-${git}-${mode}`)), library = () => loadLibrary(profiles);
@@ -39,6 +46,11 @@ async function scenario(root, { git, mode }) {
     ['skill', { name: 'customize-opencode' }],
     ['skill', { name: 'harness-sikkerhedsgennemgang' }],
     ['read', { filePath: path.join(project, '.env') }],
+    // Det, der skiller læsevagten fra OpenCodes egen regel: store bogstaver (på macOS er .ENV den samme fil som .env) og links.
+    ['read', { filePath: path.join(project, '.ENV') }],
+    ['read', { filePath: path.join(project, 'genvej-env') }],
+    ['read', { filePath: path.join(project, 'genvej-reference.md') }],
+    ['read', { filePath: path.join(project, 'genvej-references', 'andet.md') }],
     ...(git ? [['read', { filePath: path.join(project, '.git/config') }]] : []),
     // En valgt integration hentes som andre skills, og dens reference kan læses.
     ['skill', { name: 'harness-integration-adresser' }],
@@ -78,26 +90,34 @@ async function scenario(root, { git, mode }) {
   try {
     await engine.start();
     await engine.send('Hjælp med en tilgængelig forside.', 'APPENS-SYSTEMPROMPT');
-    const outcome = await Promise.race([finished, new Promise(resolve => setTimeout(() => resolve('timeout'), 120000))]);
+    let timer;
+    const outcome = await Promise.race([finished, new Promise(resolve => { timer = setTimeout(() => resolve('timeout'), 120000); })]);
+    clearTimeout(timer);
     assert.equal(outcome, 'session.idle', `motoren sluttede med ${outcome}`);
     const main = requests.filter(body => (body.tools || []).some(tool => tool.function?.name === 'read'));
     const system = JSON.stringify(main[0].messages.filter(message => message.role === 'system'));
     const listed = [...system.matchAll(/<name>([a-z0-9-]+)<\/name>/g)].map(found => found[1]).sort();
     const results = main.at(-1).messages.filter(message => message.role === 'tool').map(message => typeof message.content === 'string' ? message.content : JSON.stringify(message.content));
     const denied = text => /prevents you from using this specific tool call/.test(text);
+    const guarded = text => /^Aura beskytter denne fil\.$/.test(text.trim());
+    // Beskyttede bytes når aldrig modellen, mens den valgte reference gør (modkontrol).
+    const sent = JSON.stringify(requests);
+    assert.ok(sent.includes('VALGT-REFERENCE'), 'den valgte reference når modellen');
+    assert.ok(!sent.includes('PRIVAT-REFERENCE') && !sent.includes('HEMMELIG=1'), 'en ikke valgt reference og .env når aldrig modellen');
     assert.deepEqual(listed, context.skills.map(skill => skill.name).sort(), 'modellen ser præcis de aktive skills');
     assert.match(system, /APPENS-SYSTEMPROMPT/);
     assert.doesNotMatch(system, /PROJEKT-AGENTS-MARKOER/, 'projektets AGENTS.md indlæses ikke; appen sender selv grundreglerne');
     assert.match(results[0], /skill_content name="harness-design-og-tilgaengelighed"/, 'en aktiv skill kan hentes');
     assert.ok(results[1].includes('WCAG') || results[1].includes('tilgængelig'), `skillens reference kan læses: ${results[1].slice(0, 200)}`);
-    assert.ok(denied(results[2]), `en ikke valgt privat reference afvises: ${results[2].slice(0, 160)}`);
+    assert.ok(guarded(results[2]), `en ikke valgt privat reference afvises af Auras læsevagt: ${results[2].slice(0, 160)}`);
     assert.match(results[3], /VALGT-REFERENCE/, 'den valgte reference kan læses');
     assert.ok(denied(results[4]), 'OpenCodes egen skill er skjult');
     // En skill under en slået fra funktion lægges slet ikke i motoren.
     assert.match(results[5], /Skill "harness-sikkerhedsgennemgang" not found/, 'en skill under en slået fra funktion findes ikke');
-    assert.ok(denied(results[6]), '.env afvises');
-    if (git) assert.ok(denied(results[7]), 'Git-mappen afvises');
-    const integration = git ? 8 : 7;
+    assert.ok(guarded(results[6]), `.env afvises af Auras læsevagt: ${results[6].slice(0, 160)}`);
+    for (const [index, name] of [[7, '.ENV'], [8, 'et link til .env'], [9, 'et link til en privat reference'], [10, 'en fil gennem et link til references']]) assert.ok(guarded(results[index]), `${name} afvises af Auras læsevagt: ${results[index].slice(0, 160)}`);
+    if (git) assert.ok(guarded(results[11]), `Git-mappen afvises af Auras læsevagt: ${results[11].slice(0, 160)}`);
+    const integration = git ? 12 : 11;
     assert.match(results[integration], /skill_content name="harness-integration-adresser"[\s\S]*adressevaelger\.dk/, 'en valgt integration kan hentes');
     assert.match(results[integration + 1], /EPSG:25832/, 'integrationens reference kan læses');
     assert.deepEqual(asked, [], 'intet af det spørger brugeren');
@@ -110,6 +130,6 @@ async function scenario(root, { git, mode }) {
   try {
     const results = [];
     for (const setup of [{ git: true, mode: 'free' }, { git: false, mode: 'free' }, { git: true, mode: 'plan' }]) results.push(await scenario(root, setup));
-    console.log(JSON.stringify({ status: 'bestået', results, checks: ['kun aktive skills vises for modellen', 'aktiv skill hentes', 'skillens reference læses uden spørgsmål', 'ikke valgt privat reference afvises', 'valgt reference læses', 'OpenCodes egen skill skjult', 'skill under slået fra funktion findes ikke i motoren', '.env og .git afvist', 'valgt integration og dens reference hentes', 'projektets AGENTS.md indlæses ikke', 'med og uden Git', 'også under planlægning'] }, null, 2));
+    console.log(JSON.stringify({ status: 'bestået', results, checks: ['kun aktive skills vises for modellen', 'aktiv skill hentes', 'skillens reference læses uden spørgsmål', 'ikke valgt privat reference afvises', 'valgt reference læses', 'OpenCodes egen skill skjult', 'skill under slået fra funktion findes ikke i motoren', '.env og .git afvist', '.ENV og links til .env og references afvist', 'valgt integration og dens reference hentes', 'projektets AGENTS.md indlæses ikke', 'med og uden Git', 'også under planlægning'] }, null, 2));
   } finally { await fs.rm(root, { recursive: true, force: true }); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

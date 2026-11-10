@@ -3,7 +3,7 @@ const path = require('node:path');
 const { spawn } = require('node:child_process');
 const { Terminal } = require('./terminal.cjs');
 const { createKeychain } = require('./keychain.cjs');
-const { Vault, dataDirectory, privateDirectory, lock, unlockStale } = require('./storage.cjs');
+const { Vault, dataDirectory, privateDirectory, lock, unlockStale, isLegacy } = require('./storage.cjs');
 const { configure, doctor } = require('./runtime.cjs');
 const { Application } = require('./app.cjs');
 const { login } = require('./connections.cjs');
@@ -53,6 +53,16 @@ function parse(args) {
 }
 // AURA_KEYCHAIN=off springer nøgleringen over, så automatiske prøver aldrig rører brugerens rigtige nøglering.
 function chooseKeychain(env, directory) { return env.AURA_KEYCHAIN === 'off' ? null : createKeychain({ directory }); }
+// Adgangen kan kun tilbagekaldes, når nøglen kan læses. En browserforbindelse fra 0.2.0-beta.6 ligger i adgangssætningslageret;
+// i nøgleringstilstand flyttes den først til nøgleringen sammen med de andre gamle nøgler (fund 43). Returnerer den værdi,
+// forbindelsen har bagefter, så nøgleringens post kan slettes med den.
+async function readableSecret(app, id) {
+  await app.vault.unlock(app.ui);
+  if (isLegacy((await app.bench.connection(id)).secret)) await app.vault.migrate(app.bench.store, app.ui);
+  const connection = await app.bench.connection(id);
+  app.bench.store.decrypt(connection);
+  return connection.secret;
+}
 async function logout(app) {
   const { ui, vault } = app;
   const connections = (await app.bench.store.read()).connections;
@@ -61,13 +71,29 @@ async function logout(app) {
   const connection = connections.find(c => c.id === id);
   const revoke = connection?.kind === 'komplai' && connection.account?.authMethod !== 'token';
   const question = revoke ? 'Fjern forbindelsen og tilbagekald denne loginadgang hos Komplai?' : connection?.kind === 'komplai' ? 'Fjern tokenet fra Aura? Det virker fortsat andre steder og kan tilbagekaldes i Komplai.' : 'Fjern forbindelsen?';
-  if (id && await ui.confirm(question)) {
-    if (revoke) await vault.unlock(ui);
-    await app.bench.removeConnection(id); ui.line('Forbindelsen er fjernet.');
-    // Nøglen må ikke blive liggende i nøgleringen uden en forbindelse, der bruger den.
-    try { if (vault.forget(connection.secret)) ui.line('Nøglen er også slettet fra computerens nøglering.'); }
-    catch (error) { ui.line(`Nøglen ligger stadig i computerens nøglering og kunne ikke slettes automatisk. ${error.message}`); }
+  if (!id || !await ui.confirm(question)) return;
+  let secret = connection.secret, removed = false;
+  if (revoke) {
+    try { secret = await readableSecret(app, id); }
+    catch (error) {
+      if (error?.code === 'CANCELLED') throw error;
+      // Uden adgangssætningen kan nøglen aldrig læses igen. Forbindelsen må stadig kunne fjernes, ellers kan brugeren ikke
+      // komme af med den; adgangen hos Komplai er så ikke tilbagekaldt og kan tilbagekaldes dér.
+      ui.line(`Nøglen kan ikke læses, så Aura kan ikke tilbagekalde adgangen hos Komplai. ${error.message}`);
+      if (!await ui.confirm('Fjern forbindelsen fra Aura alligevel? Adgangen kan stadig tilbagekaldes i Komplai.')) return;
+      // En flytning kan have lagt nøglen i nøgleringen, før læsningen fejlede. Posten slettes med den værdi, forbindelsen har nu.
+      secret = (await app.bench.store.read()).connections.find(c => c.id === id)?.secret ?? secret;
+      await app.bench.store.update(state => { state.connections = state.connections.filter(c => c.id !== id); });
+      await app.bench.invalidateConnection(id);
+      ui.line('Forbindelsen er fjernet fra Aura. Adgangen hos Komplai er ikke tilbagekaldt; det kan gøres i Komplai.');
+      removed = true;
+    }
   }
+  // Kunne adgangen hos komplai ikke tilbagekaldes (fx uden net), er forbindelsen fjernet alligevel, og kernen siger det i removalNotice (Q:D2-3).
+  if (!removed) { const result = await app.bench.removeConnection(id); ui.line(result?.removalNotice || 'Forbindelsen er fjernet.'); }
+  // Nøglen må ikke blive liggende i nøgleringen uden en forbindelse, der bruger den, heller ikke efter udvejen ovenfor (N:F-1).
+  try { if (vault.forget(secret)) ui.line('Nøglen er også slettet fra computerens nøglering.'); }
+  catch (error) { ui.line(`Nøglen ligger stadig i computerens nøglering og kunne ikke slettes automatisk. ${error.message}`); }
 }
 async function main(argv = process.argv.slice(2), ui = new Terminal()) {
   const options = parse([...argv]);

@@ -115,7 +115,9 @@ const helpers = require('./ui-test-helpers.cjs');
     await page.screenshot({ path: path.join(root, 'udgivelse-arbejder.png') });
     await app.evaluate(() => { globalThis.resumeUpload(); globalThis.uploadPause = null; }); await sending; assert.equal(await page.isVisible('#deployment-progress'), false); await check(); let receipt = (await state()).last;
     assert.match(receipt.verification, /kræver adgang/); assert.equal(await app.evaluate(() => globalThis.deploymentUploads), 1); await capture('resultat');
-    const savedDestination = (await state()).config; await page.click('#deployment-another');
+    // Udgiv et andet sted ligger under Se detaljer, så kvitteringen har højst to hovedknapper og Se detaljer i første lag.
+    assert.equal(await page.locator('#deployment-another').isVisible(), false, 'Udgiv et andet sted står ikke i kvitteringens første lag.');
+    const savedDestination = (await state()).config; await reveal('#deployment-another'); await page.click('#deployment-another');
     assert.deepEqual(await page.locator('[data-deploy-step="providers"] [data-provider]:visible').evaluateAll(items => items.map(item => item.dataset.provider)), ['azure', 'cloudflare', 'github-pages', 'komplai', 'promte', 'vercel']);
     assert.deepEqual((await state()).config, savedDestination, 'Et andet sted ændrer først den gemte destination ved en ny gennemgang.');
     await app.evaluate(() => { globalThis.setupPause = new Promise(resolve => { globalThis.resumeSetup = resolve; }); });
@@ -128,14 +130,17 @@ const helpers = require('./ui-test-helpers.cjs');
     await page.keyboard.press('Escape'); assert.equal(await page.evaluate(() => document.activeElement.id), 'deploy-button'); await page.click('#deploy-button'); await idle(); assert.match(await page.locator('#deployment-checks').textContent(), /mislykkedes/);
     await app.evaluate(({ BrowserWindow }) => { const w = BrowserWindow.getAllWindows().find(w => w.webContents.getURL().startsWith('harness://')); w.setSize(980, 720); w.webContents.setZoomFactor(1.5); }); await capture('resultat-980-150');
     await newVersion(); await review(); await capture('gennemgang-980-150'); await page.click('#deployment-edit'); await review(); await app.evaluate(() => { globalThis.deploymentFailure = true; }); await send(); receipt = (await state()).last;
+    // Et uvist udfald oven på en live udgivelse står som «Upload ikke bekræftet», også i topknappen, aldrig som grønt «Udgivet» (fund R#28).
     assert.equal(receipt.state, 'UNKNOWN'); assert.equal(await page.locator('#deployment-check').evaluate(el => el.hidden), true); assert.equal(await page.isVisible('#deployment-portal'), true); assert.equal(await app.evaluate(() => globalThis.deploymentUploads), 2); await capture('ukendt-upload');
+    assert.equal(await page.locator('#deployment-state').textContent(), 'Upload ikke bekræftet'); assert.equal(await page.locator('#deployment-status').getAttribute('data-state'), 'UNKNOWN');
     await page.keyboard.press('Escape'); await page.click('#deploy-button'); await idle(); assert.equal(await app.evaluate(() => globalThis.deploymentUploads), 2); assert.match(await page.locator('#deployment-state-note').textContent(), /oversigt, før du prøver en ny upload/);
     await newVersion(); await page.click('#deployment-file-options'); await page.click('#deployment-change-destination'); await page.click('#deployment-select-destination'); await page.click('#deployment-other'); await selectProvider('azure'); await idle(); await capture('azure-abonnement-980-150');
     await page.selectOption('#deployment-choice', { label: 'test-abonnement' }); await page.click('#deployment-choice-continue'); await idle(); await capture('azure-egen-app-980-150'); await page.selectOption('#deployment-choice', { label: 'Azure-test' }); await page.click('#deployment-choice-continue'); await idle(); assert.equal(await page.inputValue('#deploy-group'), 'test-gruppe');
     assert.equal(await page.locator('#deploy-mode option[value=source]').isDisabled(), true); await review(); assert.match(await page.locator('#deployment-summary').textContent(), /11111111-2222-4333-8444-555555555555.*test-gruppe.*harness-test.*erstatter/); assert.equal(await page.locator('#deployment-review-app-address').textContent(), 'Testadresse afventer udgivelse'); await capture('azure-gennemgang'); await send(); assert.equal(await page.locator('#deployment-open').evaluate(el => el.hidden), true); await check(); receipt = (await state()).last;
     assert.equal(receipt.checks.content.status, 'matched'); assert.match(await page.locator('#deployment-checks').textContent(), /HTTP 200 uden login.*matcher.*Testerens adgang.*Ikke afprøvet/); await capture('azure-resultat');
-    // Guidet valg har højst fire kontroller plus navigationens Tilbage og Luk.
-    assert.ok(screens.every(screen => !screen.overflow)); assert.ok(screens.every(screen => screen.details || (screen.providers ? screen.choices === 8 : screen.setupChoice ? screen.choices <= 6 : screen.result ? screen.choices <= 5 : screen.choices <= 4)), JSON.stringify(screens)); assert.deepEqual(errors, []);
+    // Guidet valg har højst fire kontroller plus navigationens Tilbage og Luk. Kvitteringen har højst fire synlige kontroller med Luk:
+    // højst to hovedknapper og Se detaljer (AGENTS.md); Udgiv et andet sted ligger under Se detaljer.
+    assert.ok(screens.every(screen => !screen.overflow)); assert.ok(screens.every(screen => screen.details || (screen.providers ? screen.choices === 8 : screen.setupChoice ? screen.choices <= 6 : screen.choices <= 4)), JSON.stringify(screens)); assert.deepEqual(errors, []);
     await fs.writeFile(path.join(root, 'skaermmaaling.json'), JSON.stringify(screens, null, 2)); await fs.writeFile(path.join(root, 'kvittering.json'), JSON.stringify(receipt, null, 2));
     console.log(JSON.stringify({ status: 'bestået', root, screens, sourceCommit: head, limitations: ['lokale adaptere og injiceret artifact-grænse', 'ingen rigtig Vercel- eller Azure-udgivelse', 'ingen Git-skrivninger'] }));
   } finally { await app?.close(); }

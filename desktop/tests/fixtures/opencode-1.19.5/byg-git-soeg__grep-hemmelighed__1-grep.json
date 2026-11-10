@@ -1,6 +1,6 @@
 {
  "opencode": "1.19.5",
- "aura": "d0c3fca+ændringer",
+ "aura": "1cfa7a6+ændringer",
  "scenario": "byg-git-soeg",
  "outcome": "idle",
  "case": "grep-hemmelighed",
@@ -22,8 +22,8 @@
   "del:completed"
  ],
  "request": {
-  "id": "per_1abd27865001X8r7ICAfQ7nfxL",
-  "sessionID": "ses_e542d8d79ffeBga5YF1Pc60yWB",
+  "id": "per_1c4c67e8f001gIOS6NEsc13Qe5",
+  "sessionID": "ses_e3b398532ffeoRuSmwWI1ujThB",
   "permission": "grep",
   "patterns": [
    "HEMMELIG"
@@ -35,7 +35,7 @@
    "*"
   ],
   "tool": {
-   "messageID": "msg_1abd27854001A9w0M5n8qv8tvk",
+   "messageID": "msg_1c4c67e860013pX5yNvPUp6Rn9",
    "callID": "kald-4-0"
   }
  },
@@ -45,8 +45,8 @@
   "input": {}
  },
  "policyInput": {
-  "id": "per_1abd27865001X8r7ICAfQ7nfxL",
-  "sessionID": "ses_e542d8d79ffeBga5YF1Pc60yWB",
+  "id": "per_1c4c67e8f001gIOS6NEsc13Qe5",
+  "sessionID": "ses_e3b398532ffeoRuSmwWI1ujThB",
   "permission": "grep",
   "patterns": [
    "HEMMELIG"
@@ -58,7 +58,7 @@
    "*"
   ],
   "tool": {
-   "messageID": "msg_1abd27854001A9w0M5n8qv8tvk",
+   "messageID": "msg_1c4c67e860013pX5yNvPUp6Rn9",
    "callID": "kald-4-0"
   },
   "toolInput": {

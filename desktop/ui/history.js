@@ -41,6 +41,8 @@
       const busyChanged = status && Boolean(status.busy) !== Boolean(data.busy);
       if (status) status = data;
       busyControls(data);
+      // En åben version følger historikken, fx når en opgave gemmer en ny version, eller filerne ændres.
+      if (status && version && !$('#version-detail').hidden) versionActions();
       if (busyChanged && !$('#versions-view').hidden) await load();
     } catch { if (request === statusRequest) $('#version-status').textContent = 'Kontrollér versioner'; }
   }
@@ -67,6 +69,7 @@
       box.append(input, document.createTextNode(`${change} · ${file.file}`)); row.append(box);
       if (file.blocked) row.append(node('p', file.blocked, 'hint'));
       else if (file.binary) row.append(node('p', 'Binær billed- eller skrifttypefil. Indholdet vises ikke her; kontrollér filen før tilvalg.', 'hint'));
+      else if (file.beforeHidden) { const details = node('details'); details.append(node('summary', 'Se indhold efter'), node('p', file.beforeHidden, 'hint'), node('h4', 'Efter'), node('pre', file.text ?? '(slettet fil)')); row.append(details); }
       else { const details = node('details'); details.append(node('summary', 'Se indhold før og efter'), node('h4', 'Før'), node('pre', file.before ?? '(ny fil)'), node('h4', 'Efter'), node('pre', file.text ?? '(slettet fil)')); row.append(details); }
       input.onchange = () => { $('#git-save').disabled = !$('#git-files input:checked'); }; $('#git-files').append(row);
     }
@@ -131,12 +134,24 @@
     const note = $('#version-images'); note.replaceChildren();
     if (has) { note.append(`Billeder af ${viewText(data.images.view)}.${data.images.before ? '' : ' Der er intet billede fra før.'}`); note.append(info('billederne', 'Aura tager selv billederne af forhåndsvisningen i baggrunden, når en version gemmes, og når du går tilbage. De gemmes kun i Aura på denne computer, ikke i projektet, og sendes ikke til AI’en.')); }
     else note.textContent = 'Der er ingen billeder af denne version. Aura tager dem, når en version gemmes, mens forhåndsvisningen kører.';
-    const latest = status?.history?.[0]?.commit === commit && !status.changes;
-    $('#version-restore').hidden = latest; $('#version-revert').hidden = !data.parent;
-    busyControls(status);
-    $('#version-restore').classList.toggle('primary', !latest);
+    versionActions();
     window.workspace.showVersion(data);
     $('#version-title').focus();
+  }
+  // »Gå tilbage hertil« vises ikke for den version, filerne allerede svarer til: den nyeste uden ugemte ændringer.
+  function versionActions() {
+    if (!version) return;
+    const latest = status?.history?.[0]?.commit === version.commit && !status.changes;
+    $('#version-restore').hidden = latest; $('#version-revert').hidden = !version.parent;
+    busyControls(status);
+    $('#version-restore').classList.toggle('primary', !latest);
+  }
+  // Efter en gendannelse, en fortrydelse eller en indfletning vises listen og en åben version, som projektet er nu.
+  async function refreshShownVersions() {
+    const detail = Boolean(version) && !$('#version-detail').hidden;
+    if ($('#versions-view').hidden && !detail) return;
+    try { await load(); } catch { return; }
+    if (detail) versionActions();
   }
   $('#version-back').onclick = () => { version = null; window.workspace.showVersions(); $('#versions-heading').focus(); action(load); };
   $('#version-restore').onclick = () => { if (version) action(() => reviewRestoration({ commit: version.commit }, { label: `Gendannet til: ${version.name}` })); };
@@ -160,7 +175,9 @@
     $('#git-save-all').disabled = true;
     try {
       const result = await call('gitSave', { note: $('#git-note').value, view: window.previewViewSize?.() || null }); $('#git-note').value = '';
-      $('#git-feedback').textContent = result.saved ? `Versionen er gemt lokalt på denne computer.${result.kept.length ? ` Disse filer blev ikke gemt, fordi de kan indeholde hemmeligheder eller er for store: ${result.kept.join(', ')}.` : ''}` : 'Der var ingen ændringer at gemme.';
+      // De filer, der ikke kom med, nævnes altid, også når intet blev gemt. Årsagen står ved hver fil under Avanceret.
+      const kept = result.kept.length ? ` Disse filer blev ikke gemt, fordi de kan indeholde hemmeligheder eller er for store: ${result.kept.join(', ')}. Årsagen står ved filen under Avanceret.` : '';
+      $('#git-feedback').textContent = result.saved ? `Versionen er gemt lokalt på denne computer.${kept}` : kept ? `Ingen version blev gemt.${kept}` : 'Der var ingen ændringer at gemme.';
     } finally { $('#git-save-all').disabled = false; await load(); }
   }); };
   $('#git-form').onsubmit = event => { event.preventDefault(); action(async () => {
@@ -210,6 +227,8 @@
     const changing = files.length - conflicts.length;
     $('#restore-summary').textContent = !files.length ? 'Filerne svarer allerede til det, du vil tilbage til.'
       : `${changing ? `${count(changing, 'fil sættes', 'filer sættes')} tilbage.` : ''}${kept ? ` Dine senere rettelser i ${count(kept, 'fil', 'filer')} bevares.` : ''}${conflicts.length ? ` I ${count(conflicts.length, 'fil', 'filer')} har I begge rettet de samme linjer; du vælger nedenfor.` : ''}`.trim();
+    // En binær fil eller en fil i et ældre tekstformat, som opgaven ændrede, sættes ikke tilbage. Gennemgangen siger det (spor P).
+    if (review.kept?.length) { const names = review.kept.slice(0, 3).join(', ') + (review.kept.length > 3 ? ` og ${review.kept.length - 3} flere` : ''), one = review.kept.length === 1; $('#restore-summary').textContent = `${$('#restore-summary').textContent} ${names} sættes ikke tilbage, fordi ${one ? 'filen er binær' : 'filerne er binære'} eller gemt i et ældre tekstformat (ikke UTF-8). Brug Versioner, hvis ${one ? 'den' : 'de'} skal tilbage.`.trim(); }
     if (review.kind === 'merge') $('#restore-summary').textContent = files.length ? `${count(files.length, 'fil', 'filer')} fra kopien gennemgås. ${kept ? 'Projektets øvrige rettelser bevares. ' : ''}${conflicts.length ? `${count(conflicts.length, 'fil har', 'filer har')} konflikter; dine linjer er anbefalet.` : 'Ændringerne kan flettes ind.'}` : 'Kopien har ingen ændringer at flette ind. Du kan afslutte kopien og fortsætte i projektet.';
     // Billederne: forhåndsvisningen nu og det, den går tilbage til, hvis Aura har et billede af det.
     const imgs = review.images || {};
@@ -280,13 +299,17 @@
       const box = sourceView.review; box.replaceChildren(node('h3', result.restored.files ? 'Kopiens ændringer er flettet ind' : 'Kopien er afsluttet'));
       box.append(node('p', result.restored.files ? `${count(result.restored.files, 'fil er', 'filer er')} ændret i projektet.${result.saved ? ' Gemt som en ny version.' : ''} Prøv resultatet i forhåndsvisningen.` : 'Projektfilerne er uændrede. Nye opgaver arbejder i projektet.'));
       if (result.restored.files) {
-        const buttons = node('div', undefined, 'row'), changes = node('button', 'Se ændringerne'), undo = node('button', 'Fortryd indfletningen');
-        changes.type = undo.type = 'button'; changes.onclick = () => action(() => window.workspace.showChange(result.task));
+        // Kvitteringen beder om at prøve resultatet og har derfor selv knappen som hovedvalg, som efter Fortryd og gendannelse (Q:C2-5).
+        // Knappen virker kun, så længe samme samtale er åben.
+        const buttons = node('div', undefined, 'row'), preview = node('button', 'Afprøv resultatet', 'primary'), changes = node('button', 'Se ændringerne'), undo = node('button', 'Fortryd indfletningen');
+        preview.type = changes.type = undo.type = 'button'; preview.onclick = () => { if (active()) window.showResultPreview?.(); };
+        changes.onclick = () => action(() => window.workspace.showChange(result.task));
         undo.onclick = () => action(() => reviewRestoration({ undo: true, expected: result.restored.id }, { owner, title: 'Fortryd indfletningen?', confirm: 'Fortryd indfletningen' }));
-        buttons.append(changes, undo); box.append(buttons);
+        buttons.append(preview, changes, undo); box.append(buttons);
       }
       if (result.error) box.append(node('p', result.error)); box.hidden = false;
-      if (active()) message(result.error || 'Kopien er afsluttet. Du arbejder nu i projektet.'); return;
+      if (active()) { message(result.error || 'Kopien er afsluttet. Du arbejder nu i projektet.'); await refreshShownVersions(); }
+      return;
     }
     const changed = result.restored?.files || 0, files = `${count(changed, 'fil er', 'filer er')} sat tilbage`;
     if (changed && taskUndo && taskID) { sourceView.undoneTasks ||= new Set(); sourceView.undoneTasks.add(taskID); }
@@ -294,11 +317,21 @@
     const text = result.error || (!changed ? 'Ingen filer blev ændret, fordi du beholdt dine linjer.' : result.saved ? `${files} og gemt som en ny version. Du kan gå frem igen under Ændringer › Versioner.${first}` : git ? `${files}. Gennemse forhåndsvisningen. Ændringerne er ikke gemt som en ny version.${first}` : `${files}. Gennemse forhåndsvisningen. Du kan fortryde det under Ændringer › Versioner.`);
     if (active()) $('#git-feedback').textContent = text;
     const box = sourceView.review; box.replaceChildren(node('h3', result.error ? 'Gendannelsen kræver din opmærksomhed' : changed ? taskUndo ? 'Opgaven er fortrudt' : 'Filerne er sat tilbage' : 'Dine linjer er bevaret'), node('p', text)); box.hidden = false;
+    // Kvitteringen beder om at gennemse forhåndsvisningen og har derfor selv knappen; resultatkortets «Afprøv resultatet»
+    // forsvinder med det gamle kort (Q:C2-5). Knappen virker kun, så længe samme samtale er åben.
+    if (changed && !result.error) { const buttons = node('div', undefined, 'review-actions'), preview = node('button', 'Gennemse forhåndsvisningen', 'primary'); preview.type = 'button'; preview.onclick = () => { if (active()) window.showResultPreview?.(); }; buttons.append(preview); box.append(buttons); }
     box.tabIndex = -1; if (active()) box.focus();
+    if (active()) await refreshShownVersions();
   });
 
   // Nye billeder fra baggrunden: listen eller den åbne version opdateres, hvis de vises.
   window.harness.onEvent(event => {
+    // Sikkerhedsnettet er der nu, og Aura har givet et nyt projekt dets standarder (beslutning (c), main.cjs settleDefaults).
+    if (event.type === 'approvals.defaults' && event.root === current?.root) {
+      const turned = event.commands ? '«Filændringer i projektet» og «Byg og kontrollér automatisk»' : '«Filændringer i projektet»';
+      message(`Versionerne er klar, så Aura har slået ${turned} til. AI’en spørger ikke længere om dem. Du kan ændre det i Projektets indstillinger.`);
+      return;
+    }
     if (event.type !== 'history.images' || event.root !== current?.root) return;
     if (version && event.commit === version.commit) action(() => open(version.commit));
     else if (!$('#versions-view').hidden) action(load);

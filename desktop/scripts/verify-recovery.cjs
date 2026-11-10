@@ -49,25 +49,34 @@ const { skipIntroduction, menuClick, taskOptions, selectMode } = require('./ui-t
     await page.click('[data-close="restore-dialog"]'); assert.match(await fs.readFile(pageFile,'utf8'),/Ugemt/);
     await page.click('#version-restore');await page.waitForFunction(()=>!document.querySelector('#restore-confirm').disabled);await page.click('#restore-confirm');
     await page.locator('#run-review').filter({hasText:'1 fil er sat tilbage'}).waitFor();
+    // Gendannelsen skifter ikke fane; brugeren står i Ændringer › Versioner og vælger selv Forhåndsvisning.
+    await page.click('#tab-preview');
     await page.frameLocator('#preview').getByRole('heading',{name:'Godkendt version'}).waitFor();
     assert.equal((await git.status(project)).head,second.head); assert.equal(await fs.readFile(path.join(project,'.env'),'utf8'),'PRIVATE=kun-lokalt');
     await page.screenshot({path:path.join(root,'gendannet.png'),animations:'disabled'});
     await app.close();app=null;await launch();await menuClick(page,'#git-button');await page.click('#restore-undo');await page.waitForFunction(()=>!document.querySelector('#restore-confirm').disabled);await page.click('#restore-confirm');
     await page.locator('#run-review').filter({hasText:'er sat tilbage'}).waitFor();
+    await page.click('#tab-preview');
     await page.frameLocator('#preview').getByRole('heading',{name:'Ugemt forsøg'}).waitFor();
     assert.equal((await git.status(project)).head,second.head);assert.equal(await fs.readFile(path.join(project,'noter.txt'),'utf8'),'Bevar denne fil');
     await require('./ui-test-helpers.cjs').addConnection(page,{name:'Kontrolleret fejlprøve',baseURL:`http://127.0.0.1:${server.address().port}/v1`});
     const state=await page.evaluate(()=>window.harness.connectionState());await taskOptions(page);await page.selectOption('#connection-select',state.value.connections[0].id);await page.locator('#model-shortlist button').first().click();await selectMode(page,'plan');
+    // En færdig plan bevares ved fejl og Stop, indtil en ny plan erstatter den (docs/decisions.md, 3. november 2026). Hvert nyt forsøg giver en ny plan.
+    const planID=async()=>(await page.evaluate(()=>window.harness.connectionState())).value.plan?.id||null;
+    let lastPlan=null;
     for(const [failure,text] of [['key','prøve med forkert nøgle'],['quota','prøve med opbrugt kvote'],['stream','prøve med afbrudt forbindelse']]){
       mode=failure;await send(text);await page.locator('#run-status').filter({hasText:'Fejl'}).waitFor({timeout:60000});
-      assert.equal(await page.inputValue('#prompt'),text);assert.equal(await page.isVisible('#plan-card'),false);
+      assert.equal(await page.inputValue('#prompt'),text);
+      assert.equal(await page.isVisible('#plan-card'),Boolean(lastPlan),'Planen fra forrige forsøg står stadig efter fejlen');assert.equal(await planID(),lastPlan);
       assert.equal((await page.locator('#messages').textContent()).includes('SKJULT_UDVIDERTEKST'),false);
       await page.screenshot({path:path.join(root,failure+'.png'),animations:'disabled'});
       mode='ok';await send('Prøv igen efter '+failure);await page.locator('#run-status').filter({hasText:'Klar'}).waitFor({timeout:60000});await page.waitForSelector('#plan-card:not([hidden])');
+      const next=await planID();assert.ok(next&&next!==lastPlan,'Et nyt forsøg efter fejlen giver en ny plan');lastPlan=next;
     }
     mode='wait';await send('Bevar denne besked efter stop');await page.locator('#messages .assistant').filter({hasText:'Delvist svar før brugerens stop.'}).waitFor({timeout:60000});await page.click('#stop');await page.locator('#run-status').filter({hasText:'Stoppet'}).waitFor();
-    assert.equal(await page.inputValue('#prompt'),'Bevar denne besked efter stop');assert.equal(await page.isVisible('#plan-card'),false);
+    assert.equal(await page.inputValue('#prompt'),'Bevar denne besked efter stop');assert.equal(await page.isVisible('#plan-card'),true,'Planen står stadig efter Stop');assert.equal(await planID(),lastPlan);
     mode='ok';await send('Prøv igen efter stop');await page.locator('#run-status').filter({hasText:'Klar'}).waitFor({timeout:60000});
+    assert.ok(![null,lastPlan].includes(await planID()),'Et nyt forsøg efter Stop giver en ny plan');
     assert.equal(requests,8,'Ingen automatisk gentagelse af fejlede kald');
     await page.waitForSelector('#plan-card:not([hidden])');await menuClick(page,'#git-button');await restoreTo('Godkendt udgangspunkt');await page.click('#restore-confirm');await page.locator('#run-review').filter({hasText:'er sat tilbage'}).waitFor();
     assert.equal(await page.isVisible('#plan-card'),false);assert.equal((await page.evaluate(()=>window.harness.connectionState())).value.workspace.plan,null);
@@ -88,7 +97,7 @@ const { skipIntroduction, menuClick, taskOptions, selectMode } = require('./ui-t
       const mail=new URL(opened[0]);assert.equal(mail.protocol,'mailto:');assert.equal(mail.pathname,person.email);assert.match(mail.searchParams.get('subject'),/^Feedback om Aura /);
     }else{assert.equal(await page.textContent('#support-contact'),'Send feedback til den, der inviterede dig.');assert.equal(await page.isVisible('#support-feedback'),false);}
     await page.screenshot({path:path.join(root,'feedback.png'),animations:'disabled'});
-    console.log(JSON.stringify({status:'bestået',root,requests,checks:['gendan og fortryd gennem UI og genstart','HEAD og private filer bevaret','forkert nøgle og kvote med kladde bevaret','afbrudt HTTP-strøm bliver en fejl','ny plan efter hver fejl og stop','fejlrapport gennem filvælger uden projektindhold','feedback til kontakten i package.json'],limitation:'Kontrolleret modelserver; ingen vurdering af en rigtig models svar'}));
+    console.log(JSON.stringify({status:'bestået',root,requests,checks:['gendan og fortryd gennem UI og genstart','HEAD og private filer bevaret','forkert nøgle og kvote med kladde bevaret','afbrudt HTTP-strøm bliver en fejl','planen bevares ved fejl og stop','ny plan efter hver fejl og stop','fejlrapport gennem filvælger uden projektindhold','feedback til kontakten i package.json'],limitation:'Kontrolleret modelserver; ingen vurdering af en rigtig models svar'}));
   }catch(error){console.error('Testmateriale: '+root);console.error(error.message);await page?.screenshot({path:path.join(root,'fejl.png'),animations:'disabled',timeout:3000}).catch(()=>{});throw error;}
   finally{await app?.close();server.closeAllConnections();await new Promise(resolve=>server.close(resolve));}
 })().catch(error=>{console.error(error);process.exitCode=1;});

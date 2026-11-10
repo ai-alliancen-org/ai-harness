@@ -1,6 +1,6 @@
 {
  "opencode": "1.19.5",
- "aura": "d0c3fca+ændringer",
+ "aura": "1cfa7a6+ændringer",
  "scenario": "byg-uden-git-soeg",
  "outcome": "idle",
  "case": "grep-tool-output",
@@ -22,8 +22,8 @@
   "del:completed"
  ],
  "request": {
-  "id": "per_1abd28ea1002xRxQY8N2IYEWD9",
-  "sessionID": "ses_e542d7b68ffezKI5f78zcPRWM1",
+  "id": "per_1c4c68ce2001QOOAzASAVs1wpb",
+  "sessionID": "ses_e3b3979f3ffe5KHrNXt25TaWnK",
   "permission": "grep",
   "patterns": [
    "^39999$"
@@ -36,7 +36,7 @@
    "*"
   ],
   "tool": {
-   "messageID": "msg_1abd28e8c001Y3gb62dUuexLWv",
+   "messageID": "msg_1c4c68ccb001aijWEMQS7fyXJ0",
    "callID": "kald-23-0"
   }
  },
@@ -49,8 +49,8 @@
   }
  },
  "policyInput": {
-  "id": "per_1abd28ea1002xRxQY8N2IYEWD9",
-  "sessionID": "ses_e542d7b68ffezKI5f78zcPRWM1",
+  "id": "per_1c4c68ce2001QOOAzASAVs1wpb",
+  "sessionID": "ses_e3b3979f3ffe5KHrNXt25TaWnK",
   "permission": "grep",
   "patterns": [
    "^39999$"
@@ -63,7 +63,7 @@
    "*"
   ],
   "tool": {
-   "messageID": "msg_1abd28e8c001Y3gb62dUuexLWv",
+   "messageID": "msg_1c4c68ccb001aijWEMQS7fyXJ0",
    "callID": "kald-23-0"
   },
   "toolInput": {
@@ -97,6 +97,6 @@
   "blockedMode": false
  },
  "toolResult": [
-  "No files found"
+  "Found 1 matches\n${RUNTIME}/data/opencode/tool-output/tool_1c4c68ca6001yN592uFt1xcfT2:\n  Line 39999: 39999\n"
  ]
 }

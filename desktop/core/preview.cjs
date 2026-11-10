@@ -19,32 +19,47 @@ async function publicFile(root, relative) {
   return target;
 }
 // Bruges også af Electron-protokollen, hvis main giver hvert projekt en fast, særskilt origin.
-async function readPreviewAsset(projectRoot, pathname, { sdk } = {}) {
+// En mappe vises med sin index.html, som på GitHub Pages og de andre statiske værter (fund 22, beta 3): en adresse med /
+// til sidst giver mappens index.html. En mappe uden / til sidst giver { redirect: true } til en kalder, der kan sende
+// browseren videre til samme adresse med /, så sidens relative links peger ind i mappen. Andre kaldere får fejlen som før.
+async function readPreviewAsset(projectRoot, pathname, { sdk, redirects = false } = {}) {
   if (typeof pathname !== 'string' || !pathname.startsWith('/')) throw Error('Ugyldig sti.');
   if (sdk && pathname.startsWith('/_komplai/run/')) {
     const script = await sdk(pathname);
     if (typeof script !== 'string') throw Error('SDK-filen findes ikke.');
     return { data: Buffer.from(script), contentType: 'text/javascript; charset=utf-8' };
   }
-  const relative = pathname.slice(1) || 'index.html';
-  const file = await publicFile(path.join(projectRoot, 'public'), relative);
+  const publicRoot = path.join(projectRoot, 'public'), relative = pathname.slice(1);
+  let file;
+  try { file = await publicFile(publicRoot, !relative || relative.endsWith('/') ? relative + 'index.html' : relative); }
+  catch (error) {
+    if (redirects && relative && !relative.endsWith('/') && await publicFile(publicRoot, relative + '/index.html').then(() => true, () => false)) return { redirect: true };
+    throw error;
+  }
   return { data: await fs.readFile(file), contentType: mime[path.extname(file).toLowerCase()] || 'application/octet-stream' };
 }
 // sdk(route) leverer komplai Run-appens SDK på /_komplai/run/, som Run gør på appens egen adresse.
 async function startPreview(projectRoot, { sdk, network = {}, serviceOrigins = [], host = '127.0.0.1', port = 0 } = {}) {
   if (host !== '127.0.0.1' || !Number.isInteger(port) || port < 0 || port > 65535) throw Error('Forhåndsvisningen skal bruge en lokal port.');
   const token = randomBytes(24).toString('hex');
-  let origin;
+  let origin, cookie;
+  // Adressen med nøglen i stien giver browseren en cookie med samme nøgle (HttpOnly, SameSite=Strict, navngivet efter porten).
+  // Så virker sidens rod-absolutte links, fx href="/om/" og "/style.css", som på en rigtig vært (Q:C2-3). Uden nøglen i stien
+  // eller cookien afvises kaldet som før.
+  const admitted = header => String(header || '').split(';').some(part => { const [name, ...value] = part.trim().split('='); return name === cookie && value.join('=') === token; });
   const server = http.createServer(async (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Content-Security-Policy', contentSecurityPolicy(policyFor({ origin, network, serviceOrigins, static: true })));
     try {
       if (req.headers.host !== new URL(origin).host || !['GET', 'HEAD'].includes(req.method)) throw new Error('Afvist.');
-      const pathname = decodeURIComponent(new URL(req.url, origin).pathname);
-      const sdkRoute = sdk && pathname.startsWith('/_komplai/run/');
-      if (!sdkRoute && !pathname.startsWith(`/${token}/`)) throw new Error('Afvist.');
-      const { data, contentType } = await readPreviewAsset(projectRoot, sdkRoute ? pathname : '/' + pathname.slice(token.length + 2), { sdk });
+      const url = new URL(req.url, origin), pathname = decodeURIComponent(url.pathname);
+      const sdkRoute = sdk && pathname.startsWith('/_komplai/run/'), keyed = pathname.startsWith(`/${token}/`);
+      if (!sdkRoute && !keyed && !admitted(req.headers.cookie)) throw new Error('Afvist.');
+      const { data, contentType, redirect } = await readPreviewAsset(projectRoot, sdkRoute || !keyed ? pathname : '/' + pathname.slice(token.length + 2), { sdk, redirects: true });
+      if (keyed) res.setHeader('Set-Cookie', `${cookie}=${token}; Path=/; HttpOnly; SameSite=Strict`);
+      // En mappe uden / til sidst: samme adresse med /, med nøglen i stien, hvis den stod der, og adressens egen kodning.
+      if (redirect) { res.writeHead(302, { Location: `${url.pathname}/${url.search}` }); return res.end(); }
       res.setHeader('Content-Type', contentType);
       res.end(req.method === 'HEAD' ? undefined : data);
     } catch {
@@ -53,7 +68,7 @@ async function startPreview(projectRoot, { sdk, network = {}, serviceOrigins = [
     }
   });
   await new Promise((resolve, reject) => { server.once('error', reject); server.listen(port, host, resolve); });
-  origin = `http://127.0.0.1:${server.address().port}`;
+  origin = `http://127.0.0.1:${server.address().port}`; cookie = `aura-preview-${server.address().port}`;
   return { url: `${origin}/${token}/`, close: () => new Promise(resolve => { server.close(resolve); server.closeAllConnections(); }) };
 }
 module.exports = { startPreview, publicFile, readPreviewAsset };

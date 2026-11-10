@@ -20,6 +20,12 @@ const helpers = require('./ui-test-helpers.cjs');
     return { name, root: folder, file, model: `test-${index}` };
   }));
   const requests = [], held = new Map(), errors = [], checks = [];
+  // Nøglerne indtastes i nøglevinduet, som kun tager imod synlig ASCII (derfor ingen æ, ø eller å). Forventningerne bruger de
+  // samme konstanter, så den indtastede nøgle og den forventede ikke kan glide fra hinanden igen.
+  const KEY_BEFORE = 'syntetisk-noegle-foer-opgaven', KEY_AFTER = 'syntetisk-noegle-efter-opgaven';
+  // Kommandoen, AI'en kører uden sandkasse efter én godkendelse. Den skriver, om den har arvet motorens hemmeligheder i sit miljø (RN:B1-2):
+  // OPENCODE_CONFIG_CONTENT (gatewayens midlertidige adgangskode og adresse) og OPENCODE_SERVER_PASSWORD. Motoren tømmer dem i shell.env.
+  const HUSKET_KOMMANDO = "node -e \"require('node:fs').writeFileSync('husket-resultat.json',JSON.stringify({nøgle:Boolean(process.env.OPENCODE_CONFIG_CONTENT),adgangskode:Boolean(process.env.OPENCODE_SERVER_PASSWORD)}))\"";
   const server = http.createServer(async (req, res) => {
     if (req.url === '/v1/models') return res.end(JSON.stringify({ data: projects.map(item => ({ id: item.model, name: item.name })) }));
     if (req.url !== '/v1/chat/completions') { res.writeHead(404); return res.end(); }
@@ -47,7 +53,7 @@ const helpers = require('./ui-test-helpers.cjs');
       }
       if (JSON.stringify(lastUser?.content).includes('husket kommando')) {
         if (body.messages.at(-1)?.role === 'tool') return reply({ content: 'Den præcise huskede kommando er udført.' });
-        return reply({ tool_calls: [{ index: 0, id: 'husket', type: 'function', function: { name: 'bash', arguments: JSON.stringify({ command: "node -e \"require('node:fs').writeFileSync('husket-resultat.json',JSON.stringify({nøgle:Boolean(process.env.OPENCODE_CONFIG_CONTENT)}))\"", workdir: project.root, description: 'Prøver en præcis husket kommando' }) } }] }, 'tool_calls');
+        return reply({ tool_calls: [{ index: 0, id: 'husket', type: 'function', function: { name: 'bash', arguments: JSON.stringify({ command: HUSKET_KOMMANDO, workdir: project.root, description: 'Prøver en præcis husket kommando' }) } }] }, 'tool_calls');
       }
       if (JSON.stringify(lastUser?.content).includes('isoleret kommando')) {
         if (body.messages.at(-1)?.role === 'tool') return reply({ content: 'Den isolerede kommando er udført.' });
@@ -63,6 +69,19 @@ const helpers = require('./ui-test-helpers.cjs');
     } catch (error) { errors.push(error.message); if (!res.destroyed) { res.writeHead(500); res.end('Syntetisk serverfejl'); } }
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  // Gamle kommandoregler, som beta 2 og beta 3 gemte dem, og en gemt hjemmeside, lagt i appens lager før start (brugerens beslutning
+  // 10. november 2026, «Fjern funktionen»): kommandoreglerne bevares, men bruges aldrig og står under Projektets tilladelser som «Ikke i brug».
+  // Beta 2's regel for HUSKET_KOMMANDO har AI'ens input i nøglen, beta 3's har kommando og mappe; de står som én række. Den indpakkede form er
+  // sandkassens indpakning af npm test, som beta 2 kunne gemme. Hjemmesiden står som før.
+  const { createHash } = require('node:crypto'), seed = new (require('../core/store.cjs').Store)(path.join(root, 'appdata', 'harness'), {});
+  const seededRule = (kind, match, label) => ({ id: createHash('sha256').update(JSON.stringify(match)).digest('hex'), kind, label, target: label.replace(/^[^:]+: /, ''), match });
+  const wrapped = `exec /usr/bin/env -i PATH='/usr/bin:/bin' '/app/node' '/app/core/command-sandbox-runner.mjs' '/appdata/policy.json' '${Buffer.from(JSON.stringify({ command: 'npm test', cwd: projects[0].root })).toString('base64url')}'`;
+  await seed.update(state => { state.projects[seed.projectKey(projects[0].root)] = { approvals: { version: 1, autoProjectFiles: false, autoCommands: false, rules: [
+    seededRule('bash', { kind: 'bash', command: HUSKET_KOMMANDO, cwd: projects[0].root, input: { command: HUSKET_KOMMANDO, description: 'Prøver en præcis husket kommando', workdir: projects[0].root } }, `Kommando: ${HUSKET_KOMMANDO}`),
+    seededRule('bash', { kind: 'bash', command: HUSKET_KOMMANDO, cwd: projects[0].root }, `Kommando: ${HUSKET_KOMMANDO}`),
+    seededRule('bash', { kind: 'bash', command: wrapped, cwd: projects[0].root, input: {} }, `Kommando: ${wrapped}`),
+    seededRule('webfetch', { kind: 'webfetch', origin: 'https://example.test' }, 'Hjemmeside: https://example.test')
+  ] } }; });
   let app, page;
   const check = text => { checks.push(text); console.log('Bestået: ' + text); };
   const waitHeld = async model => { for (let n = 0; n < 600 && !held.has(model); n++) await new Promise(resolve => setTimeout(resolve, 100)); assert.ok(held.has(model), 'modellen afventer kontrolleret svar'); };
@@ -94,7 +113,9 @@ const helpers = require('./ui-test-helpers.cjs');
     await app.evaluate(({ app }) => {
       const require = process.getBuiltinModule('module').createRequire(app.getAppPath() + '/package.json');
       const { OpenCodeEngine } = require('./core/engine.cjs'), handle = OpenCodeEngine.prototype.handleEvent;
-      globalThis.multiProjectEngineEvents = [];
+      globalThis.multiProjectEngineEvents = []; globalThis.multiProjectEngines = [];
+      // Hver motor, der startes, så prøven kan se, om en kommando kørte med eller uden sandkasse (RN:B1-2).
+      const start = OpenCodeEngine.prototype.start; OpenCodeEngine.prototype.start = function(...args) { globalThis.multiProjectEngines.push(this); return start.apply(this, args); };
       OpenCodeEngine.prototype.handleEvent = function(event) { globalThis.multiProjectEngineEvents.push({ at: Date.now(), type: event.type, recovered: event.recovered === true, compacting: Boolean(this.compaction), root: this.root }); if (globalThis.dropProjectIdle === this.root && !event.recovered && (event.type === 'session.idle' || event.type === 'session.status' && event.properties?.status?.type === 'idle')) return; return handle.call(this, event); };
     });
     await app.evaluate(() => {
@@ -103,7 +124,7 @@ const helpers = require('./ui-test-helpers.cjs');
     });
     page = await app.firstWindow(); page.on('pageerror', error => errors.push(error.message));
     await helpers.skipIntroduction(page); page.setDefaultTimeout(90000); await helpers.enableSharing(page);
-    const connection = await helpers.addConnection(page, { name: 'Tre kontrollerede modeller', baseURL: `http://127.0.0.1:${server.address().port}/v1`, apiKey: 'syntetisk-noegle-foer-opgaven', app });
+    const connection = await helpers.addConnection(page, { name: 'Tre kontrollerede modeller', baseURL: `http://127.0.0.1:${server.address().port}/v1`, apiKey: KEY_BEFORE, app });
     await page.evaluate(() => { window.multiProjectEvents = []; window.harness.onEvent(event => window.multiProjectEvents.push(event)); });
     for (const project of projects) {
       await helpers.openExistingProject(app, page, project.root); await helpers.taskOptions(page);
@@ -130,17 +151,26 @@ const helpers = require('./ui-test-helpers.cjs');
     await helpers.previewOptions(page); assert.equal(await page.locator('#attach-preview').isEnabled(), true); await page.keyboard.press('Escape');
     await call('saveConnection', { id: connection.id, kind: 'compatible', name: 'Nyt navn til næste opgave', baseURL: connection.baseURL });
     // Hovedvinduet kan ikke sende en nøgle, heller ikke under arbejdet. Den indtastes i nøglevinduet.
-    const withKey = await page.evaluate(value => window.harness.saveConnection(value), { id: connection.id, kind: 'compatible', name: 'Nyt navn til næste opgave', baseURL: connection.baseURL, apiKey: 'syntetisk-efter' });
+    const withKey = await page.evaluate(value => window.harness.saveConnection(value), { id: connection.id, kind: 'compatible', name: 'Nyt navn til næste opgave', baseURL: connection.baseURL, apiKey: KEY_AFTER });
     assert.equal(withKey.ok, false); assert.match(withKey.error, /nøglevinduet/);
     const removed = await page.evaluate(id => window.harness.removeConnection(id), connection.id); assert.equal(removed.ok, false); assert.match(removed.error, /bruges af en opgave/);
-    check('Indstillinger, Udgiv og preview kan åbnes under arbejdet; forbindelse kan ændres, men ikke fjernes i brug');
+    // Nøglen skiftes under arbejdet ad brugerens vej: Indstillinger › AI-forbindelser › Åbn › Indtast ny nøgle › nøglevinduet.
+    await helpers.menuClick(page, '#connections-button');
+    await page.waitForFunction(() => { const dialog = document.querySelector('#connections-dialog'); return dialog.open && !dialog.getAnimations().some(animation => animation.playState === 'running'); });
+    await page.click('#saved-connections button[aria-label="Åbn Nyt navn til næste opgave"]');
+    await page.waitForSelector('#connection-edit:not([hidden])');
+    await page.click('#enter-key'); await helpers.enterCredential(app, KEY_AFTER);
+    // Efter en gemt nøgle viser dialogen listen igen med kvitteringen i #connections-feedback.
+    await page.locator('#connections-feedback').filter({ hasText: 'Nøglen er kontrolleret og gemt krypteret.' }).waitFor();
+    await page.click('[data-close="connections-dialog"]');
+    check('Indstillinger, Udgiv og preview kan åbnes under arbejdet; forbindelse og nøgle kan ændres, men forbindelsen ikke fjernes i brug');
     for (const project of projects) {
       await switchTo(project);
       assert.match(await page.locator('#approvals').textContent(), /index\.html/);
       await allow(); await waitHeld(project.model);
       assert.match(await fs.readFile(project.file, 'utf8'), new RegExp(project.name + ' efter'));
     }
-    assert.equal(requests.filter(item => item.body.tools?.length).every(item => item.authorization === 'Bearer syntetisk-før'), true, 'alle aktive gatewaykald bruger den oprindelige nøgle');
+    assert.equal(requests.filter(item => item.body.tools?.length).every(item => item.authorization === 'Bearer ' + KEY_BEFORE), true, 'alle aktive gatewaykald bruger den oprindelige nøgle, også efter nøgleskiftet');
     // Alfa afslutter i baggrunden, mens Gamma stadig arbejder og vises.
     held.get(projects[0].model)();
     await page.waitForFunction(chat => window.multiProjectEvents.some(event => event.type === 'run.status' && event.chat === chat && event.status === 'idle'), projects[0].chat);
@@ -166,10 +196,11 @@ const helpers = require('./ui-test-helpers.cjs');
     await switchTo(projects[0]);
     check('et forsinket IPC-svar beholder sin oprindelige samtale, mens et andet projekt åbnes');
     await send('Svar med ny nøgle'); await page.locator('#messages').filter({ hasText: 'Alfa bruger den nye nøgle' }).waitFor(); await page.locator('#stop').waitFor({ state: 'hidden' });
-    assert.equal(requests.filter(item => item.body.tools?.length).at(-1).authorization, 'Bearer syntetisk-efter');
-    const compact = await call('prepare', { chat: projects[0].chat, connectionID: connection.id, modelID: projects[0].model, mode: 'free' });
+    assert.equal(requests.filter(item => item.body.tools?.length).at(-1).authorization, 'Bearer ' + KEY_AFTER);
+    // Siden 94bcbe1 gennemgås beskeden sammen med konteksten: prepare får teksten, og send får contextBinding.
+    const compact = await call('prepare', { chat: projects[0].chat, connectionID: connection.id, modelID: projects[0].model, mode: 'free', text: 'Svar igen med ny nøgle' });
     const beforeCompact = requests.length;
-    await call('send', { chat: projects[0].chat, fingerprint: compact.fingerprint, text: 'Svar igen med ny nøgle', compact: true });
+    await call('send', { chat: projects[0].chat, fingerprint: compact.fingerprint, contextBinding: compact.contextBinding, text: 'Svar igen med ny nøgle', compact: true });
     await waitHeld('compact');
     assert.equal((await call('connectionState')).running, true, 'ny opgave er stadig aktiv efter sammenfatningens idle');
     held.get('compact')();
@@ -182,27 +213,27 @@ const helpers = require('./ui-test-helpers.cjs');
     await page.waitForFunction(chats => chats.every(chat => window.multiProjectEvents.some(event => event.type === 'run.status' && event.chat === chat && event.status === 'idle')), projects.map(item => item.chat));
     check('næste opgave bruger den ændrede nøgle, mens de øvrige projekter afslutter deres oprindelige kald');
     await app.evaluate((_electron, root) => { globalThis.dropProjectIdle = root; }, projects[0].root);
-    const recovery = await call('prepare', { chat: projects[0].chat, connectionID: connection.id, modelID: projects[0].model, mode: 'free' });
-    await call('send', { chat: projects[0].chat, fingerprint: recovery.fingerprint, text: 'Afslut med ny nøgle og tabt idle' });
+    const recovery = await call('prepare', { chat: projects[0].chat, connectionID: connection.id, modelID: projects[0].model, mode: 'free', text: 'Afslut med ny nøgle og tabt idle' });
+    await call('send', { chat: projects[0].chat, fingerprint: recovery.fingerprint, contextBinding: recovery.contextBinding, text: 'Afslut med ny nøgle og tabt idle' });
     for (let n = 0; n < 100 && !await app.evaluate(() => globalThis.multiProjectEngineEvents.some(event => event.recovered)); n++) await new Promise(resolve => setTimeout(resolve, 100));
     assert.equal(await app.evaluate(() => globalThis.multiProjectEngineEvents.some(event => event.recovered)), true);
     await idle();
     await app.evaluate(() => { globalThis.dropProjectIdle = null; });
     check('afsluttet modelsvar frigiver opgaven gennem serverstatus, selv når begge idle-events mangler');
-    const idea = await call('prepare', { chat: projects[0].chat, connectionID: connection.id, modelID: projects[0].model, mode: 'chat' });
-    await call('send', { chat: projects[0].chat, fingerprint: idea.fingerprint, text: 'Jeg vil have en app til 17 blå cykler.' });
+    const idea = await call('prepare', { chat: projects[0].chat, connectionID: connection.id, modelID: projects[0].model, mode: 'chat', text: 'Jeg vil have en app til 17 blå cykler.' });
+    await call('send', { chat: projects[0].chat, fingerprint: idea.fingerprint, contextBinding: idea.contextBinding, text: 'Jeg vil have en app til 17 blå cykler.' });
     await idle();
     for (const text of ['Sæt i gang!', 'Fortsæt med cyklerne']) {
-      const build = await call('prepare', { chat: projects[0].chat, connectionID: connection.id, modelID: projects[0].model, mode: 'free', includeHistory: false });
-      await call('send', { chat: projects[0].chat, fingerprint: build.fingerprint, text });
+      const build = await call('prepare', { chat: projects[0].chat, connectionID: connection.id, modelID: projects[0].model, mode: 'free', includeHistory: false, text });
+      await call('send', { chat: projects[0].chat, fingerprint: build.fingerprint, contextBinding: build.contextBinding, text });
       await idle();
       const sent = requests.filter(item => item.body.tools?.length).at(-1).body.messages;
       assert.equal(JSON.stringify(sent).match(/17 blå cykler/g)?.length, 1, 'idéen følger med én gang i den faktiske modelrequest');
       assert.doesNotMatch(JSON.stringify(sent), /Aktuel arbejdsmåde: Samtale/);
     }
     check('Samtale til Byg med Sæt i gang bevarer den tidligere idé i modelrequest og næste besked');
-    const beforePlan = requests.length, proposal = await call('prepare', { chat: projects[0].chat, connectionID: connection.id, modelID: projects[0].model, mode: 'chat' });
-    await call('send', { chat: projects[0].chat, fingerprint: proposal.fingerprint, text: 'Giv et konkret cykelforslag' }); await idle();
+    const beforePlan = requests.length, proposal = await call('prepare', { chat: projects[0].chat, connectionID: connection.id, modelID: projects[0].model, mode: 'chat', text: 'Giv et konkret cykelforslag' });
+    await call('send', { chat: projects[0].chat, fingerprint: proposal.fingerprint, contextBinding: proposal.contextBinding, text: 'Giv et konkret cykelforslag' }); await idle();
     assert.ok((await call('connectionState')).plan); assert.equal(await page.locator('#plan-offer').isVisible(), false);
     await page.click('#build-plan'); await page.waitForFunction(() => document.querySelector('#data-dialog').open || !document.querySelector('#stop').hidden);
     if (await page.locator('#data-dialog').evaluate(element => element.open)) await page.click('#accept-send');
@@ -210,29 +241,70 @@ const helpers = require('./ui-test-helpers.cjs');
     assert.equal(requests.slice(beforePlan).filter(item => item.body.tools?.length).length, 2);
     check('et konkret forslag i Samtale får direkte Byg-knap uden endnu en planrunde');
     await call('saveProjectSettings', { autoProjectFiles: true });
-    const fileStart = await page.evaluate(() => window.multiProjectEvents.length), filePermission = await call('prepare', { chat: projects[0].chat, connectionID: connection.id, modelID: projects[0].model, mode: 'free' });
-    await call('send', { chat: projects[0].chat, fingerprint: filePermission.fingerprint, text: 'Skriv en automatisk projektfil' });
+    const fileStart = await page.evaluate(() => window.multiProjectEvents.length), filePermission = await call('prepare', { chat: projects[0].chat, connectionID: connection.id, modelID: projects[0].model, mode: 'free', text: 'Skriv en automatisk projektfil' });
+    await call('send', { chat: projects[0].chat, fingerprint: filePermission.fingerprint, contextBinding: filePermission.contextBinding, text: 'Skriv en automatisk projektfil' });
     await page.waitForFunction(start => window.multiProjectEvents.slice(start).some(event => event.type === 'permission.auto' && event.policy?.projectFile), fileStart, { timeout: 10000 }); await idle();
     assert.equal(await fs.readFile(path.join(projects[0].root, 'automatisk.txt'), 'utf8'), 'Tilladt projektfil');
     check('automatisk projektfiladgang virker gennem den rigtige motors tilladelsesforespørgsel');
     await call('saveProjectSettings', { autoCommands: true });
-    const isolated = await call('prepare', { chat: projects[0].chat, connectionID: connection.id, modelID: projects[0].model, mode: 'free' });
-    await call('send', { chat: projects[0].chat, fingerprint: isolated.fingerprint, text: 'Kør isoleret kommando' });
+    const isolated = await call('prepare', { chat: projects[0].chat, connectionID: connection.id, modelID: projects[0].model, mode: 'free', text: 'Kør isoleret kommando' });
+    await call('send', { chat: projects[0].chat, fingerprint: isolated.fingerprint, contextBinding: isolated.contextBinding, text: 'Kør isoleret kommando' });
     await page.waitForFunction(() => window.multiProjectEvents.some(event => event.type === 'permission.auto' && event.policy?.kind === 'bash'));
     await idle();
     assert.deepEqual(JSON.parse(await fs.readFile(path.join(projects[0].root, 'isolationsresultat.json'), 'utf8')), { nøgle: false, ok: true });
     check('rigtig OpenCode-plugin kører automatisk bash med OS-isolation og uden modelcredentials');
     await call('saveProjectSettings', { autoCommands: false });
-    const commandStart = await page.evaluate(() => window.multiProjectEvents.length), remember = await call('prepare', { chat: projects[0].chat, connectionID: connection.id, modelID: projects[0].model, mode: 'free' });
-    await call('send', { chat: projects[0].chat, fingerprint: remember.fingerprint, text: 'Prøv en husket kommando' });
-    await page.waitForFunction(start => window.multiProjectEvents.slice(start).some(event => event.type === 'permission.asked' && event.properties?.policy?.kind === 'bash'), commandStart);
-    const permission = await page.evaluate(() => window.multiProjectEvents.filter(event => event.type === 'permission.asked' && event.properties?.policy?.kind === 'bash').at(-1).properties);
-    assert.equal(permission.policy.persistable, true); await call('reply', { chat: projects[0].chat, id: permission.id, allow: true, scope: 'project' }); await idle();
-    const rememberedStart = await page.evaluate(() => window.multiProjectEvents.length), remembered = await call('prepare', { chat: projects[0].chat, connectionID: connection.id, modelID: projects[0].model, mode: 'free' });
-    await call('send', { chat: projects[0].chat, fingerprint: remembered.fingerprint, text: 'Prøv igen en husket kommando' });
-    await page.waitForFunction(start => window.multiProjectEvents.slice(start).some(event => event.type === 'permission.auto' && event.source === 'rule' && event.policy?.kind === 'bash'), rememberedStart, { timeout: 15000 }); await idle();
-    assert.equal(JSON.parse(await fs.readFile(path.join(projects[0].root, 'husket-resultat.json'), 'utf8')).nøgle, false);
-    check('en præcis husket kommando genbruges kun gennem aktiv OS-isolation, selv når bred automatisk kørsel er slået fra');
+    // Huskede kommandoer er fjernet (brugerens beslutning 10. november 2026): uden automatisk kørsel spørges der om en kommando hver gang.
+    // Kortet tilbyder aldrig «Tillad altid i projektet», et svar med 'project' afvises, og de gamle regler i lageret bruges ikke, heller ikke
+    // dem for præcis denne kommando i denne mappe.
+    const bashAsked = start => page.waitForFunction(start => window.multiProjectEvents.slice(start).some(event => event.type === 'permission.asked' && event.properties?.policy?.kind === 'bash'), start, { timeout: 15000 });
+    const lastBash = () => page.evaluate(() => window.multiProjectEvents.filter(event => event.type === 'permission.asked' && event.properties?.policy?.kind === 'bash').at(-1).properties);
+    // RN:B1-2: motoren fra «Kør isoleret kommando» kører med sandkassen, og saveProjectSettings genstarter den ikke (engineRestartNeeded).
+    // I den motor ville env -i tømme miljøet i forvejen, så påstanden nedenfor ikke kunne fyre. Motoren lukkes derfor, som ved en genstart
+    // af appen; næste opgave starter en ny motor uden sandkasse og fortsætter samme AI-session.
+    await app.evaluate(async (_electron, root) => { for (const engine of globalThis.multiProjectEngines) if (engine.root === root && engine.active) await engine.close(); }, projects[0].root);
+    const commandStart = await page.evaluate(() => window.multiProjectEvents.length), remember = await call('prepare', { chat: projects[0].chat, connectionID: connection.id, modelID: projects[0].model, mode: 'free', text: 'Prøv en husket kommando' });
+    await call('send', { chat: projects[0].chat, fingerprint: remember.fingerprint, contextBinding: remember.contextBinding, text: 'Prøv en husket kommando' });
+    await bashAsked(commandStart);
+    const permission = await lastBash();
+    assert.equal(permission.policy.persistable, false, 'en kommando tilbydes ikke «Tillad altid i projektet»');
+    const commandCard = page.locator(`#approvals .approval[data-id="${permission.id}"]`); await commandCard.waitFor();
+    assert.equal(await commandCard.getByRole('button', { name: 'Tillad altid i projektet', exact: true }).count(), 0, 'knappen står ikke på kommandokortet');
+    const refused = await page.evaluate(input => window.harness.reply(input), { chat: projects[0].chat, id: permission.id, allow: true, scope: 'project' });
+    assert.equal(refused.ok, false); assert.match(refused.error, /kun godkendes én gang/);
+    await call('reply', { chat: projects[0].chat, id: permission.id, allow: true, scope: 'once' }); await idle();
+    // RN:B1-2: en kommando, der godkendes én gang uden sandkasse, arver hverken gatewayens adgang eller motorens adgangskode. Den kører
+    // dog med brugerens rettigheder og kan stadig læse dem i motorens proces (fx med ps); det forhindrer kun sandkassen.
+    // Forudsætningen: kommandoen kørte i en motor uden sandkasse. Ellers beviser påstanden intet.
+    assert.equal(await app.evaluate((_electron, root) => { const engine = globalThis.multiProjectEngines.filter(item => item.root === root).at(-1); return Boolean(engine?.active && !engine.sandbox); }, projects[0].root), true, 'kommandoen kørte i en ny motor uden sandkasse');
+    assert.deepEqual(JSON.parse(await fs.readFile(path.join(projects[0].root, 'husket-resultat.json'), 'utf8')), { nøgle: false, adgangskode: false }, 'kommandoen arver hverken OPENCODE_CONFIG_CONTENT eller OPENCODE_SERVER_PASSWORD');
+    const rememberedStart = await page.evaluate(() => window.multiProjectEvents.length), remembered = await call('prepare', { chat: projects[0].chat, connectionID: connection.id, modelID: projects[0].model, mode: 'free', text: 'Prøv igen en husket kommando' });
+    await call('send', { chat: projects[0].chat, fingerprint: remembered.fingerprint, contextBinding: remembered.contextBinding, text: 'Prøv igen en husket kommando' });
+    await bashAsked(rememberedStart);
+    assert.equal(await page.evaluate(start => window.multiProjectEvents.slice(start).some(event => event.type === 'permission.auto' && event.policy?.kind === 'bash'), rememberedStart), false, 'ingen gammel regel kører kommandoen automatisk');
+    await call('reply', { chat: projects[0].chat, id: (await lastBash()).id, allow: true, scope: 'once' }); await idle();
+    check('uden automatisk kørsel spørges der om en kommando hver gang; den kan ikke huskes, gamle kommandoregler bruges ikke, og kommandoen ser ikke motorens hemmeligheder');
+    // Projektets tilladelser: de gamle kommandoregler står som «Ikke i brug» med en knap, der sletter dem. Hjemmesiden står som før med Fjern.
+    await page.click('#project-menu-toggle'); await page.click('#project-settings-button');
+    await page.waitForFunction(() => document.querySelector('#project-settings-dialog').open && document.querySelectorAll('#project-permission-rules li button').length > 0);
+    const savedRules = page.locator('#project-approval-settings details').filter({ has: page.locator('#project-permission-rules') });
+    if (!await savedRules.evaluate(element => element.open)) await savedRules.locator('summary').click();
+    const ruleRows = () => page.locator('#project-permission-rules li').evaluateAll(items => items.map(item => ({ text: item.textContent, button: item.querySelector('button.text-button')?.textContent || '' })));
+    const before = await ruleRows();
+    assert.deepEqual(before.map(row => row.button), ['Slet', 'Slet', 'Fjern'], 'beta 2 og beta 3 for samme kommando er én række');
+    assert.ok(before[0].text.startsWith('Kommando: node -e') && before[0].text.includes('· i projektmappen') && before[0].text.includes('Ikke i brug'), before[0].text);
+    assert.ok(before[1].text.startsWith('Kommando: npm test · i projektmappen') && before[1].text.includes('Ikke i brug'), 'den indpakkede form vises som den kommando, den pakker ind');
+    assert.ok(before[2].text.startsWith('Hjemmeside: https://example.test'));
+    for (let n = 2; n > 0; n--) {
+      await page.locator('#project-permission-rules li').filter({ hasText: 'Ikke i brug' }).first().getByRole('button', { name: /^Slet den gamle kommandoregel/ }).click();
+      await page.waitForFunction(count => document.querySelectorAll('#project-permission-rules li').length === count, n);
+      assert.equal(await page.locator('#project-settings-feedback').textContent(), 'Den gamle kommandoregel er slettet.');
+    }
+    assert.deepEqual((await ruleRows()).map(row => row.button), ['Fjern']);
+    const stored = JSON.parse(await fs.readFile(path.join(root, 'appdata', 'harness', 'settings.json'), 'utf8')).projects[seed.projectKey(projects[0].root)].approvals.rules;
+    assert.deepEqual(stored.map(rule => rule.kind), ['webfetch'], 'alle gamle kommandoregler er slettet fra lageret; hjemmesiden er bevaret');
+    await page.click('[data-close="project-settings-dialog"]');
+    check('gamle kommandoregler står som «Ikke i brug» under Projektets tilladelser og kan slettes; en gemt hjemmeside står som før');
     const archived = await call('chatArchive', { id: projects[0].chat, archived: true }); assert.notEqual(archived.chat, projects[0].chat);
     assert.equal((await call('recentProjects')).find(item => item.root === projects[0].root).chats.find(item => item.id === projects[0].chat).archived, true);
     await call('chatArchive', { id: projects[0].chat, archived: false });

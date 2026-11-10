@@ -76,19 +76,23 @@ test('S4-20c: «Fjern alligevel» sletter den lokale adgang, når komplai ikke k
   assert.equal((await store.read()).hosting?.komplai, undefined);
 });
 
-test('S4-4b: verifyMaterial i workflowet spærrer Authorization: Bearer og NAVN=værdi uden citationstegn', async t => {
+test('S4-4b: verifyMaterial i workflowet spærrer de samme præcise fund som Auras gennemgang og nævner filen', async t => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'aura-s4b-pages-'));
   t.after(() => fs.rm(root, { recursive: true, force: true }));
   const sha = 'a'.repeat(40);
   const jwt = 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dBjftJeZ4CVPmB92K27uhbUJU1p1r_wW1gFWFOEjXk';
-  const cases = [`fetch(u, { headers: { Authorization: 'Bearer ${jwt}' } })`, 'MIN_API_KEY=Zx9Qm3Tp7Vb2Nk5Ld8Hs1Jf4Gc6Rw0Ya', 'TOKEN=abc123xyz'];
+  // R#31: workflowet bruger secrets.blockingSecret som Auras gennemgang. NAVN=værdi uden anførselstegn er .env-syntaks
+  // og spærres hverken af Aura eller af workflowet; en nøgle i anførselstegn spærres af begge.
+  const blocked = [`fetch(u, { headers: { Authorization: 'Bearer ${jwt}' } })`, 'const MIN_API_KEY = "Zx9Qm3Tp7Vb2Nk5Ld8Hs1Jf4Gc6Rw0Ya";', 'const token = "ghp_' + 'a1B2'.repeat(9) + '";'];
+  const passed = ['MIN_API_KEY=Zx9Qm3Tp7Vb2Nk5Ld8Hs1Jf4Gc6Rw0Ya', 'TOKEN=abc123xyz', 'let sourceToken = 0;'];
   let n = 0;
-  for (const text of cases) {
+  for (const text of [...blocked, ...passed]) {
     const workspace = path.join(root, 'w' + n), runner = path.join(root, 'r' + n++);
     await fs.mkdir(path.join(workspace, 'public'), { recursive: true }); await fs.mkdir(runner);
     await fs.writeFile(path.join(workspace, 'public/index.html'), `<script>${text}</script>`);
     const env = { GITHUB_WORKSPACE: workspace, RUNNER_TEMP: runner, GITHUB_SHA: sha, REVIEWED_SHA: sha, REVIEWED_HASH: 'b'.repeat(64), AURA_DIRECTORY: 'public' };
-    await assert.rejects(verifyMaterial(env), /hemmelighed/, text);
+    if (blocked.includes(text)) await assert.rejects(verifyMaterial(env), /hemmelighed i public\/index\.html/, text);
+    else await assert.rejects(verifyMaterial(env), /ikke den gennemgåede/, `${text}: kun fingeraftrykket er forkert, hemmelighedskontrollen er passeret`);
   }
 });
 

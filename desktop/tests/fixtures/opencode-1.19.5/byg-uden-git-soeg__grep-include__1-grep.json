@@ -1,6 +1,6 @@
 {
  "opencode": "1.19.5",
- "aura": "d0c3fca+ændringer",
+ "aura": "1cfa7a6+ændringer",
  "scenario": "byg-uden-git-soeg",
  "outcome": "idle",
  "case": "grep-include",
@@ -22,8 +22,8 @@
   "del:completed"
  ],
  "request": {
-  "id": "per_1abd288e5001s7Pu3As2f788HF",
-  "sessionID": "ses_e542d7b68ffezKI5f78zcPRWM1",
+  "id": "per_1c4c68929001xrxSDLlznLcij7",
+  "sessionID": "ses_e3b3979f3ffe5KHrNXt25TaWnK",
   "permission": "grep",
   "patterns": [
    "useState"
@@ -36,7 +36,7 @@
    "*"
   ],
   "tool": {
-   "messageID": "msg_1abd288d6001QeN6fCJuKp2nGa",
+   "messageID": "msg_1c4c6891d001GtjipTk0aFq5mT",
    "callID": "kald-3-0"
   }
  },
@@ -46,8 +46,8 @@
   "input": {}
  },
  "policyInput": {
-  "id": "per_1abd288e5001s7Pu3As2f788HF",
-  "sessionID": "ses_e542d7b68ffezKI5f78zcPRWM1",
+  "id": "per_1c4c68929001xrxSDLlznLcij7",
+  "sessionID": "ses_e3b3979f3ffe5KHrNXt25TaWnK",
   "permission": "grep",
   "patterns": [
    "useState"
@@ -60,7 +60,7 @@
    "*"
   ],
   "tool": {
-   "messageID": "msg_1abd288d6001QeN6fCJuKp2nGa",
+   "messageID": "msg_1c4c6891d001GtjipTk0aFq5mT",
    "callID": "kald-3-0"
   },
   "toolInput": {

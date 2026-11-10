@@ -75,7 +75,16 @@ function contentSecurityPolicy(input) {
   const connections = [...new Set([...p.serviceOrigins, ...p.serviceOrigins.map(socketOrigin).filter(Boolean), ...(p.network.connect || [])])].join(' ');
   return [`default-src 'self'`, `script-src 'self' 'unsafe-inline' 'unsafe-eval'${values('scripts') ? ' ' + values('scripts') : ''}`, `style-src 'self' 'unsafe-inline'${values('styles') ? ' ' + values('styles') : ''}`, `font-src 'self' data:${values('styles') ? ' ' + values('styles') : ''}`, `img-src 'self' data: blob:${values('images') ? ' ' + values('images') : ''}`, `media-src 'self' blob:${values('images') ? ' ' + values('images') : ''}`, `connect-src 'self' ${connections}`, `frame-src 'none'`, `object-src 'none'`, `base-uri 'self'`, `form-action 'self'`, ...(p.static ? ['sandbox allow-scripts allow-same-origin allow-forms'] : [])].join('; ');
 }
+// Forhåndsvisningens ramme viser kun projektets egen side. Et link til et andet websted eller en omdirigering til en anden adresse
+// stoppes, og brugeren får at vide hvorfor i stedet for en tom ramme. Det er ikke et netlistevalg, så der er intet samtykke og ingen
+// rettelse at sende til AI'en. Teksten bruger statuslinjens ord om ↻ (ui/app.js) og passer også, når adressen er projektets egen
+// server under et andet navn, fx localhost i stedet for 127.0.0.1.
+function blockedNavigation(url) {
+  const origin = originOf(url);
+  return { kind: 'navigation', origin, resourceType: 'subFrame', reason: 'navigation', message: `Forhåndsvisningen kan ikke vise ${origin || 'en anden adresse'}. Den viser kun dit projekt på dets egen adresse. Tryk ↻ for at hente din side igen.`, repair: '' };
+}
 function blockedRequest(input) {
+  if (['subFrame', 'mainFrame'].includes(input.resourceType)) return { ...blockedNavigation(input.url), resourceType: input.resourceType };
   const kind = requestKind(input.resourceType), origin = originOf(input.url);
   const label = { scripts: 'Et kodebibliotek', styles: 'En typografi eller stilfil', images: 'Et billede eller en mediefil', connect: 'En forbindelse til en tjeneste' }[kind] || 'En ressource';
   return { kind: kind || 'resource', origin, resourceType: input.resourceType || 'other', reason: 'network-policy', message: `${label} fra ${origin || 'en ukendt adresse'} blev blokeret af projektets netadgang.`, repair: kind === 'scripts' || kind === 'styles' ? 'Brug projektets lokale pakker og filer, eller gennemgå netadgangen til den konkrete adresse. Bevar projektets valgte teknologi.' : 'Kontrollér, om appen skal bruge denne tjeneste, og gennemgå projektets netadgang. Erstat ikke rigtige data med opdigtede resultater.' };
@@ -97,15 +106,23 @@ function consentableAddress(kind, address) {
   if (privateHost(host) || internalHost(host) || host.includes(':') || /^[\d.]+$/.test(host) || !/^(?:[a-z0-9-]+\.)+(?:[a-z]{2,}|xn--[a-z0-9-]+)$/.test(host)) return { ok: false, reason: 'IP-adresser, lokale og private adresser kan ikke tillades.' };
   return { ok: true, origin: url.origin };
 }
+// Samme loft som normalizeRuntimeConfig i core/project-runtime.cjs: højst 20 adresser pr. slags netadgang.
+const NETWORK_LIMIT = 20;
+// Navnene står som felterne under Projektets indstillinger › Forhåndsvisning › Se detaljer, så brugeren kan finde listen.
+const LIST_NAMES = { scripts: 'Scripts', styles: 'Typografi og stylesheets', images: 'Billeder' };
 // Returnerer projektets nye netliste. `seen` er de blokeringer, appen selv har set; en adresse, der ikke er set blokeret, kan ikke tillades.
+// Resultatet er kontrolleret, før det returneres: en liste over loftet må aldrig gemmes, for så kan projektet ikke åbnes igen.
 function grantAddress(runtime, seen, { kind, origin } = {}) {
   const check = consentableAddress(kind, origin);
   if (!check.ok) throw Error(check.reason);
   if (!(seen || []).some(item => item && item.kind === kind && item.origin === check.origin)) throw Error('Forhåndsvisningen har ikke blokeret denne adresse.');
   const config = normalizeRuntimeConfig(runtime || {});
   const network = { scripts: [], styles: [], images: [], connect: [], ...(config.network || {}) };
-  if (!network[kind].includes(check.origin)) network[kind] = [...network[kind], check.origin];
-  return { ...config, network };
+  if (!network[kind].includes(check.origin)) {
+    if (network[kind].length >= NETWORK_LIMIT) throw Error(`Netlisten har allerede ${NETWORK_LIMIT} adresser under ${LIST_NAMES[kind]}, som er det højeste antal. Fjern en adresse under Projektets indstillinger › Forhåndsvisning › Se detaljer, og prøv igen.`);
+    network[kind] = [...network[kind], check.origin];
+  }
+  return normalizeRuntimeConfig({ ...config, network });
 }
 
-module.exports = { consentableAddress, grantAddress, CONSENT_KINDS, privateHost, originOf, policyFor, allowedRequest, contentSecurityPolicy, blockedRequest, requestKind };
+module.exports = { consentableAddress, grantAddress, CONSENT_KINDS, NETWORK_LIMIT, privateHost, originOf, policyFor, allowedRequest, contentSecurityPolicy, blockedRequest, blockedNavigation, requestKind };

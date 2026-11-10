@@ -90,8 +90,8 @@ const { run } = require('../core/git.cjs');
   const idea='En oversigt over tre fiktive mødelokaler, hvor jeg kan finde plads til et møde.';await page.fill('#prompt',idea);
   await page.click('#send');
   await page.waitForSelector('#data-dialog[open]');
-  assert.equal(await page.isVisible('#data-history-text'),true);
-  assert.match(await page.locator('#data-history-text').textContent(),/tidligere beskeder og værktøjsresultater/);
+  // Første besked i et nyt projekt: der er ingen tidligere samtale, så linjen om den står ikke (DESIGN.md:57, N:B1-4).
+  assert.equal(await page.isVisible('#data-history-text'),false);
   assert.doesNotMatch(await page.locator('#data-lead').textContent(),/planen/,'før første plan findes, må resuméet ikke påstå, at den sendes');
   assert.match(await page.locator('#data-details').textContent(),/Ukendt/); assert.equal(await page.isVisible('#data-warning'),true);
   assert.match(await page.locator('#data-details').textContent(), /Projektets egne regler, der sendes[\s\S]*DESKTOP-PROJEKTREGEL/);

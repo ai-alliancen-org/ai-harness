@@ -14,13 +14,15 @@ async function main() {
   await fs.mkdir(path.dirname(file), { recursive: true });
   await fs.writeFile(file, '<h1>Før ændringen</h1>');
   const requests = [], errors = [], key = 'syntetisk-mistral-noegle';
-  let phase = 'chat', calls = 0, app, offerMedium = true;
+  let phase = 'chat', calls = 0, app, offerMedium = true, catalogRejected = false;
   const note = 'Syntetisk tænkeafsnit til formatkontrol.';
   const thinking = text => ({ type: 'thinking', thinking: [{ type: 'text', text }] });
   const server = http.createServer(async (req, res) => {
     try {
       assert.equal(req.headers.authorization, `Bearer ${key}`);
       res.setHeader('content-type', 'application/json');
+      // En afvist nøgle afvises også af kataloget. Svaret nævner ikke nøglen.
+      if (req.url === '/v1/models' && catalogRejected) { res.writeHead(401); return res.end(JSON.stringify({ error: { message: 'Unauthorized' } })); }
       if (req.url === '/v1/models') return res.end(JSON.stringify({ data: [
         { id: 'mistral-medium-latest', name: 'Mistral Medium', capabilities: { completion_chat: true, function_calling: true } },
         { id: 'mistral-large-4', name: 'Mistral Large 4', max_context_length: 524288, capabilities: { completion_chat: true, function_calling: true } },
@@ -135,10 +137,27 @@ async function main() {
     await page.waitForFunction(() => !document.querySelector('#stop').disabled); await page.click('#stop'); await finished();
     phase = 'error'; await send('Prøv forbindelsen igen.'); await finished();
     assert.doesNotMatch(await page.locator('body').textContent(), new RegExp(key));
-    assert.match(await page.locator('#messages').textContent(), /API-nøglen|afvist|afviste/);
+    // Kortet står i #run-review. #messages indeholder allerede «Du afviste 1 handling» fra afvisningen ovenfor. Overskriften
+    // er nøglekortets egen: «afviste kaldet» står også i kvote- og afvisningskortene og under Se detaljer ved enhver HTTP-fejl.
+    assert.equal(await page.locator('#run-review > h3').first().textContent(), 'AI’en afviste din nøgle', 'kortet siger, at nøglen blev afvist');
+    assert.equal(await page.locator('#run-review .review-actions button.primary').textContent(), 'Gennemgå AI-forbindelse', 'nøglekortets hovedknap fører til AI-forbindelsen');
     assert.equal(requests.filter(request => request.phase === 'error').length, 1, 'ingen automatisk genafsendelse ved afvist nøgle');
-    await page.click('#open'); await page.waitForFunction(() => !document.querySelector('#open').disabled && document.querySelector('#model-select').value === 'mistral-large-4');
-    assert.match(await page.locator('#model-chip').textContent(), /Mistral Large 4/, 'genåbning bevarer brugerens modelvalg');
+    // Genåbning, mens kataloget også afviser nøglen: åbningen gennemføres, advarslen står, og brugerens gemte model står
+    // stadig under skrivefeltet. Den gamle option skal være væk, så prøven ikke læser tilstanden fra før klikket.
+    catalogRejected = true;
+    const beforeRejected = await page.evaluateHandle(() => document.querySelector('#model-select').selectedOptions[0]);
+    await page.click('#open');
+    await page.waitForFunction(old => !old.isConnected && !document.querySelector('#connection-warning').hidden && document.querySelector('#model-select').value === 'mistral-large-4', beforeRejected);
+    assert.match(await page.locator('#model-chip').textContent(), /mistral-large-4/, 'genåbning med afvist katalog bevarer brugerens modelvalg');
+    assert.doesNotMatch(await page.locator('body').textContent(), new RegExp(key));
+    catalogRejected = false;
+    // Genåbningen erstatter modellisten. Flere end én option betyder, at kataloget er hentet igen.
+    const beforeReopen = await page.evaluateHandle(() => document.querySelector('#model-select').selectedOptions[0]);
+    await page.click('#open');
+    await page.waitForFunction(old => !old.isConnected && document.querySelector('#model-select').options.length > 1, beforeReopen);
+    assert.equal(await page.inputValue('#model-select'), 'mistral-large-4', 'genåbning bevarer brugerens modelvalg');
+    assert.match(await page.locator('#model-chip').textContent(), /Mistral Large 4/, 'modelchippen viser det bevarede valg');
+    assert.equal(await page.isVisible('#connection-warning'), false, 'advarslen forsvinder, når kataloget svarer igen');
     // Samme konto, men et katalog uden Medium: et nyt projekt må ikke stiltiende vælge prøveversionen.
     offerMedium = false;
     const another = path.join(root, 'Uden standardmodel'); await fs.mkdir(another);
@@ -149,7 +168,7 @@ async function main() {
     assert.doesNotMatch(await page.locator('#model-shortlist').textContent(), /Den første er udbyderens eget/);
     assert.equal(await page.locator('#model-shortlist .model-choice').count(), 2);
     await page.screenshot({ path: path.join(root, 'uden-standardmodel.png'), animations: 'disabled' });
-    console.log(JSON.stringify({ status: 'bestået', root, requests: requests.length, usage, checks: ['tre faktuelle modelvalg', 'intet automatisk skift til Large 4', 'pris og datagennemgang', 'struktureret streaming og bevaret historik', 'rigtig OpenCode og godkendt filændring', 'preview fra disk', 'afvisning og Stop', 'nøglefejl uden gentagne kald'], model: 'Kontrolleret lokal Mistral-server; ingen ekstern modelafprøvning' }));
+    console.log(JSON.stringify({ status: 'bestået', root, requests: requests.length, usage, checks: ['tre faktuelle modelvalg', 'intet automatisk skift til Large 4', 'pris og datagennemgang', 'struktureret streaming og bevaret historik', 'rigtig OpenCode og godkendt filændring', 'preview fra disk', 'afvisning og Stop', 'nøglefejl uden gentagne kald', 'genåbning med afvist katalog bevarer modelvalget'], model: 'Kontrolleret lokal Mistral-server; ingen ekstern modelafprøvning' }));
   } catch (error) {
     if (app) { const page = await app.firstWindow(); await page.screenshot({ path: path.join(root, 'fejl.png') }).catch(() => {}); console.error((await page.locator('#messages').innerText().catch(() => '')).slice(-3000)); }
     console.error('Prøvens filer:', root, 'HTTP-fejl:', errors); throw error;

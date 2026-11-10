@@ -47,7 +47,8 @@ async function save(app) {
   for (const file of review.files) {
     ui.line(`\n${file.file} · ${file.status}`);
     if (file.blocked) { ui.line(`Udeladt: ${file.blocked}`); continue; }
-    show(ui, { før: file.before, efter: file.text, binær: file.binary || false });
+    // En gemt version, der kan rumme en hemmelighed, vises ikke; grunden står i stedet (Q:D1-4, desktop/core/git.cjs beforeHidden).
+    show(ui, { før: file.beforeHidden || file.before, efter: file.text, binær: file.binary || false });
     if (await ui.confirm('Tag filen med i versionen?')) selected.push(file.file);
   }
   if (!selected.length) return;

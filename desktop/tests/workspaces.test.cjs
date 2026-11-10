@@ -108,7 +108,10 @@ test('simuleret Windows bevarer filopgaver og enkeltgodkendelse trods en husket 
   bench.selection = async () => ({ connection, model: { id: 'test' }, route: null });
   bench.skills.context = async () => ({ rules: '', skills: [], titles: [], features: {}, integrations: [] });
   const p = { id: 'kommando', permission: 'bash', metadata: { command: 'node lokal.cjs', workdir: bench.project.root }, patterns: [] };
-  await bench.approvalsPolicy.grant({ projectRoot: bench.project.root, workspaceRoot: bench.project.root, mode: 'free', commandSandboxSupported: true, commandSandbox: true }, p, { scope: 'project' });
+  // En kommandoregel, som beta 3 gemte, før huskede kommandoer blev fjernet (beslutning 10. november 2026). Den bruges aldrig.
+  const canonicalRoot = await fs.realpath(bench.project.root), match = { kind: 'bash', command: 'node lokal.cjs', cwd: canonicalRoot };
+  await bench.store.update(state => { (state.projects[bench.store.projectKey(canonicalRoot)] ||= {}).approvals = { version: 1, rules: [{ id: require('node:crypto').createHash('sha256').update(JSON.stringify(match)).digest('hex'), kind: 'bash', label: 'Kommando: node lokal.cjs', target: 'node lokal.cjs', match }] }; });
+  assert.equal((await bench.approvalsPolicy.settings(canonicalRoot)).rules[0].inactive, true, 'reglen står som ikke i brug');
   t.mock.method(require('../core/command-sandbox.cjs'), 'support', async () => ({ available: false, platform: 'win32', reason: 'Isolation understøttes endnu ikke på Windows.' }));
   const input = { connectionID: connection.id, modelID: 'test', mode: 'free' }, disclosure = await bench.prepare({ ...input, text: 'Ret projektfilen' });
   assert.equal(bench.chat.prepared.commandIsolation, false);

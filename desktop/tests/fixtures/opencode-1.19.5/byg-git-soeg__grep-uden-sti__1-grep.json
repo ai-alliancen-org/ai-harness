@@ -1,6 +1,6 @@
 {
  "opencode": "1.19.5",
- "aura": "d0c3fca+ændringer",
+ "aura": "1cfa7a6+ændringer",
  "scenario": "byg-git-soeg",
  "outcome": "idle",
  "case": "grep-uden-sti",
@@ -22,8 +22,8 @@
   "del:completed"
  ],
  "request": {
-  "id": "per_1abd27796001XHVwrT6Pljb6QV",
-  "sessionID": "ses_e542d8d79ffeBga5YF1Pc60yWB",
+  "id": "per_1c4c67e10001g2C0I3SGiNygWt",
+  "sessionID": "ses_e3b398532ffeoRuSmwWI1ujThB",
   "permission": "grep",
   "patterns": [
    "NEEDLE"
@@ -35,7 +35,7 @@
    "*"
   ],
   "tool": {
-   "messageID": "msg_1abd274a0001kZf3HhHLPPs96D",
+   "messageID": "msg_1c4c67c2100165hQA24eBqwyvb",
    "callID": "kald-0-0"
   }
  },
@@ -45,8 +45,8 @@
   "input": {}
  },
  "policyInput": {
-  "id": "per_1abd27796001XHVwrT6Pljb6QV",
-  "sessionID": "ses_e542d8d79ffeBga5YF1Pc60yWB",
+  "id": "per_1c4c67e10001g2C0I3SGiNygWt",
+  "sessionID": "ses_e3b398532ffeoRuSmwWI1ujThB",
   "permission": "grep",
   "patterns": [
    "NEEDLE"
@@ -58,7 +58,7 @@
    "*"
   ],
   "tool": {
-   "messageID": "msg_1abd274a0001kZf3HhHLPPs96D",
+   "messageID": "msg_1c4c67c2100165hQA24eBqwyvb",
    "callID": "kald-0-0"
   },
   "toolInput": {
@@ -87,6 +87,6 @@
   "blockedMode": false
  },
  "toolResult": [
-  "Found 2 matches\n${ROOT}/notes.txt:\n  Line 1: Hej verden NEEDLE\n\n\n${ROOT}/src/app.js:\n  Line 1: const [a] = useState(0); // NEEDLE\n\n"
+  "Found 2 matches\n${ROOT}/src/app.js:\n  Line 1: const [a] = useState(0); // NEEDLE\n\n\n${ROOT}/notes.txt:\n  Line 1: Hej verden NEEDLE\n"
  ]
 }

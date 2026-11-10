@@ -75,3 +75,31 @@ Byg nægter ikke længere filer i projektet (skrivevagt i motoren), Tillad ikke 
 ## Ikke undersøgt
 
 `ui/approvals.js` ud over de første linjer, `preview-edit`, `preview.cjs` (stiangreb), komplai/Promte-preview, `vercel-setup`, `azure-setup`, Windows-grenene i `canonicalPath`, om OpenCode 1.18.33 har værktøjet `multiedit`, og den rigtige OpenCode-matcher mod regelrækkefølgen. Intet er prøvet mod en rigtig model.
+
+## Status efter runde 2 og brugerens valg, 10. november 2026
+
+Niveau: *enhedsprøvet* for alle rettelser og *kørt mod rigtigt materiale* (den rigtige Electron-app med OpenCode 1.19.5 og lokale modeller) for de prøver, der er nævnt nedenfor. Valg d og skærmene i punkt 2 er kun enhedsprøvet. Syv spor rettede 90 punkter fra en anden gennemgang (71 rettet, 17 delvist, 2 allerede løst), og hvert spor blev efterprøvet af en skeptiker og repareret. Bagefter er brugerens fire valg bygget (a til d, se `decisions.md`). De 17 delvise punkter er kontrolleret i koden den 10. november: 14 er nu lagt helt ind, og de øvrige står nedenfor. Rettelserne fra 10. november er ucommittede i arbejdstræet.
+
+**Kørt i den rigtige Electron-app med OpenCode 1.19.5 og lokale modeller** (detaljer i `teststatus.md`): `approval-cards` (kortsamlingen), `multi-project` (gamle kommandoregler som «Ikke i brug»), `features` (nye projekter uden versioner spørger som før) og `versions` (nye projekter med versioner godkender filændringer uden kort), `desktop` (skærmmål, K3-trinnet og mappen `/om` uden `/`), `frameworks` (samtykket med Vite), `workspace`, `deployment`, `komplai-publish`, `publishing-switch`, `composer-actions`, `overview`, `network-report`, `chat`, `planning`, `resume` m.fl. `multi-project`, `composer-actions`, `komplai-publish`, `publishing-switch` og `overview` er kørt direkte med `node scripts/verify-<navn>.cjs`, fordi de ikke har en `test:`-post. Intet er kørt mod en rigtig model, en pakket app eller Windows/Linux.
+
+### Brugerens fire valg
+- **a. Kortsamling:** bygget og kørt i appen. Efter fem kort kommer ét spørgsmål, og et ja dækker filer, søgning og sandkasse-kommandoer i projektet.
+- **b. Huskede kommandoer:** fjernet; gamle regler vises som «Ikke i brug» og kan slettes (kørt i appen).
+- **c. Ingen automatik uden versioner:** bygget og kørt i appen (`features`, `versions`).
+- **d. Sætninger i hemmelighedsfelter:** enhedsprøvet, med mutationskontrol; ikke kørt i appen.
+
+### Hvad der stadig mangler eller kun er delvist lukket
+1. **Rigtig model:** ingen af rettelserne er kørt med en rigtig udbyder. Kørslen kræver en nøgle, som du taster i nøglevinduet.
+2. **Ikke set med øjnene i appen** (kun prøvet i simuleret DOM eller Node): forklaringen under «Se detaljer» på grænsekortet, linjen om tidligere samtale i «Før du sender», knappen «Åbn kørslen på GitHub» ved en Pages-fejl, «Gennemse forhåndsvisningen» på kvitteringen efter Fortryd, meddelelsen om en sprunget opstart i Projektets indstillinger, Fortryd af en fil i et ældre tekstformat, cookien i terminalens forhåndsvisning og meddelelsen, når en komplai-adgang ikke kan tilbagekaldes. De Electron-prøver, der rører de samme skærme, er kørt grønt.
+3. **Terminalpakken:** de transitive afhængigheder i CLI-pakken (`aura-harness`, rodens `package.json`) er ikke låst: `npm-shrinkwrap.json` findes ikke i pakkens rod, og npm bruger ikke repoets `package-lock.json` ved installation. Kun de direkte afhængigheder (`@anthropic-ai/sandbox-runtime` 0.0.81 og OpenCode 1.19.5) har en præcis version. Skal løses før næste CLI-udgivelse.
+4. **Linux:** sandkassens rettelse til Linux (runnerens socketmappe) er kun skrevet; `bubblewrap` og `socat` findes ikke på maskinen.
+5. **Afsnittet om en rigtig model fra 21. oktober** i `teststatus.md` (`verify-live-app.cjs` uden `--controlled`) er ikke genskabt efter fletningen 6a40582; der står kun en linje om, at kørslen ikke er gjort.
+6. **Et dobbelt skift af et link under en søgning** (link ved `before`, mappe ved kortet, link ved søgningen) er ikke lukket. Det kræver, at søgningens sti skrives om til den faktiske sti. Tilsvarende viser en skrivning gennem et link til projektet OpenCodes eget mappekort. Begge er åbne spørgsmål til dig.
+
+### Dine fire åbne valg
+1. Skal en komplai-AI-forbindelse, hvis tilbagekaldelse mislykkes, fortsat fjernes uden spørgsmål, eller kræve «Fjern kun fra denne computer»?
+2. Skal en ødelagt gendannelsesjournal flyttes til side?
+3. Skal appvalget i komplai Run med fem synlige kontroller (Ny app, Eksisterende app, Konto og adgang, Tilbage, Luk) være en udtrykkelig undtagelse fra grænsen på fire?
+4. Skal hullet i kommandoer uden sandkasse (de kan læse motorens midlertidige nøgle med brugerens rettigheder) stå som kendt begrænsning i beta 3 eller kræve en ombygning af motorstarten?
+
+Øvrige smådetaljer, som sporene meldte som spørgsmål (om en 503 med langt Retry-After også skal stoppe straks, om cookien i terminalens forhåndsvisning må følge med til andre lokale porte, og om dialogen med AI-forbindelser skal spørge, før den lukker med ugemte ændringer), er ikke afgjort og ændrer ikke noget i beta 3.

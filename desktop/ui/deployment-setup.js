@@ -206,13 +206,24 @@
       go('files');
     });
     bind('#deployment-promte-logout', async () => { await act('promte-logout'); await loadConnection(); });
+    // Beskeden kan kun sættes i skrivefeltet, når samtalen ikke arbejder, og feltet er tomt (draftMessage i app.js). Ellers slås
+    // Promte-integrationen ikke til, og Udgiv siger hvorfor, så Gør klar ikke ændrer projektet, uden at beskeden sendes (Q:B2-3).
+    // Send er også slået fra, mens projektet åbnes; så siges det, og ikke at AI’en arbejder (window.projectLoading i app.js).
+    const promteBlocked = () => $('#stop').hidden && window.projectLoading?.() ? 'Projektet åbnes stadig. Vent, til det er klar, og vælg så Gør klar til Promte igen.'
+      : !$('#stop').hidden || $('#send').disabled ? 'AI’en arbejder i denne samtale. Vent, til den er færdig, og vælg så Gør klar til Promte igen.'
+      : $('#prompt').value.trim() ? 'Din kladde står i skrivefeltet. Send eller ryd den, og vælg så Gør klar til Promte igen.' : '';
     // Brugerens byggehandling bruger Promte-skillen og den normale afsendelse med eventuelt modelsamtykke.
     bind('#deployment-promte-prepare', async () => {
       const owner = typeof selectedOwner === 'function' ? selectedOwner() : null;
+      const blocked = promteBlocked(); if (blocked) throw Error(`${blocked} Intet er ændret endnu.`);
       await api('featuresSave', { scope: 'projekt', values: { 'integration-promte': true } }); await window.refreshFeatures?.();
       if (!dialog.open || owner?.root !== selectedOwner()?.root || owner?.chat !== selectedOwner()?.chat) return;
+      // Startede en opgave, mens integrationen blev slået til, siges det ærligt: integrationen er slået til, beskeden er ikke sendt.
+      const late = promteBlocked(); if (late) throw Error(`Promte-integrationen er slået til for projektet, men beskeden er ikke sendt. ${late}`);
       // Beskeden skrives, når dialogen er lukket, så fokus ender i skrivefeltet og ikke på Udgiv.
-      dialog.addEventListener('close', () => window.draftMessage?.('Brug projektets Promte-skill til at gøre appen klar til udgivelse hos Promte. Behold indhold, design og funktioner. Gennemfør ændringerne, og kontrollér resultatet.', 'Promte er valgt. AI’en gør appen klar til udgivelse.', { mode: 'free', submit: true, owner }), { once: true });
+      // Noten står, når beskeden er sat i skrivefeltet, også hvis afsendelsen venter. Den siger derfor kun det, der er sket.
+      // En kladde eller en samtale, der arbejder, giver i stedet sin egen besked fra draftMessage i app.js.
+      dialog.addEventListener('close', () => window.draftMessage?.('Brug projektets Promte-skill til at gøre appen klar til udgivelse hos Promte. Behold indhold, design og funktioner. Gennemfør ændringerne, og kontrollér resultatet.', 'Promte-integrationen er slået til for projektet. Beskeden om at gøre appen klar til Promte står i skrivefeltet.', { mode: 'free', submit: true, owner }), { once: true });
       dialog.close();
     });
     bind('#deployment-promte-other', () => back());
@@ -280,14 +291,29 @@
     }
     function statusText(value) {
       if (value?.automatic) return `Vercel · ${value.latest ? stateLabels[value.latest.state] || 'Kontrollér status' : 'Følger Git'}`;
-      const r = value?.last; if (r?.checks?.provider?.status === 'unknown') return `${names[r.config.provider] || 'Udgivelse'} · Status kunne ikke hentes`; return r ? `${names[r.config.provider] || 'Udgivelse'} · ${r.state === 'READY' && window.ShareView.addressUnchecked(r) ? window.ShareView.UNCHECKED : stateLabels[r.state] || 'Kontrollér status'}` : '';
+      const r = value?.last; if (!r) return '';
+      const name = names[r.config.provider] || 'Udgivelse', view = window.ShareView;
+      if (r.checks?.provider?.status === 'unknown') return `${name} · ${['login', 'organisation'].includes(r.checks.provider.reason) ? 'Log ind igen' : 'Status kunne ikke hentes'}`;
+      // Topknappen siger det samme som kortet: en kontrolleret adresse, der ikke svarer, er ikke en færdig udgivelse.
+      if (view.notReady(r)) return `${name} · Appen er ikke klar endnu`;
+      return `${name} · ${r.state === 'READY' && view.addressUnchecked(r) ? view.UNCHECKED : stateLabels[r.state] || 'Kontrollér status'}`;
+    }
+    // Farven følger kortets tone: kun en bekræftet udgivelse, hvis adresse svarer, står grønt (READY i styles.css).
+    // En adresse, der ikke svarer, står som advarsel (UNKNOWN), og en adresse, der ikke er kontrolleret, står neutralt.
+    function headerState(error) {
+      const r = tracking?.last;
+      if (error || r?.checks?.provider?.status === 'unknown') return 'UNKNOWN';
+      if (tracking?.automatic) return tracking?.latest?.state || r?.state || '';
+      if (r && window.ShareView.notReady(r)) return 'UNKNOWN';
+      if (r?.state === 'READY' && window.ShareView.addressUnchecked(r)) return 'UPLOADED';
+      return r?.state || '';
     }
     function renderHeader(error = trackingError) {
       const button = $('#deployment-status'), has = Boolean(tracking?.automatic || tracking?.last);
       button.hidden = !has || !window.sharingOn?.() || !trackingRoot;
       button.disabled = $('#deploy-button').disabled;
       button.textContent = error ? 'Udgivelse · Status kunne ikke hentes' : statusText(tracking);
-      button.dataset.state = error || tracking?.last?.checks?.provider?.status === 'unknown' ? 'UNKNOWN' : tracking?.latest?.state || tracking?.last?.state || '';
+      button.dataset.state = headerState(error);
       button.title = tracking?.automatic ? 'Se status for udgivelser fra Git' : 'Se seneste udgivelse';
     }
     async function refresh(remote = false) {

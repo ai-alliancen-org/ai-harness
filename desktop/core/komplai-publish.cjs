@@ -38,6 +38,8 @@ const messages = {
 // En afvisning, hvor komplai tydeligt har sagt nej, og intet er uploadet: alt undtagen publication_uncertain.
 function refusal(message, code) { const e = Error(message); if (code) e.code = code; e.notUploaded = true; return e; }
 const finalRefusal = code => typeof code === 'string' && code in messages && code !== 'publication_uncertain';
+// Adgangen mangler, er udløbet eller tilbagekaldt: kun et nyt login hjælper. Kontrollér viser det i stedet for «prøv igen».
+const loginNeeded = message => Object.assign(Error(message), { login: true });
 
 function suggestLabel(name) {
   let label = String(name || '').toLowerCase().replace(/æ/g, 'ae').replace(/ø/g, 'oe').replace(/å/g, 'aa').normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
@@ -81,20 +83,20 @@ class KomplaiDeployment {
   constructor(store, { hub = HUB, fetcher = (...args) => fetch(...args), now = () => Date.now() } = {}) { this.store = store; this.hub = hub; this.fetcher = fetcher; this.now = now; this.id = 'komplai'; }
   async account() {
     const saved = (await this.store.read()).hosting?.komplai;
-    if (!saved?.secret) throw Error('Log ind med komplai for at udgive til komplai Run.');
-    if (Date.parse(saved.expiresAt) <= this.now()) throw Error('Udgivelsesadgangen er udløbet. Log ind med komplai igen.');
+    if (!saved?.secret) throw loginNeeded('Log ind med komplai for at udgive til komplai Run.');
+    if (Date.parse(saved.expiresAt) <= this.now()) throw loginNeeded('Udgivelsesadgangen er udløbet. Log ind med komplai igen.');
     return { ...saved, key: this.store.decrypt(saved) };
   }
   async call(route, options = {}) {
     const { key } = await this.account();
     try { return await json(this.hub + route, { ...options, key, fetcher: this.fetcher }); }
-    catch (error) { const e = Error(messages[error.code] || error.message); e.code = error.code; e.status = error.status; if (finalRefusal(error.code)) e.notUploaded = true; throw e; }
+    catch (error) { const e = Error(messages[error.code] || error.message); e.code = error.code; e.status = error.status; if (finalRefusal(error.code)) e.notUploaded = true; if (error.status === 401 || ['unauthorised', 'invalid_token'].includes(error.code)) e.login = true; throw e; }
   }
   /** Organisationens adresse og dine apps. Bruges også af Udgiv-dialogen. */
   async overview() {
     const account = await this.account(), d = await this.call('/api/publish/native');
     if (!d || d.address !== account.address || !Array.isArray(d.apps)) throw Error('komplais svar matcher ikke din udgivelsesadgang. Log ind igen.');
-    return { organisationName: account.organisationName, address: d.address, slugs: d.slugs === true, apps: d.apps.map(a => ({ id: a.id, name: a.name, slug: a.slug, url: appURL(a.url), visibility: a.visibility, activeRelease: a.activeRelease, releases: a.releases?.length || 0 })) };
+    return { organisationName: account.organisationName, organisationId: account.organisationId, address: d.address, slugs: d.slugs === true, apps: d.apps.map(a => ({ id: a.id, name: a.name, slug: a.slug, url: appURL(a.url), visibility: a.visibility, activeRelease: a.activeRelease, releases: a.releases?.length || 0 })) };
   }
   async address(slug, appId) {
     if (!validLabel(slug)) return { available: false, reason: 'invalid_slug', message: messages.invalid_slug };
@@ -105,7 +107,8 @@ class KomplaiDeployment {
   async inspect(config) {
     const d = await this.overview(), portal = `${this.hub}/publish`;
     const access = config.visibility === 'public' ? 'Alle med linket kan åbne appen. Undlad fortrolige oplysninger.' : 'Kun nuværende medlemmer af organisationen kan åbne appen efter login med komplai.';
-    const base = { owner: d.organisationName, address: d.address, visibility: config.visibility, access, region: 'komplais appmiljø hos Hetzner i Tyskland (EU). Appen kører i den besøgendes browser.', settings: {}, environmentKeys: [], environmentNote: 'Appen får ingen hemmelige værdier. Serverkode køres ikke.' };
+    // organisationId følger kvitteringen, så en senere kontrol kan se, om adgangen stadig gælder appens organisation.
+    const base = { owner: d.organisationName, organisationId: d.organisationId, address: d.address, visibility: config.visibility, access, region: 'komplais appmiljø hos Hetzner i Tyskland (EU). Appen kører i den besøgendes browser.', settings: {}, environmentKeys: [], environmentNote: 'Appen får ingen hemmelige værdier. Serverkode køres ikke.' };
     if (config.appId) {
       const app = d.apps.find(a => a.id === config.appId);
       if (!app) throw Error(messages.not_found);
@@ -192,7 +195,13 @@ class KomplaiDeployment {
   }
   async status(config, receipt) {
     const d = await this.overview(), app = d.apps.find(a => a.id === (receipt.appId || config.appId));
-    if (!app) return { state: 'REMOVED', url: null };
+    if (!app) {
+      // Gælder adgangen en anden organisation end appens, viser komplai ikke appen, men den er ikke nødvendigvis slettet. Så
+      // gemmes intet REMOVED, og kortet beder om et login med appens organisation (N:D2-5). Ældre kvitteringer har kun navnet.
+      const target = receipt.target || {};
+      if (target.organisationId ? target.organisationId !== d.organisationId : Boolean(target.owner) && target.owner !== d.organisationName) throw Object.assign(Error(`Appen hører til ${target.owner || 'en anden organisation'}. Log ind med den organisation for at kontrollere den.`), { organisation: true });
+      return { state: 'REMOVED', url: null };
+    }
     return { state: app.activeRelease === receipt.id ? 'READY' : app.activeRelease ? 'REPLACED' : 'UNPUBLISHED', url: app.url, visibility: app.visibility };
   }
 }

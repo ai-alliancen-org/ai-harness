@@ -21,7 +21,29 @@ function run(command, args, { input, timeout = 60000 } = {}) {
   const result = spawnSync(command, args, { input, encoding: 'utf8', timeout, windowsHide: true, maxBuffer: 1024 * 1024 });
   return { status: result.status, stdout: result.stdout || '', stderr: result.stderr || '', error: result.error };
 }
+// Windows PowerShell 5.1 skriver fejl og fremdrift som CLIXML («#< CLIXML» og XML), når standardfejl er omdirigeret. Så læses
+// kun fejlposterne (<S S="Error">) ud; fremdrift som «Preparing modules for first use» udelades, og XML-tegn og _x000D_ afkodes.
+function clixmlErrors(text) {
+  if (!/^\s*#< CLIXML/.test(text)) return text;
+  const entities = { lt: '<', gt: '>', amp: '&', quot: '"', apos: "'" };
+  return [...text.matchAll(/<S S="Error">([\s\S]*?)<\/S>/g)].map(match => match[1]
+    .replace(/_x([0-9A-Fa-f]{4})_/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+    .replace(/&(lt|gt|amp|quot|apos);/g, (_, name) => entities[name])).join('\n');
+}
+// PowerShells egen fejltekst til detaljerne, så en Windows-tester kan se årsagen, fx Constrained Language Mode (RN:F-3).
+// Nøglen går gennem stdin og indgår hverken i scriptet eller dets fejltekst. Teksten renses alligevel for styretegn og
+// lange base64- eller hex-værdier og afkortes. Andre værktøjers rå tekst vises ikke.
+function powershellDetails(result) {
+  const text = clixmlErrors(String(result.stderr || '')).replace(/[\x00-\x1f\x7f]/g, ' ').replace(/[A-Za-z0-9+/=_-]{40,}/g, '••••').replace(/\s+/g, ' ').trim();
+  if (!text) return `PowerShell svarede: afsluttede med kode ${result.status} uden fejltekst.`;
+  return `PowerShell svarede: ${text.length > 400 ? text.slice(0, 400) + ' …' : text}`;
+}
 function failure(tool, result, hint) {
+  const error = classify(tool, result, hint);
+  if (tool === 'PowerShell' && !result.error) error.details = powershellDetails(result);
+  return error;
+}
+function classify(tool, result, hint) {
   if (result.error?.code === 'ENOENT') return new KeychainError('UNAVAILABLE', `${tool} findes ikke på denne computer.${hint ? ' ' + hint : ''}`);
   if (result.error?.code === 'ETIMEDOUT') return new KeychainError('LOCKED', 'Nøgleringen svarede ikke i tide. Den er måske låst og venter på dig.');
   if (result.error) return new KeychainError('UNAVAILABLE', `${tool} kunne ikke startes.`);
@@ -90,9 +112,34 @@ function linux({ runner = run } = {}) {
 // Windows har ingen kommandolinje til Credential Manager, der kan læse en post tilbage. DPAPI gør det samme arbejde for den
 // aktuelle Windows-bruger: PowerShell krypterer nøglen, og den krypterede tekst ligger i en fil i datamappen. Uden for din
 // Windows-konto kan filen ikke åbnes. Nøglen går gennem stdin.
+// Nøglen må hverken stå i en cmdlet-parameter eller komme ud som pipeline-output. PowerShells modullogning (hændelse 4103)
+// skriver parameterværdier ordret, og transskription skriver alt, der går gennem værten. Derfor kaldes DPAPI direkte gennem
+// .NET, og svaret skrives med [Console]::Out uden om værten (fund 44). Filformatet er det samme som ConvertFrom-SecureString
+// uden -Key: hex af DPAPI (CurrentUser) over nøglen i UTF-16LE. Nøgler gemt før rettelsen kan derfor stadig læses.
+const PROTECT = [
+  "$ErrorActionPreference='Stop'",
+  'Add-Type -AssemblyName System.Security',
+  '$t=[Console]::In.ReadToEnd().Trim()',
+  '$u=[Text.Encoding]::Unicode.GetBytes([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($t)))',
+  '$p=[Security.Cryptography.ProtectedData]::Protect($u,$null,[Security.Cryptography.DataProtectionScope]::CurrentUser)',
+  '[Array]::Clear($u,0,$u.Length)',
+  "[Console]::Out.Write([BitConverter]::ToString($p).Replace('-','').ToLowerInvariant())",
+  '[Console]::Out.Flush()'
+].join('; ');
+const UNPROTECT = [
+  "$ErrorActionPreference='Stop'",
+  'Add-Type -AssemblyName System.Security',
+  '$h=[Console]::In.ReadToEnd().Trim()',
+  "if($h -notmatch '^(?:[0-9a-fA-F]{2})+$'){throw 'invalid key file'}",
+  '$d=[byte[]]::new([int]($h.Length/2))',
+  'for($i=0;$i -lt $d.Length;$i++){$d[$i]=[Convert]::ToByte($h.Substring($i*2,2),16)}',
+  '$u=[Security.Cryptography.ProtectedData]::Unprotect($d,$null,[Security.Cryptography.DataProtectionScope]::CurrentUser)',
+  '$b=[Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes([Text.Encoding]::Unicode.GetString($u)))',
+  '[Array]::Clear($u,0,$u.Length)',
+  '[Console]::Out.Write($b)',
+  '[Console]::Out.Flush()'
+].join('; ');
 function windows({ runner = run, directory, fsModule = fs } = {}) {
-  const PROTECT = "$ErrorActionPreference='Stop'; $t=[Console]::In.ReadToEnd().Trim(); $b=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($t)); ConvertTo-SecureString -String $b -AsPlainText -Force | ConvertFrom-SecureString";
-  const UNPROTECT = "$ErrorActionPreference='Stop'; $t=[Console]::In.ReadToEnd().Trim(); $s=ConvertTo-SecureString -String $t; $p=[Runtime.InteropServices.Marshal]::SecureStringToBSTR($s); try { $x=[Runtime.InteropServices.Marshal]::PtrToStringBSTR($p) } finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($p) }; [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($x))";
   const powershell = (script, input) => runner('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], { input });
   // Tjenestenavnet indeholder datamappens hash; filen får det som præfiks, så to datamapper aldrig deler fil.
   const file = (service, account) => path.join(directory, 'keys', `${service.replace(/[^A-Za-z0-9._-]/g, '_')}.${account}.dpapi`);

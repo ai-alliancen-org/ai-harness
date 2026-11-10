@@ -18,7 +18,7 @@ function fixture() {
   const context = { $, navigator: { platform: 'MacIntel' }, view: {}, current: { root: '/projekt' }, running: false, projectLoading: false, pendingSend: null, acceptedFingerprint: null, activePlan: null,
     state: { connections: [{ id: 'test' }] }, selectedOwner: () => ({ root: '/projekt', chat: 'samtale' }), action: fn => { const promise = fn(); actions.push(promise); return promise; },
     call: async (method, input, owner) => { prepared.push({ method, input, owner }); return new Promise(resolve => { release = resolve; }); },
-    selection: () => ({ mode: $('#work-mode').value, includeHistory: $('#include-history').checked }),
+    selection: () => ({ mode: $('#work-mode').value }),
     updateWorkMode() {}, saveChatDraft() {}, applyRunning() { $('#send').disabled = context.running; }, reviewKey: data => data.fingerprint,
     async sendNow(data, text) { sent.push({ data, text }); }, showData(data) { dataShown.push(data); }, showSetup() {}, openTaskSettings() {}, message() {}, connectionFailed() {},
     window: { ConversationMode: require('../ui/conversation-mode.js') } };
@@ -47,7 +47,7 @@ test('normal samtykkegennemgang bevares, og Annuller frigiver afsendelsen', asyn
 test('en klar egen byggebesked vælger Byg og bevarer samtalekonteksten, mens spørgsmål bliver i Samtale', async () => {
   for (const [text, mode, plan] of [['byg', 'free', null], ['byg planen', 'build', { id: 'plan' }], ['hvordan bygger vi?', 'chat', null]]) {
     const f = fixture(); f.$('#prompt').value = text; f.context.activePlan = plan; f.key({ metaKey: true });
-    assert.equal(f.prepared[0].input.mode, mode); assert.equal(f.prepared[0].input.includeHistory, mode !== 'chat');
+    assert.equal(f.prepared[0].input.mode, mode);
     f.release({ accepted: true }); await Promise.all(f.actions);
   }
 });
@@ -94,13 +94,14 @@ test('idéen får ét spørgsmål, og først et svar flytter arbejdsmåden', () 
   assert.equal(koerer.$('#work-mode').value, 'free'); assert.equal(koerer.context.view.modeChosen, undefined);
 });
 
-test('manuelt skift til Byg medtager samtalen også uden en særlig byggebesked', () => {
+// Samtalen følger med af sig selv: samme AI-session har den, og en ny får de seneste beskeder (kernen, Q:B1-2). Der er intet tilvalg at sætte.
+test('manuelt skift til Byg huskes som brugerens valg', () => {
   const f = fixture();
   vm.runInContext(ideaSource, f.context);
   vm.runInContext(source.slice(source.indexOf('function updateWorkMode()'), source.indexOf("$('#composer-mode').onclick")), f.context);
   for (const previous of ['chat', 'plan']) {
-    f.$('#work-mode').value = previous; f.context.updateWorkMode(); f.$('#include-history').checked = false;
+    f.context.view.modeChosen = false; f.$('#work-mode').value = previous; f.context.updateWorkMode();
     f.$('#work-mode').value = 'free'; f.$('#work-mode').onchange();
-    assert.equal(f.$('#include-history').checked, true); assert.equal(f.context.view.modeChosen, true);
+    assert.equal(f.context.view.modeChosen, true); assert.equal(f.context.view.composerMode, 'free');
   }
 });
