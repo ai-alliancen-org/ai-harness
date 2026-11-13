@@ -417,9 +417,10 @@ class ChatSession {
   }
   async send(input) {
     if (this.archiving || this.data.archived) throw new Error('Hent samtalen fra arkivet, før du fortsætter.');
-    if (this.sending || this.running || this.finishing) throw new Error('Der er allerede en opgave i gang i denne samtale.');
+    if (this.sending || this.running || this.finishing || this.stopping) throw new Error('Der er allerede en opgave i gang i denne samtale.');
     this.sending = true;
-    try { return await this.sendPrepared(input); } finally { this.sending = false; this.starting = false; }
+    const operation = this.sendPrepared(input); this.sendOperation = operation;
+    try { return await operation; } finally { this.sending = false; this.starting = false; if (this.sendOperation === operation) this.sendOperation = null; }
   }
   async sendPrepared(input) {
     if (this.running) throw new Error('Der er allerede en opgave i gang i denne samtale.');
@@ -505,7 +506,7 @@ class ChatSession {
         // Samtalen fortsætter sin tidligere AI-session, når forbindelse, model og regler er de samme som sidst, og gennemgangen
         // forudsagde det. Forudsagde den en ny session, fx fordi opgaven skulle have sin egen kopi, starter en ny, som vist (Q:B1-2).
         const resume = prepared.sessionContinues !== false && this.data.opencode?.fingerprint === (prepared.disclosure.sessionFingerprint || prepared.disclosure.fingerprint) ? this.data.opencode.session : null;
-        this.engine = bench.engineFactory({ root: this.root, directory: path.join(bench.store.root, 'runtime', bench.store.projectKey(this.root)), provider, model: prepared.model, references: prepared.references, mode: prepared.mode, skills: prepared.context.skills, resume, sandbox: this.commandSandbox, tempRoot: path.join(this.root, '.aura', 'tmp'), preview: require('./preview-bridge.cjs').info(this.root), onEvent: event => { if (this.engine === instance) this.event(event); } });
+        this.engine = bench.engineFactory({ root: this.root, directory: path.join(bench.store.root, 'runtime', bench.store.projectKey(this.root)), provider, model: prepared.model, references: prepared.references, mode: prepared.mode, skills: prepared.context.skills, resume, sandbox: this.commandSandbox, tempRoot: path.join(this.root, '.aura', 'tmp'), preview: require('./preview-bridge.cjs').info(this.root), onEvent: event => { if (this.engine === instance && !this.runStopped) this.event(event); } });
         const instance = this.engine;
         await this.engine.start(); checkStopped(); this.engineIdentity = (prepared.disclosure.sessionFingerprint || prepared.disclosure.fingerprint); this.engineSandbox = Boolean(prepared.commandIsolation); this.engineKey = `${prepared.connection.id}|${prepared.model.id}`;
         // Gennemgangen forudsagde, at samme AI-session fortsætter, men den kunne ikke genoptages: OpenCode fandt den ikke, eller
@@ -562,8 +563,11 @@ class ChatSession {
       if (generation === this.generation && this.running && !this.finishing) this.emit({ type: 'run.status', status: 'working', mode: this.runMode });
       return true;
     } catch (error) {
+      // Stop venter på motorens afbrydelse, før den lukker og frigiver mappen. En afbrudt HTTP-kvittering
+      // må ikke lukke motoren, mens den stadig stopper værktøjer.
+      if (this.runStopped && this.stopping) throw new Error('Opgaven blev stoppet før afsendelse.', { cause: error });
       if ((this.copy || bench.checkpointOwner === this)) { this.checkpoints.cancel(); await this.checkpoints.finish(); }
-      this.running = false; bench.release(this);
+      this.running = false;
       // Kender hovedprocessen fejlens type, siger Aktivitet den med samme ord som resultatkortet, også når samtalen ikke kunne
       // gøres kortere (RN:B1-3).
       const kind = this.runFailure?.kind || (typeof error?.failure === 'string' ? error.failure : null);
@@ -571,7 +575,7 @@ class ChatSession {
       const diff = this.runStopped && this.runBefore ? await changes(this.root, this.runBefore).catch(() => null) : null;
       const task = await this.finishTask(this.runStopped ? 'stopped' : 'error', diff);
       if (this.runStopped) { this.emit(this.runReview('stopped', diff, task)); this.afterImage(task); }
-      this.dropUnansweredClarification(); await this.saveHistory(this.runStopped ? 'stopped' : 'error'); await this.close(); this.emit({ type: 'run.status', status: this.runStopped ? 'stopped' : 'error', mode: this.runMode, planRetained: Boolean(this.plan) }); bench.chatsChanged();
+      this.dropUnansweredClarification(); await this.saveHistory(this.runStopped ? 'stopped' : 'error'); await this.close(); this.starting = false; this.waiting = false; bench.release(this); this.emit({ type: 'run.status', status: this.runStopped ? 'stopped' : 'error', mode: this.runMode, planRetained: Boolean(this.plan) }); bench.chatsChanged();
       // Et Stop under opstarten, fx mens samtalen sammenfattes, er et stop og ikke en fejl. Brugerfladen genkender det på teksten.
       if (this.runStopped) throw new Error('Opgaven blev stoppet før afsendelse.', { cause: error });
       // Kender hovedprocessen fejlens type, fx en afbrudt forbindelse under sammenfatningen, følger den med fejlen. Så viser
@@ -936,18 +940,24 @@ class ChatSession {
     if (['message.part.updated', 'message.part.delta', 'message.updated', 'session.error', 'engine.error', 'permission.asked', 'permission.replied', 'question.asked', 'question.replied', 'question.rejected', 'session.diff'].includes(event.type)) this.emit(event);
   }
   async stop() {
+    if (this.stopping) return this.stopping;
+    const stopping = this.stopRun(); this.stopping = stopping;
+    try { return await stopping; } finally { if (this.stopping === stopping) this.stopping = null; }
+  }
+  async stopRun() {
     if (this.finishing) throw new Error('Afslutningen er i gang. Vent på resultatet.');
-    const bench = this.bench, owner = (this.copy || bench.checkpointOwner === this);
-    this.runStopped = true; this.dropUnansweredClarification(); this.expireQuestions(); this.allowProjectEdits = false; this.setApproveAll(false); this.taskRules.clear(); this.cardsShown = 0; this.collectOffer = null; this.approvals.clear(); if (owner) this.checkpoints.cancel(); ++this.generation; this.engineIdentity = null;
+    const bench = this.bench, sending = this.sendOperation, owner = () => this.copy || bench.checkpointOwner === this;
+    this.runStopped = true; this.dropUnansweredClarification(); this.expireQuestions(); this.allowProjectEdits = false; this.setApproveAll(false); this.taskRules.clear(); this.cardsShown = 0; this.collectOffer = null; this.approvals.clear(); if (owner()) this.checkpoints.cancel(); ++this.generation; this.engineIdentity = null;
     this.log({ kind: 'stop', title: 'Du trykkede på Stop', detail: 'AI\'en stopper. Det, den nåede at ændre, står under Ændringer.', status: 'stopped', task: this.task?.id });
     // Godkendelser, der stadig venter, kan ikke længere besvares.
     for (const entry of this.changes.activity.list()) if (['approval', 'question'].includes(entry.kind) && entry.status === 'waiting') this.log({ id: entry.id, status: 'expired', ended: Date.now() });
-    this.gateway?.abort(); await this.engine?.abort().catch(() => {});
-    if (!this.starting) {
-      if (owner) await this.checkpoints.finish();
+    this.gateway?.abort(); await this.engine?.abort({ starting: Boolean(sending) }).catch(() => {});
+    if (sending) { await sending.catch(() => {}); await this.close(false); }
+    if (!this.starting || sending) {
+      if (owner()) { this.checkpoints.cancel(); await this.checkpoints.finish(); }
       const diff = this.runBefore ? await changes(this.root, this.runBefore).catch(() => null) : null;
       const task = await this.finishTask('stopped', diff);
-      this.running = false; this.waiting = false; bench.release(this);
+      this.running = false; this.starting = false; this.waiting = false; bench.release(this);
       // Efter Stop viser resultatkortet, hvad AI'en nåede, og en vej videre.
       this.emit(this.runReview('stopped', diff, task));
       this.afterImage(task);

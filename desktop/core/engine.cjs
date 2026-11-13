@@ -27,16 +27,17 @@ async function guardedProgram(executable) {
   }
   throw new Error('AI-motoren blev ikke fundet: ' + executable);
 }
-async function findExecutable({ bundled = require('./runtime.cjs').get(), timeout = VERSION_CHECK_MS } = {}) {
+async function findExecutable({ bundled = require('./runtime.cjs').get(), timeout = VERSION_CHECK_MS, signal } = {}) {
   const binary = process.platform === 'win32' ? 'opencode.exe' : 'opencode';
   // Under udvikling bruges den version, `npm run runtime:prepare` har hentet og kontrolleret, før en eventuel egen installation.
   const prepared = path.join(__dirname, '..', '.runtime', `${process.platform}-${process.arch}`, 'opencode', 'bin', binary);
   const candidates = bundled ? [bundled.opencode] : [process.env.HARNESS_OPENCODE_PATH, prepared, path.join(os.homedir(), '.opencode', 'bin', binary), 'opencode'].filter(Boolean);
   let slow = false;
   for (const file of candidates) {
+    signal?.throwIfAborted();
     if (file === verified) return file;
-    try { const result = await run(file, ['--version'], { timeout, windowsHide: true }); if (result.stdout.trim() === VERSION) return (verified = file); }
-    catch (error) { if (error.killed) slow = true; /* Prøv næste eksplicitte installationsplacering. */ }
+    try { const result = await run(file, ['--version'], { timeout, windowsHide: true, signal }); signal?.throwIfAborted(); if (result.stdout.trim() === VERSION) return (verified = file); }
+    catch (error) { signal?.throwIfAborted(); if (error.killed) slow = true; /* Prøv næste eksplicitte installationsplacering. */ }
   }
   // Den pakkede app har sin egen motor. Brugeren skal have en forklaring, de kan handle på, ikke en udviklerkommando.
   if (bundled) throw new Error(slow
@@ -345,7 +346,8 @@ class OpenCodeEngine {
   // resume: en tidligere OpenCode-session for samme samtale. Findes den ikke længere, oprettes en ny.
   constructor({ root, directory, provider, model, references = [], mode = 'free', skills = [], resume = null, sandbox = null, detached = false, recovery = {}, tempRoot = null, preview = null, startTimeout = START_TIMEOUT_MS, slowStartMs = SLOW_START_MS, onEvent = () => {} }) { Object.assign(this, { startTimeout, slowStartMs, tempRoot, preview, root, directory, provider, model, references, mode, skills, resume, sandbox, detached, recovery, onEvent }); this.promptEpoch = 0; this.closedPermissions = new Set(); this.closedQuestions = new Set(); this.pendingQuestions = new Map(); this.pending = new Map(); this.active = false; this.resumed = false; }
   async request(url, method = 'GET', body, signal) {
-    const response = await fetch(`${this.url}${url}`, { method, headers: { authorization: this.auth, 'content-type': 'application/json', 'x-opencode-directory': encodeURIComponent(this.root) }, body: body === undefined ? undefined : JSON.stringify(body), signal: signal || AbortSignal.timeout(15000), redirect: 'error' });
+    const requestSignal = signal || AbortSignal.timeout(15000);
+    const response = await fetch(`${this.url}${url}`, { method, headers: { authorization: this.auth, 'content-type': 'application/json', 'x-opencode-directory': encodeURIComponent(this.root) }, body: body === undefined ? undefined : JSON.stringify(body), signal: this.startup ? AbortSignal.any([this.startup.signal, requestSignal]) : requestSignal, redirect: 'error' });
     if (!response.ok) throw Object.assign(new Error(`Agentmotoren afviste handlingen (HTTP ${response.status}).`), { status: response.status });
     if (response.status === 204) return null;
     return response.json();
@@ -356,19 +358,32 @@ class OpenCodeEngine {
     if (typeof this.resume === 'string' && /^[A-Za-z0-9_-]{1,100}$/.test(this.resume)) {
       try { const session = await this.request(`/session/${this.resume}`); if (session?.id === this.resume) { this.session = session; this.resumed = true; } } catch { /* Sessionen findes ikke længere. */ }
     }
+    this.startup?.signal.throwIfAborted();
     if (!this.resumed) this.session = await this.request('/session', 'POST', { title: 'Aura' });
     return this.session;
   }
   async start() {
-    const executable = await findExecutable();
+    if (this.startup) throw new Error('Agentmotoren er allerede ved at starte.');
+    const startup = this.startup = new AbortController();
+    try { return await this.startProcess(startup.signal); }
+    finally { if (this.startup === startup) this.startup = null; }
+  }
+  async startProcess(signal) {
+    await this.closing;
+    signal.throwIfAborted();
+    const executable = await findExecutable({ signal });
+    signal.throwIfAborted();
     await fs.mkdir(this.directory, { recursive: true, mode: 0o700 });
     this.directory = await fs.realpath(this.directory);
     await fs.mkdir(path.join(this.directory, 'home'), { recursive: true, mode: 0o700 });
     // Motorens egen temp-mappe ryddes ved start, så udpakkede biblioteker fra tidligere starter ikke hober sig op.
     await fs.rm(path.join(this.directory, 'tmp'), { recursive: true, force: true }); await fs.mkdir(path.join(this.directory, 'tmp'), { recursive: true, mode: 0o700 });
     await writeSkills(this.directory, this.skills);
+    signal.throwIfAborted();
     await writePluginRuntime(this.directory);
+    signal.throwIfAborted();
     const readGuard = await writeReadGuard(this.directory, this.root, this.references, this.skills, { tempRoot: this.tempRoot });
+    signal.throwIfAborted();
     const password = randomBytes(32).toString('hex');
     this.auth = `Basic ${Buffer.from(`harness:${password}`).toString('base64')}`;
     const skillSet = { directory: this.directory, names: this.skills.map(skill => skill.name) };
@@ -392,6 +407,7 @@ class OpenCodeEngine {
     // Terminalklienten styrer Stop via API'et; dens Ctrl+C må ikke også ramme motorens procesgruppe.
     const args = ['serve', '--hostname', '127.0.0.1', '--port', '0'], env = isolatedEnv(this.directory, this.config, password, { commandIsolation: Boolean(this.sandbox), tempRoot: this.tempRoot });
     this.enginePID = null; const startedAt = Date.now(); this.startMs = null; this.slowStart = false;
+    signal.throwIfAborted();
     if (process.platform === 'win32') this.child = spawn(executable, args, { cwd: this.root, env, detached: this.detached, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
     else {
       // På macOS og Linux startes OpenCode gennem en vagtproces, så motoren også stopper, hvis Aura eller CLI'en
@@ -400,26 +416,40 @@ class OpenCodeEngine {
       const node = require('./runtime.cjs').get()?.node || process.execPath;
       // Vagtprocessen har sin egen procesgruppe, så et signal til hele Auras gruppe ikke rammer den og ejeren samtidig.
       // Den opdager ejerens død gennem IPC-forbindelsen.
-      this.child = spawn(node, [guardian, await guardedProgram(executable), ...args], { cwd: this.root, env: { ...env, ELECTRON_RUN_AS_NODE: '1' }, detached: true, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe', 'ipc'] });
-      this.child.on('message', message => { if (message?.type === 'engine' && Number.isInteger(message.pid)) this.enginePID = message.pid; });
+      const program = await guardedProgram(executable);
+      signal.throwIfAborted();
+      this.child = spawn(node, [guardian, program, ...args], { cwd: this.root, env: { ...env, ELECTRON_RUN_AS_NODE: '1' }, detached: true, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe', 'ipc'] });
     }
     // Ingen rå proceslogs sendes til UI; de kan indeholde projektindhold.
-    this.child.stderr.resume();
-    this.child.on('exit', () => {
-      if (!this.active) return;
+    const child = this.child;
+    this.ownedChild = child;
+    child.on('message', message => { if (this.ownedChild === child && message?.type === 'engine' && Number.isInteger(message.pid)) this.enginePID = message.pid; });
+    child.stderr.resume();
+    const stopped = () => {
+      if (this.child !== child || !this.active) return;
       // Forsvinder vagtprocessen uventet, stoppes motorens procesgruppe her, så den ikke lever videre uden ejer.
       if (this.enginePID) { try { process.kill(-this.enginePID, 'SIGKILL'); } catch { /* Gruppen er allerede væk. */ } }
       this.active = false; this.handleEvent({ type: 'engine.error', message: 'Agentmotoren stoppede. Start opgaven igen for at oprette en ny session.', failure: { kind: 'engine' } });
-    });
+    };
+    child.on('exit', stopped); child.on('error', stopped);
     try {
       this.url = await new Promise((resolve, reject) => {
-        const timer = setTimeout(() => reject(new Error(SLOW_START_TEXT)), this.startTimeout);
-        let output = '';
-        const done = callback => value => { clearTimeout(timer); callback(value); };
-        this.child.once('error', done(() => reject(new Error('Agentmotoren kunne ikke startes.'))));
-        this.child.once('exit', done(() => reject(new Error('Agentmotoren afsluttede under opstart.'))));
-        this.child.stdout.on('data', chunk => { output = (output + chunk.toString()).slice(-8000); const found = output.match(/http:\/\/127\.0\.0\.1:\d+/); if (found) done(resolve)(found[0]); });
+        const child = this.child;
+        let output = '', settled = false;
+        const done = (callback, value) => {
+          if (settled) return; settled = true; clearTimeout(timer);
+          signal.removeEventListener('abort', aborted); child.off('error', failed); child.off('exit', exited); child.stdout.off('data', data);
+          callback(value);
+        };
+        const aborted = () => done(reject, signal.reason);
+        const failed = () => done(reject, new Error('Agentmotoren kunne ikke startes.'));
+        const exited = () => done(reject, new Error('Agentmotoren afsluttede under opstart.'));
+        const data = chunk => { output = (output + chunk.toString()).slice(-8000); const found = output.match(/http:\/\/127\.0\.0\.1:\d+/); if (found) done(resolve, found[0]); };
+        const timer = setTimeout(() => done(reject, new Error(SLOW_START_TEXT)), this.startTimeout);
+        signal.addEventListener('abort', aborted, { once: true }); child.once('error', failed); child.once('exit', exited); child.stdout.on('data', data);
+        if (signal.aborted) aborted();
       });
+      signal.throwIfAborted();
       // Starttiden gemmes som et tal, uden stier eller nøgler, så skærmen kan sige det, når motoren var langsom.
       this.startMs = Date.now() - startedAt; this.slowStart = this.startMs >= this.slowStartMs;
       const health = await this.request('/global/health');
@@ -434,11 +464,13 @@ class OpenCodeEngine {
         if (ready?.token !== this.sandbox.readyToken || ready?.identity !== this.sandbox.identity) throw new Error('Kommandobeskyttelsen blev ikke indlæst. Opgaven blev ikke startet.');
       }
       await this.openSession();
+      signal.throwIfAborted();
       this.active = true;
       this.listen();
       await this.eventStream.ready;
+      signal.throwIfAborted();
       return this.session.id;
-    } catch (error) { await this.close(); throw error; }
+    } catch (error) { const failure = signal.aborted ? signal.reason : error; await this.close(); throw failure; }
   }
   async listen() {
     this.eventStream?.close();
@@ -503,7 +535,7 @@ class OpenCodeEngine {
     this.currentReplySeen = false; this.currentMessageIDs = new Set([messageID]);
     const epoch = this.promptEpoch, signal = this.eventsAbort?.signal;
     try {
-      return await this.request(`/session/${this.session.id}/prompt_async`, 'POST', { messageID, model: { providerID: 'harness', modelID: this.model.id }, agent: ['chat', 'plan'].includes(mode) ? 'laes' : 'build', system, parts: [{ type: 'text', text }] });
+      return await this.request(`/session/${this.session.id}/prompt_async`, 'POST', { messageID, model: { providerID: 'harness', modelID: this.model.id }, agent: ['chat', 'plan'].includes(mode) ? 'laes' : 'build', system, parts: [{ type: 'text', text }] }, signal ? AbortSignal.any([signal, AbortSignal.timeout(15000)]) : undefined);
     } catch (error) {
       if (error.status && error.status < 500 || signal?.aborted) throw error;
       for (const wait of this.recovery.delays || [500, 1500, 3000]) {
@@ -523,7 +555,18 @@ class OpenCodeEngine {
       throw new Error('Det kunne ikke bekræftes, om agenten modtog beskeden. Aura sender den ikke igen automatisk, så handlinger ikke gentages.');
     }
   }
-  async abort() { ++this.promptEpoch; this.eventStream?.close(); this.cancelCompletionCheck(); this.cancelCompaction(); if (this.session && this.url) await this.request(`/session/${this.session.id}/abort`, 'POST'); this.pending.clear(); this.pendingQuestions.clear(); }
+  async abort({ starting = false } = {}) {
+    ++this.promptEpoch; this.eventStream?.close(); this.cancelCompletionCheck(); this.cancelCompaction();
+    if (this.startup) { await this.close(); return; }
+    if (starting) {
+      // Et prompt kan være modtaget, selv om dets HTTP-kvittering mangler. Lad først motoren stoppe eventuelle
+      // værktøjer (også kommandoer i egne procesgrupper), men lad ikke en manglende abort-kvittering fastholde Stop.
+      if (this.active && this.session && this.url) await this.request(`/session/${this.session.id}/abort`, 'POST', undefined, AbortSignal.timeout(1000)).catch(() => {});
+      await this.close(); return;
+    }
+    if (this.session && this.url) await this.request(`/session/${this.session.id}/abort`, 'POST');
+    this.pending.clear(); this.pendingQuestions.clear();
+  }
   cancelCompletionCheck() { clearTimeout(this.completionTimer); this.completionTimer = null; this.completionCheck = null; }
   watchCompletion(message) {
     this.cancelCompletionCheck();
@@ -575,9 +618,28 @@ class OpenCodeEngine {
   cancelCompaction(error = new Error('Sammenfatningen blev stoppet.')) { if (this.compaction) { this.compaction.controller.abort(error); this.compaction.reject(error); } }
   async diff() { return this.request(`/session/${this.session.id}/diff`); }
   async close() {
+    this.startup?.abort(new DOMException('Opstarten af AI-motoren blev stoppet.', 'AbortError'));
+    if (this.closing) return this.closing;
+    const closing = this.closeProcess(); this.closing = closing;
+    try { return await closing; } finally { if (this.closing === closing) this.closing = null; }
+  }
+  async closeProcess() {
     ++this.promptEpoch; this.eventStream?.close(); this.pendingQuestions.clear();
+    const child = this.child;
     // Er vagtprocessen allerede væk, stoppes motorens gruppe direkte.
-    if (this.child && this.child.exitCode !== null && this.enginePID) { try { process.kill(-this.enginePID, 'SIGKILL'); } catch { /* Gruppen er allerede væk. */ } }
-    this.cancelCompletionCheck(); this.cancelCompaction(); this.active = false; this.eventsAbort?.abort(); this.pending.clear(); if (this.child && this.child.exitCode === null) { this.child.kill(); await new Promise(resolve => { const timer = setTimeout(() => { this.child.kill('SIGKILL'); resolve(); }, 3000); this.child.once('exit', () => { clearTimeout(timer); resolve(); }); }); } }
+    if (child && (child.exitCode !== null || child.signalCode) && this.enginePID) { try { process.kill(-this.enginePID, 'SIGKILL'); } catch { /* Gruppen er allerede væk. */ } }
+    this.cancelCompletionCheck(); this.cancelCompaction(); this.active = false; this.eventsAbort?.abort(); this.pending.clear();
+    if (child && child.exitCode === null && !child.signalCode) {
+      await new Promise(resolve => {
+        const timer = setTimeout(() => {
+          child.kill('SIGKILL');
+          if (this.enginePID) { try { process.kill(-this.enginePID, 'SIGKILL'); } catch { /* Gruppen er allerede væk. */ } }
+          resolve();
+        }, 3000);
+        child.once('exit', () => { clearTimeout(timer); resolve(); }); child.kill();
+      });
+    }
+    if (this.ownedChild === child) { this.ownedChild = null; this.enginePID = null; }
+  }
 }
 module.exports = { SLOW_START_MS, SLOW_START_TEXT, createGrepGuard, trustedPolicyPatterns, createWriteGuard, OpenCodeEngine, findExecutable, isolatedEnv, permissions, engineConfig, writeSkills, writePluginRuntime, pluginRuntimeFiles, pluginRuntimePatterns, createReadGuard, writeReadGuard, VERSION, SUMMARIZE_TIMEOUT_MS };

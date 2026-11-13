@@ -903,6 +903,12 @@ function showData(data, canSend) {
 }
 async function sendNow(data, text) {
   const v = view, owner = selectedOwner(); v.activityGroup = null; v.planCard = false; v.runConnection = $('#connection-select').value; v.historyNotice = ''; renderHistoryControls();
+  // Stop er synlig, før send-IPC starter: kladden skal først gemmes. Et Stop i det tidsrum afbryder det lokale forsøg,
+  // så et sent kladdesvar aldrig kan starte opgaven bagefter. Forsøget og dets ejer hører til denne samtale.
+  let cancelStart, finish;
+  const cancelled = new Promise(resolve => { cancelStart = resolve; });
+  const operation = v.sendOperation = { owner, dispatched: false, cancelled: false, cancel: () => { operation.cancelled = true; cancelStart(false); }, done: new Promise(resolve => { finish = resolve; }) };
+  const stopped = () => { if (view === v && !$('#prompt').value) { $('#prompt').value = text; saveChatDraft(); } setRunning(false, 'Stoppet', v); };
   v.runWorkMode = $('#work-mode').value;
   v.runContextSelection = { connectionID: $('#connection-select').value, modelID: $('#model-select').value, routeID: $('#route-row').hidden ? '' : $('#route-select').value };
   v.activeModelSummary = $('#model-chip').textContent;
@@ -911,10 +917,23 @@ async function sendNow(data, text) {
   if ($('#work-mode').value === 'free') { activePlan = null; $('#plan-card').hidden = true; }
   $('#run-review').hidden = true; if ($('#work-mode').value === 'build') $('#plan-card').hidden = true;
   Object.assign(v, { lastSentText: text, lastTarget: data.previewReference || '', lastTargetRef: window.workspace?.target() || null, lastCheckpoint: null, rejectedThisRun: false, lastRejection: null });
-  appendMessage(text + (data.fileReferenceText || '') + (v.lastTarget ? `\n\nMål i forhåndsvisningen: ${v.lastTarget}` : ''), 'user', v); $('#prompt').value = ''; await saveChatDraft();
+  appendMessage(text + (data.fileReferenceText || '') + (v.lastTarget ? `\n\nMål i forhåndsvisningen: ${v.lastTarget}` : ''), 'user', v); $('#prompt').value = '';
   const compact = v.compactNext === true; v.compactNext = false; v.effortLevels = data.effortLevels || [];
-  try { await call('send', { text, fingerprint: data.fingerprint, contextBinding: data.contextBinding, chat: v.id, compact }, owner); if (view === v) { acceptedFingerprint = reviewKey(data); window.workspace?.clearReferences(); } }
-  catch (error) { if (error.message === 'Opgaven blev stoppet før afsendelse.') { setRunning(false, 'Stoppet', v); return; } if (view === v) { $('#prompt').value = text; await saveChatDraft(); } setRunning(false, 'Fejl', v); renderRunReview({ status: 'error', files: [], tools: [], failure: { kind: error.failure || 'start', message: error.message, ...(Number.isFinite(error.retryAt) ? { retryAt: error.retryAt } : {}) } }, v); }
+  try {
+    const ready = await Promise.race([Promise.resolve(saveChatDraft()).then(() => true), cancelled]);
+    if (v.sendOperation !== operation) return;
+    if (!ready || operation.cancelled) { stopped(); return; }
+    operation.dispatched = true;
+    await call('send', { text, fingerprint: data.fingerprint, contextBinding: data.contextBinding, chat: v.id, compact }, owner);
+    if (v.sendOperation === operation && view === v) { acceptedFingerprint = reviewKey(data); window.workspace?.clearReferences(); }
+  }
+  catch (error) { if (v.sendOperation !== operation) return; if (operation.cancelled || error.message === 'Opgaven blev stoppet før afsendelse.') { stopped(); return; } if (view === v) { $('#prompt').value = text; await saveChatDraft(); } if (v.sendOperation !== operation) return; setRunning(false, 'Fejl', v); renderRunReview({ status: 'error', files: [], tools: [], failure: { kind: error.failure || 'start', message: error.message, ...(Number.isFinite(error.retryAt) ? { retryAt: error.retryAt } : {}) } }, v); }
+  finally { if (v.sendOperation === operation) v.sendOperation = null; finish(); }
+}
+async function stopNow() {
+  const v = view, operation = v.sendOperation;
+  if (operation && !operation.dispatched) { operation.cancel(); await operation.done; return; }
+  await call('stop', { chat: v.id }, operation?.owner || selectedOwner());
 }
 // Under en opgave viser statusfeltet, hvor længe den har kørt, så en lang tænkepause ikke ligner, at appen er gået i stå.
 let runTimer = null;
@@ -1268,7 +1287,7 @@ $('#send').setAttribute('aria-keyshortcuts', 'Enter Meta+Enter Control+Enter');
 $('#send').title = 'Enter sender. Shift+Enter giver en ny linje.';
 $('#data-dialog').addEventListener('close', () => { pendingSend = null; });
 $('#accept-send').onclick = () => action(async () => { const pending = pendingSend; pendingSend = null; if (pending) await sendNow(pending.data, pending.text); });
-$('#stop').onclick = () => action(() => call('stop'));
+$('#stop').onclick = () => action(stopNow);
 $('#skills-button').onclick = () => action(async () => { const owner = selectedOwner(), ticket = navigationRequest; const next = await call('skills', undefined, owner); if (ticket !== navigationRequest || owner?.root !== current?.root) return; skillOwner = owner; skillList = next; $('#skill-select').replaceChildren(...skillList.map(s => option(s.id, s.enabled ? s.title : `${s.title} · slået fra`))); showSkill(); $('#skills-dialog').showModal(); });
 $('#skill-select').onchange = showSkill;
 for (const reset of [true, false]) $(reset ? '#skill-reset' : '#skill-save').onclick = () => action(async () => { const id = $('#skill-select').value; const owner = skillOwner, next = await call('saveSkill', { id, content: $('#skill-content').value, reset }, owner); if (owner?.root !== current?.root || !$('#skills-dialog').open) return; skillList = next; acceptedFingerprint = null; showSkill(); message(reset ? 'Den fælles version bruges igen i dette projekt. Det gælder fra din næste besked.' : 'Instruktionen er gemt for dette projekt. Den gælder fra din næste besked.'); });

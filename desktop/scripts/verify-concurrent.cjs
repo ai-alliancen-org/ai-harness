@@ -38,6 +38,7 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     };
     if (!body.tools?.length) return reply({ content: 'Titel' });
     if (text.includes('hold-a')) { const release = () => reply({ content: 'Opgaven er afsluttet.' }); held.add(release); res.on('close', () => held.delete(release)); return; }
+    if (text.includes('resume-after-startup-stop')) return reply({ content: 'Start efter Stop virkede.' });
     if (body.messages.at(-1)?.role === 'tool') return reply({ content: 'Rettelsen er klar. Prøv siden.' });
     const code = text.includes('opgave-a') ? document('Projektets overskrift', 'Kontakt') : text.includes('opgave-c') ? document('Kopiens overskrift', 'Kontakt') : document('Før', 'Ny kontakt');
     const hasFramework = await fs.access(path.join(folder, 'package.json')).then(() => true, () => false);
@@ -296,11 +297,7 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     if (await row(originalChat).count()) await switchChat(originalChat, project);
     if (await page.isVisible('#stop')) { await page.click('#stop'); await page.locator('#stop').waitFor({ state: 'hidden' }); }
     checks.push(`rigtige ${frameworkName}-servere for projekt og kopi bruger forskellige porte; kopi og server ryddes, mens projektets server fortsætter; WebSocket til den anden server afvises`);
-    await newChat(); await helpers.selectMode(page, 'free'); await page.fill('#prompt', 'Stop under opstart. hold-a'); await page.click('#send');
-    await page.waitForFunction(() => document.querySelector('#data-dialog').open || !document.querySelector('#stop').hidden);
-    if (await page.locator('#data-dialog').evaluate(el => el.open)) await page.click('#accept-send');
-    await page.click('#stop'); await page.locator('#stop').waitFor({ state: 'hidden' }); await wait(1000);
-    assert.equal(await page.locator('#run-status').textContent(), 'Stoppet'); checks.push('Stop under opstart bliver ved med at være Stoppet og vises ikke som en fejl');
+    await require('./startup-cancellation-checks.cjs')({ app, page, project, root, requests, newChat, call, checks });
     assert.deepEqual(errors, []); assert.ok(singleImageChecks > 0, 'gennemgangen af ét billede uden modstykke skal faktisk være afprøvet'); await fs.writeFile(path.join(root, 'maalinger.json'), JSON.stringify(measurements, null, 2)); console.log(JSON.stringify({ status: 'bestået', root, checks, requests: requests.length, singleImageChecks, measurements }, null, 1));
   } catch (error) { await shot('fejl').catch(() => {}); console.error('Testmateriale: ' + root); console.error(error); console.error('Skærmstatus:', await page.evaluate(() => ({ focus: document.activeElement?.id, mergeDisabled: document.querySelector('#merge-copy')?.disabled, dialog: document.querySelector('#restore-dialog')?.open, message: document.querySelector('#message')?.textContent, status: document.querySelector('#run-status')?.textContent })).catch(() => null)); console.error('Serverens log:', await page.locator('#server-log').textContent().catch(() => 'ikke tilgængelig')); await fs.writeFile(path.join(root, 'requests.json'), JSON.stringify(requests)); throw error; }
   finally { for (const release of held) release(); await app?.close(); server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }
