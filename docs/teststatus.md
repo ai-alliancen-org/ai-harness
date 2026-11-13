@@ -1444,6 +1444,30 @@ Niveauer: *skrevet* · *enhedsprøvet* · *kørt mod rigtigt materiale* · *udgi
 - **Ikke gjort:** opgraderingsprøven 0.6 til 0.7 er ikke kørt igen. Windows er ikke afprøvet. Intet er kørt med en rigtig udbyder eller en rigtig model. `test:preview-edit` er stadig rød (Playwright 1.64.1).
 - **Modsatte prøver ændret bevidst:** `verify-planning.cjs` forventede, at en ny plan-besked trækker den gamle plan tilbage. Den forventer nu, at planen bevares.
 
+
+## 0.7.0-beta.2 · pakker, signering og notarisation · 4. november 2026
+
+Pakkerne er bygget fra commit `f314634` i en separat arbejdskopi, så udviklingen til beta 3 ikke rørte kildetræet. Niveau: *kørt mod rigtigt materiale* for Mac Apple Silicon, ellers lavere som angivet. Intet er udgivet endnu.
+
+- **Kildekontrol:** `verify-package-source.cjs` består for `darwin-arm64`, `darwin-x64` og `win32-x64`: 199 produktfiler matcher commit og arbejdsmappe, og OpenCode 1.18.33, Git 2.53.0 og Node 22.23.3 er de låste versioner. De to ZIP-arkiver er udpakket og kontrolleret for sig.
+- **Pakkeprøve:** `test:package` er kørt mod Apple Silicon-appen (7 kontrolpunkter). Den er ikke kørt mod Intel-appen. Windows-pakken er krydsbygget på Mac og er ikke kørt på Windows.
+- **Signering:** begge Mac-apps er signeret med Developer ID (`mekbas IVS`). `codesign --verify --deep --strict` og `syspolicy_check distribution` består, og `stapler validate` består på selve appen i begge arkiver. Windows-pakken er usigneret.
+- **Notarisation:** seks indsendelser til Apple, alle `Accepted`. De to første DMG'er blev sendt før billetten blev hæftet på appen, og de fire endelige filer efter. Kvitteringer: Aura-0.7.0-beta.2-mac-arm64.dmg 513fa477-c4d0-401c-9d1d-d8690253d527; Aura-0.7.0-beta.2-mac-arm64.zip 551c89d8-c529-415a-bb26-0a1ec6381b4f; Aura-0.7.0-beta.2-mac-x64.dmg de8ea158-221c-413c-a580-2b01e2ca462b; Aura-0.7.0-beta.2-mac-x64.zip d4717f4b-7d9f-475b-a2bb-4468ac65ce26.
+- **Filoversigt:** `release-site.cjs` dannede `release.json` og `SHA256SUMS.txt` for de fem programfiler, og `verify-download.cjs` består (tre installationsfiler hentet gennem en lokal browser).
+- **Prøver forud for pakningen:** 847 af 847 enhedsprøver og Electron-prøverne for godkendelser, planlægning og samtale består på commit'et.
+- **Opgraderingsprøve 4. november:** `verify-upgrade.cjs` er kørt på Mac Apple Silicon mellem den signerede 0.7.0-beta.1 og den signerede 0.7.0-beta.2 med det notariserede ZIP-arkiv. Squirrel.Mac installerede opdateringen, projektfiler, design og kladde var uændrede, den krypterede nøgle og forbindelsen blev bevaret og kunne bruges efter opdateringen, og der blev ikke sendt noget til en model eller skrevet til Git. Automatisk genstart og Intel er ikke afprøvet, og Windows kræver en egen prøve. Prøven var forældet og blev rettet på beta-3-grenen: den gemte forbindelsen med en nøgle fra hovedvinduet, hvilket siden 0.7 kun kan ske i nøglevinduet.
+- **Notarisationen blev afbrudt to gange**, første gang af ustabilt net og anden gang af en låst skærm, som gjorde nøgleringen utilgængelig. Begge gange blev scriptet genoptaget fra de gemte indsendelses-id'er, og ingen fil blev sendt igen.
+
+## 0.7.0-beta.2 · offentliggjort og hentet fra det offentlige link · 4. november 2026
+
+Niveau: *udgivet og observeret* for hentning og Mac-notarisation. Windows er kun checksum-tjekket.
+
+- **Offentliggørelse:** første kørsel af "Offentliggør gennemgået desktopbeta" (`41894353797`) fejlede i versionskontrollen, fordi `main` var rykket til `81db7f9` (kun en docs-ændring i denne fil), mens taggen `v0.7.0-beta.2` pegede på `d63a16c`. Taggen blev flyttet til `81db7f9`, kladden beholdt sine 7 filer, og anden kørsel (`41908917792`) lykkedes. Udgivelsen er en prerelease. Pakkerne er stadig bygget og notariseret fra `d63a16c`; forskellen til `81db7f9` er kun denne fil.
+- **Downloadside:** "Udgiv downloadside" (`41909304759`) lykkedes, og siden svarer 200 på <https://ai-alliancen-org.github.io/ai-harness/> uden login.
+- **Hentning:** alle fem programfiler og `SHA256SUMS.txt` blev hentet fra udgivelsens offentlige adresse (200). `shasum -c` giver OK for alle fem, og den offentlige `SHA256SUMS.txt` er identisk med den lokale fra notariseringen.
+- **Mac:** `stapler validate` består på begge DMG'er. Appen i begge DMG'er vurderes af `spctl` som "accepted, Notarized Developer ID" (mekbas IVS), og `codesign --verify --deep --strict` giver ingen fejl. `spctl` afviser selve DMG-filerne som "no usable signature", fordi DMG'en ikke er signeret for sig.
+- **Ikke gjort:** Windows-filen er ikke hentet og kørt på en Windows-maskine og er ikke signeret. Der er ikke kørt en installation fra det offentlige link; opgraderingsprøven er kun kørt på Mac Apple Silicon mod den lokale kandidat.
+
 ## Opgradering til OpenCode 1.19.5 · 5. november 2026
 
 Niveauer: *skrevet* · *enhedsprøvet* · *kørt mod den rigtige motor* · *udgivet og set*. Intet i dette afsnit er udgivet, pakket eller committet.
