@@ -157,7 +157,8 @@ async function inspectPreviewDependencies(root, config = {}) {
   const network = normalizeRuntimeConfig(config).network || {}, diagnostics = [];
   const publicRoot = path.join(root, 'public');
   try { if ((await fs.lstat(publicRoot)).isSymbolicLink()) return diagnostics; } catch { return diagnostics; }
-  const html = (await readProjectText(publicRoot, 'index.html') || '').replace(/<!--[\s\S]*?-->/g, '');
+  // Bevar en adskillelse, når kommentarer springes over: ellers kan fx <scr<!-- ... -->ipt blive til et nyt tag i diagnosen.
+  const html = (await readProjectText(publicRoot, 'index.html') || '').replace(/<!--[\s\S]*?-->/g, ' ');
   const report = (address, script, via) => {
     if (typeof address !== 'string' || !/^(?:https?:)?\/\//i.test(address.trim())) return;
     address = address.trim();
@@ -173,7 +174,9 @@ async function inspectPreviewDependencies(root, config = {}) {
     report(address, script);
   }
   // Importmap og ESM-imports i indlejrede scripts henter også fra nettet, selv om der ikke står src på tagget.
-  for (const match of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi)) {
+  // Browseren afslutter også et script ved et sluttag med attributter eller en skråstreg. Kun HTMLs ASCII-mellemrum,
+  // / og > afslutter selve navnet; fx </script-template> i en JavaScript-streng er ikke et sluttag. Dette finder kun diagnoser.
+  for (const match of html.matchAll(/<script(?=[\t\n\f\r />])([^>]*)>([\s\S]*?)<\/script(?=[\t\n\f\r />])[^>]*>/gi)) {
     const attributes = match[1], body = match[2];
     if (!body.trim()) continue;
     if (/\btype\s*=\s*["']?importmap\b/i.test(attributes)) {

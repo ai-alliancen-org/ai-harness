@@ -44,6 +44,27 @@ async function header(last) {
   return { text: button.textContent, state: button.dataset.state, hidden: button.hidden };
 }
 
+test('udgiverens forbindelseskort bruger faste lokale logoer og afviser ændrede DOM-værdier før et API-kald', async () => {
+  const m = mount();
+  for (const [id, asset, name] of [
+    ['azure', 'provider-azure.svg', 'Azure Static Web Apps'], ['cloudflare', 'provider-cloudflare.png', 'Cloudflare Pages'],
+    ['github-pages', 'provider-github-pages.svg', 'GitHub Pages'], ['komplai', 'provider-komplai.svg', 'komplai Run'],
+    ['promte', 'provider-promte.svg', 'Promte Apps'], ['vercel', 'provider-vercel.svg', 'Vercel']
+  ]) {
+    m.$('#deploy-provider').value = id;
+    await m.$('#deployment-recheck').onclick();
+    assert.equal(m.$('#deployment-service-logo').src, asset);
+    assert.equal(m.$('#deployment-service-name').textContent, name);
+  }
+  const previous = m.$('#deployment-service-logo').src, calls = m.calls.length;
+  for (const value of ['<img src=x onerror=alert(1)>', '../../preview/index.html', '__proto__']) {
+    m.$('#deploy-provider').value = value;
+    await assert.rejects(m.$('#deployment-recheck').onclick(), /Vælg en udbyder fra listen/);
+    assert.equal(m.$('#deployment-service-logo').src, previous);
+    assert.equal(m.calls.length, calls, 'et ukendt udbydervalg når ikke API eller logo');
+  }
+});
+
 // Farven kommer fra styles.css: kun disse tilstande står grønt eller som advarsel.
 const rule = token => (styles.match(new RegExp(`([^}]*)\\{[^}]*color: var\\(--${token}\\)`, 'g')) || []).join(' ');
 const green = state => new RegExp(`#deployment-status\\[data-state="${state}"\\]`).test(rule('success-ink'));

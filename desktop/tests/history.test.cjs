@@ -139,10 +139,13 @@ test('en versions filer og indhold vises kun, når det er sikkert', async t => {
 });
 
 test('billederne gemmes i par i appens data, bindes til en version og ryddes efter 80', async t => {
+  // Optagelserne er fra forskellige tidspunkter. Filsystemets hastighed må ikke afgøre, om den manuelle versions før-billede er ældre.
+  t.mock.timers.enable({ apis: ['Date'], now: new Date('2026-11-13T12:00:00Z') });
   const directory = await temp(t), root = path.join(directory, 'projekt');
   const store = { root: path.join(directory, 'data'), projectKey: () => 'nogle' }, images = new PreviewImages(store);
   const view = { page: '', width: 800, height: 600 }, jpeg = Buffer.from('ffd8ffe0', 'hex');
   const before = await images.add(root, jpeg, { role: 'before', pair: 'p1', view, task: 't1' });
+  t.mock.timers.tick(1000);
   const after = await images.add(root, jpeg, { role: 'after', pair: 'p1', view, task: 't1' });
   assert.equal(await images.add(root, Buffer.alloc(0), { role: 'after', view }), null);
   await images.bind(root, 'p1', 'c'.repeat(40));
@@ -150,6 +153,7 @@ test('billederne gemmes i par i appens data, bindes til en version og ryddes eft
   assert.deepEqual([pair.before.id, pair.after.id, pair.view], [before.id, after.id, view]);
   assert.deepEqual((await images.pairFor(root, { task: 't1' })).after.id, after.id);
   // En version, du selv gemmer, får det seneste billede af samme visning som før-billede.
+  t.mock.timers.tick(1000);
   const manual = await images.add(root, jpeg, { role: 'after', view, commit: 'd'.repeat(40) });
   pair = await images.pairFor(root, { commit: 'd'.repeat(40) });
   assert.equal(pair.after.id, manual.id); assert.equal(pair.before.id, after.id);

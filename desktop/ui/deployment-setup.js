@@ -11,7 +11,12 @@
   const titles = { setupConnection: 'Forbind din konto', setupChoice: 'Vælg destination', promteHost: 'Hvor logger du ind med Promte?', promteNotReady: 'Appen er ikke klar til Promte endnu.', promteWorkspace: 'Hvilket arbejdsområde skal modtage appen?', pagesRepository: 'Hvor ligger dit projekt på GitHub?', pagesBranch: 'Hvilken branch vil du udgive?', cloudflareAccount: 'Hvilken Cloudflare-konto bruger du?', cloudflareProject: 'Hvilket Pages-projekt vil du opdatere?', setupConfiguration: 'Gør projektet klar til udgivelse', setupConfigReview: 'Gennemgå opsætningsfilerne', vercelMethod: 'Hvordan vil du bruge Vercel?', vercelGit: 'Forbind dit Git-projekt', tracking: 'Udgivelser fra Git' };
   const names = Object.fromEntries(providers.map(([id, name]) => [id, name]));
   const stateLabels = { READY: 'Udgivet', ERROR: 'Udgivelse fejlede', CANCELED: 'Annulleret', BLOCKED: 'Kræver handling', REJECTED: 'Afvist', QUEUED: 'I kø', BUILDING: 'Bygger', INITIALIZING: 'Forbereder', PREPARED: 'Upload afventer', REVIEWING: 'Under gennemgang', SUBMITTING: 'Udgivelse afventer', UNKNOWN: 'Kontrollér status', AWAITING_UPDATE: 'Afventer udgivelsen', UPLOADED: 'Upload modtaget', REPLACED: 'Nyere version udgivet', UNPUBLISHED: 'Ikke udgivet', REMOVED: 'Fjernet' };
-  const logo = id => `provider-${id}.${id === 'cloudflare' ? 'png' : 'svg'}`;
+  const logos = new Map([
+    ['azure', 'provider-azure.svg'], ['cloudflare', 'provider-cloudflare.png'],
+    ['github-pages', 'provider-github-pages.svg'], ['komplai', 'provider-komplai.svg'],
+    ['promte', 'provider-promte.svg'], ['vercel', 'provider-vercel.svg']
+  ]);
+  const logo = id => logos.get(id);
   window.DeploymentSetupUI = { titles, mount({ api, go, back, busy, rows, heading, invalidate, chooseProvider, prepareReview, input, receipt, openDialog }) {
     const dialog = $('#deployment-dialog');
     const choiceSteps = { 'azure-subscription': 'azureSubscription', 'azure-app': 'azureApp', 'vercel-team': 'vercelTeam', 'vercel-project': 'vercelProject' };
@@ -20,7 +25,11 @@
     let promteSaved = '', promteHost = '';
     const normalizedHost = value => { try { const url = new URL(value); return url.protocol === 'https:' && !url.username && !url.password ? url.origin : ''; } catch { return ''; } };
     let choice = null, connection = null, configReview = null, gitProject = null, tracking = null, polling = null, loginID = null, epoch = 0, refreshing = false, trackingRoot = null, trackingError = false;
-    const provider = () => $('#deploy-provider').value;
+    const provider = () => {
+      const id = $('#deploy-provider').value;
+      if (!logos.has(id)) throw Error('Vælg en udbyder fra listen.');
+      return id;
+    };
     const pages = () => ['github-pages', 'cloudflare'].includes(provider());
     const act = (action, config = input(), extra = {}) => api('deploymentSetup', { action, config, ...extra });
     const open = (kind, id = provider()) => api('deploymentSetupOpen', { provider: id, kind, config: input() });

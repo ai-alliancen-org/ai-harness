@@ -47,7 +47,9 @@ test('R#35: Azure OpenAI og Azure Blob står i resuméet og diagrammet, og hver 
   assert.notEqual(azure.kind, 'Hosting', 'et kald fra koden er ingen hosting');
   assert.deepEqual(azure.hosts, ['kommunedata.blob.core.windows.net', 'kommunekoe.servicebus.windows.net'], 'hver vært står med, ikke kun den første');
   const detaljer = await fanetekst(m);
-  for (const vaert of ['kommune-ai.openai.azure.com', 'kommunedata.blob.core.windows.net', 'kommunekoe.servicebus.windows.net']) assert.match(detaljer, new RegExp(vaert.replaceAll('.', '\\.')), vaert);
+  assert.match(detaljer, /kommune-ai\.openai\.azure\.com/);
+  assert.match(detaljer, /kommunedata\.blob\.core\.windows\.net/);
+  assert.match(detaljer, /kommunekoe\.servicebus\.windows\.net/);
 });
 
 test('R#35: Gemini og Alexandra er AI-leverandører, og Firestore er sin egen række', async t => {

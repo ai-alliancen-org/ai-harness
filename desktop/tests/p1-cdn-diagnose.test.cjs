@@ -30,9 +30,34 @@ test('ESM-imports fra https i et indlejret modulscript giver en diagnose', async
   assert.deepEqual(fund.map(item => item.origin).sort(), ['https://cdn.jsdelivr.net', 'https://esm.sh', 'https://unpkg.com']);
 });
 
+test('script-sluttags med attributter, ASCII-mellemrum eller skråstreg bevarer importmap- og ESM-diagnoser', async t => {
+  for (const closing of ['</script\t\n bar>', '</ScRiPt ignored=value>', '</script/>', '</script\f extra="x">']) {
+    for (const [type, body] of [['importmap', '{"imports":{"x":"https://blocked.example/x.js"}}'], ['module', 'import x from "https://blocked.example/x.js";']]) {
+      const root = await projekt(t, `<script type="${type}">${body}${closing}`);
+      assert.deepEqual((await inspectPreviewDependencies(root)).map(item => item.origin), ['https://blocked.example'], `${type}: ${JSON.stringify(closing)}`);
+    }
+  }
+});
+
+test('script-lignende navne og ikke-HTML-mellemrum afslutter ikke et modulscript', async t => {
+  for (const text of ['</script-template>', '</script:custom>', '</script\u00a0>']) {
+    const root = await projekt(t, `<script type="module">const text = ${JSON.stringify(text)}; import x from "https://after.example/x.js";</script>`);
+    assert.deepEqual((await inspectPreviewDependencies(root)).map(item => item.origin), ['https://after.example'], JSON.stringify(text));
+  }
+  const root = await projekt(t, '<script-template type="module">import x from "https://not-a-script.example/x.js";</script>');
+  assert.deepEqual(await inspectPreviewDependencies(root), []);
+});
+
 test('importmap og imports på netlisten, i kommentarer eller uden adresse giver ingen diagnose', async t => {
   const root = await projekt(t, `<!-- <script type="importmap">{"imports":{"a":"https://skjult.example.net/a.js"}}</script> --><script type="importmap">{"imports":{"r":"https://esm.sh/r"}}</script><script type="module">import x from './x.js'; const tekst = "fra https://eksempel.dk";</script><script type="importmap">ikke json</script>`);
   assert.deepEqual(await inspectPreviewDependencies(root, { network: { scripts: ['https://esm.sh'] } }), []);
+});
+
+test('kommentarer sammenføjer ikke HTML- eller JavaScript-fragmenter til falske netafhængigheder', async t => {
+  const root = await projekt(t, '<scr<!-- adskil -->ipt src="https://not-a-tag.example/a.js"></script>'
+    + '<script type="module">im<!-- adskil -->port "https://not-an-import.example/b.js";</script>'
+    + '<script type="module">import "https://real.example/c.js";</script>');
+  assert.deepEqual((await inspectPreviewDependencies(root)).map(item => item.origin), ['https://real.example']);
 });
 
 test('JavaScript-kommentarer, strenge og andre scripttyper giver ingen falsk ESM-diagnose, men rigtige imports gør', async t => {

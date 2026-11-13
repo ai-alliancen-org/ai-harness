@@ -7,9 +7,8 @@ const { policyFor, allowedRequest } = require('../core/preview-policy.cjs');
 
 test('nye projekter får Tailwind og webskrifter som standard', () => {
   assert.ok(DESIGN_PREVIEW_NETWORK, 'DESIGN_PREVIEW_NETWORK skal være eksporteret');
-  assert.ok(DESIGN_PREVIEW_NETWORK.scripts.includes('https://cdn.tailwindcss.com'));
-  assert.ok(DESIGN_PREVIEW_NETWORK.styles.includes('https://fonts.googleapis.com'));
-  assert.ok(DESIGN_PREVIEW_NETWORK.styles.includes('https://fonts.gstatic.com'));
+  assert.deepEqual(DESIGN_PREVIEW_NETWORK.scripts, ['https://cdn.tailwindcss.com']);
+  assert.deepEqual(DESIGN_PREVIEW_NETWORK.styles, ['https://fonts.googleapis.com', 'https://fonts.gstatic.com']);
 });
 
 test('eksterne billeder er ikke tilladt som standard, men kræver brugerens samtykke pr. adresse (brugerens valg 5. november)', () => {
@@ -27,6 +26,9 @@ test('et nyt projekt med standarden kan hente Tailwind, og et tilfældigt script
   assert.equal(allowedRequest({ url: 'https://cdn.tailwindcss.com/3.4.0', resourceType: 'script' }, projekt), true);
   assert.equal(allowedRequest({ url: 'https://billeder.example.com/a.png', resourceType: 'image' }, projekt), false, 'et eksternt billede kræver samtykke');
   assert.equal(allowedRequest({ url: 'https://ondt.example.com/x.js', resourceType: 'script' }, projekt), false);
+  for (const url of ['https://cdn.tailwindcss.com.evil.example/x.js', 'https://evil.example/https://cdn.tailwindcss.com', 'https://cdn.tailwindcss.com@evil.example/x.js']) {
+    assert.equal(allowedRequest({ url, resourceType: 'script' }, projekt), false, url);
+  }
 });
 
 test('et eksisterende projekt uden standarden får ikke Tailwind af sig selv', () => {
