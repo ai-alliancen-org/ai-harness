@@ -12,9 +12,32 @@
 - Ctrl+C under login og modelvalg stopper selve netkaldet, så terminalen ikke venter på tidsgrænsen.
 - En lås fra en Aura, der blev afbrudt, overtages automatisk, når processen ikke findes mere, eller når dens nummer nu bruges af et andet program. `aura unlock` viser procesnummeret.
 
+## Installation i næste udgivelse
+
+Den næste CLI-pakke skal **pakkes ud og installeres som sin egen rod med `npm ci`**. `npm-shrinkwrap.json` låser også de transitive sikkerhedsrettelser. En direkte `npm install ./aura-harness-VERSION.tgz` er ikke en understøttet installationsvej for næste udgivelse: npm 10.9.9 ignorerede den medfølgende shrinkwrap og geninstallerede de sårbare versioner. Det skete med både v2-, v3- og nested låsefiler. Overrides i en installeret afhængighed anvendes heller ikke af npm. Den friske installationsprøve i `cli/tests/tarball.test.cjs` kontrollerer derfor de faktisk installerede versioner efter udpakning og `npm ci` i pakkens rod.
+
+Efter kontrol af udgivelsens SHA-256 lægges arkivet i en **ny installationsmappe**. Brug den konkrete versions filnavn i stedet for `VERSION`:
+
+```sh
+tar -xzf aura-harness-VERSION.tgz
+npm ci --prefix ./package --include=optional --ignore-scripts --no-audit --no-fund
+node ./package/cli/aura.cjs doctor
+node ./package/cli/aura.cjs login
+```
+
+`tar` opretter undermappen `package`. De samme kommandoer bruges i shell og PowerShell. Node, npm, Git og `tar` skal være installeret; nøgler indtastes i CLI'ens skjulte felt. Ingen global npm-installation eller npm-genereret PowerShell-wrapper er nødvendig. `doctor` skal finde den låste OpenCode 1.19.5; stop ved fejl.
+
+Åbn et separat projekt med `node ./package/cli/aura.cjs chat "./mit-projekt"`. Efter `/exit` genåbnes projektvalget med:
+
+```sh
+node ./package/cli/aura.cjs resume
+```
+
+Ved versionsløftet erstattes alle installations- og startkommandoer i de tre platformsguider og `cli/README.md` med denne vej, herunder de gamle `./node_modules/.bin/aura`- og `aura.cmd`-kommandoer. Bevar den platformsspecifikke opsætning af `AURA_HOME`. De nuværende offentliggjorte 0.2.0-beta.6-guider beskriver stadig den historiske pakke og ændres først sammen med næste versionsløft.
+
 ## Tjekliste ved udgivelsen
 
-1. Brugeren vælger versionsnummeret. `package.json` og `package-lock.json` får samme version.
+1. Brugeren vælger versionsnummeret. `package.json` og `npm-shrinkwrap.json` får samme version.
 2. Ret filnavnet `aura-harness-VERSION.tgz` i de tre platformsguider. Pakningen afviser gamle filnavne.
 3. Ret OpenCode-versionen i de tre platformsguider til den, `package.json` låser (i dag 1.19.5). En udgivelsespakning afviser guider med en anden version (`guideProblem` i `scripts/cli-release-contract.cjs`); en lokal prøve med `--local` kontrollerer kun filnavnet.
 4. Erstat afsnittene nedenfor. Linjenumrene passer til de gældende guider, som de står nu.
@@ -45,7 +68,7 @@ Linje 42:
 
 Linje 33:
 
-> `doctor` skal finde Node, Git og OpenCode 1.19.5. Stop ved fejl, og send fejlteksten. Brug ikke en anden tilfældig Aura-pakke som erstatning. Kommandoen `aura.cmd` undgår PowerShells eventuelle blokering af npm-genererede `.ps1`-filer.
+> `node ./package/cli/aura.cjs doctor` skal finde Node, Git og OpenCode 1.19.5. Stop ved fejl, og send fejlteksten. Brug ikke en anden tilfældig Aura-pakke som erstatning. Node-kommandoen bruger ingen npm-genereret `.ps1`-fil.
 
 Linje 46:
 
@@ -53,7 +76,7 @@ Linje 46:
 
 Linje 54, punkt 5:
 
-> 5. Skriv `/exit`. Start igen med `aura.cmd resume` som nedenfor. Kontrollér samtale, plan, modelvalg og filer. Der må ikke blive spurgt om en adgangssætning. Har du brugt 0.2.0-beta.6 med samme `AURA_HOME`, spørges der om den gamle adgangssætning, når nøglerne flyttes, og ikke igen, når de er flyttet. Data må ikke slettes, heller ikke ved en forkert adgangssætning.
+> 5. Skriv `/exit`. Start igen med `node ./package/cli/aura.cjs resume` som nedenfor. Kontrollér samtale, plan, modelvalg og filer. Der må ikke blive spurgt om en adgangssætning. Har du brugt 0.2.0-beta.6 med samme `AURA_HOME`, spørges der om den gamle adgangssætning, når nøglerne flyttes, og ikke igen, når de er flyttet. Data må ikke slettes, heller ikke ved en forkert adgangssætning.
 
 Linje 89, feltet i rapporten:
 

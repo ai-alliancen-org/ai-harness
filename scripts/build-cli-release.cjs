@@ -54,7 +54,7 @@ async function build(directory, { local = false } = {}) {
   // Opret kun en ny mappe. Tidligere pakker og deres beviser må ikke overskrives.
   const source = await sourceState(local);
   const pkg = JSON.parse(await fs.readFile(path.join(root, 'package.json')));
-  const lock = JSON.parse(await fs.readFile(path.join(root, 'package-lock.json')));
+  const lock = JSON.parse(await fs.readFile(path.join(root, 'npm-shrinkwrap.json')));
   if (pkg.name !== 'aura-harness' || lock.version !== pkg.version || lock.packages[''].version !== pkg.version) throw new Error('CLI-versionen og låsefilen stemmer ikke.');
   const expected = names(pkg.version);
   await fs.mkdir(path.dirname(directory), { recursive: true });

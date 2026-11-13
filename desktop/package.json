@@ -86,5 +86,17 @@
     "electron-updater": "6.8.11",
     "pdfjs-dist": "6.4.299",
     "semver": "7.8.5"
+  },
+  "overrides": {
+    "effect": "4.0.0-beta.103",
+    "toml": "5.0.1",
+    "zod": "4.6.6",
+    "node-forge": "1.4.3",
+    "app-builder-lib": {
+      "minimatch@>=7 <11.0.1": "11.0.1"
+    },
+    "@electron/universal": {
+      "minimatch@>=7 <11.0.1": "11.0.1"
+    }
   }
 }

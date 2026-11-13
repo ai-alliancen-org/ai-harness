@@ -36,7 +36,7 @@ function draftProblem(text, version) {
   return `Versionen er ${version}, men ${draftFile} findes stadig. Teksterne dér beskriver CLI'en efter ${base}: flyt dem ind i de tre platformsguider, cli/README.md og docs/releases/cli-beta.md, og slet udkastet i samme commit.`;
 }
 function allowedSource(name) {
-  return /^(LICENSE|README\.md|package\.json|cli\/[\w-]+\.(cjs|md)|desktop\/core\/[\w-]+\.(?:cjs|mjs)|desktop\/ui\/(?:approval-view|conversation-mode|plan-view)\.js|desktop\/runtime-lock\.json|scripts\/harness\.cjs)$/.test(name)
+  return /^(LICENSE|README\.md|package\.json|npm-shrinkwrap\.json|cli\/[\w-]+\.(cjs|md)|desktop\/core\/[\w-]+\.(?:cjs|mjs)|desktop\/ui\/(?:approval-view|conversation-mode|plan-view)\.js|desktop\/runtime-lock\.json|scripts\/harness\.cjs)$/.test(name)
     || /^profiles\/[a-zA-Z0-9_/-]+\.(md|json|txt)$/.test(name);
 }
 // Læs de faktiske npm-arkivfiler uden at udpakke eller udføre dem.

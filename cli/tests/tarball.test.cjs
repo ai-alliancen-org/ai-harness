@@ -1,10 +1,11 @@
 // Tarballprøven (fund 41, 48 og 50 i gennemgangen af beta 3): CLI-pakken skal virke, som npm installerer den, og ikke kun fra repoet.
 // Fra repoet findes desktop/node_modules, så de andre prøver kan ikke se, hvad pakken mangler. Her pakkes rodpakken med npm pack,
-// arkivet installeres i en tom mappe som i cli/MACOS.md, og motorens plugin-opstart og kommandobeskyttelsen køres fra den installerede pakke.
+// arkivet udpakkes i en tom mappe og installeres med npm ci som beskrevet i udkastet til næste CLI-udgivelse.
+// Motorens plugin-opstart og kommandobeskyttelsen køres fra den udpakkede, installerede pakke.
 // npm henter pakkens afhængigheder fra registret eller fra npm's cache. Uden begge springes de prøver over, der kræver installationen.
 // Den valgfrie OpenCode-motor hentes ikke; motorstarten bruger den låste motor fra repoet, hvis den findes.
-// Kun de direkte afhængigheder er låst til en præcis version. npm bruger ikke repoets package-lock.json, når pakken installeres, og
-// pakken har ingen npm-shrinkwrap.json, så deres egne afhængigheder (fx node-forge, commander og zod) løses forfra hos brugeren.
+// npm-shrinkwrap.json følger med arkivet, og pakken er installationens rod, så npm bruger både låsefil og overrides.
+// npm 10.9.9 ignorerer shrinkwrap ved direkte installation af en lokal .tgz som afhængighed; den vej er ikke understøttet for næste CLI.
 const { test, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
@@ -12,6 +13,7 @@ const fsSync = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { execFile } = require('node:child_process');
+const { createRequire } = require('node:module');
 const { promisify } = require('node:util');
 const run = promisify(execFile);
 const { unpack } = require('../../scripts/cli-release-contract.cjs');
@@ -28,6 +30,16 @@ function npmCli() {
 }
 const npm = (args, options = {}) => run(process.execPath, [npmCli(), ...args], { maxBuffer: 32 * 1024 * 1024, timeout: 300000, ...options });
 
+// Følg Nodes søgestier; pluginet har kun en import-eksport, så require.resolve(name) kan ikke bruges.
+async function dependency(from, name) {
+  for (const directory of from.resolve.paths(name) || []) {
+    const file = path.join(directory, name, 'package.json');
+    const manifest = await fs.readFile(file, 'utf8').then(JSON.parse).catch(error => { if (error.code !== 'ENOENT') throw error; return null; });
+    if (manifest?.name === name) return { manifest, require: createRequire(await fs.realpath(file)) };
+  }
+  throw new Error(`Manifestet for ${name} blev ikke fundet.`);
+}
+
 let base, archive, installed, unavailable = null;
 before(async () => {
   base = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), 'aura-tarball-')));
@@ -35,8 +47,15 @@ before(async () => {
   await fs.mkdir(packed); await fs.mkdir(target);
   const { stdout } = await npm(['pack', '--json', '--ignore-scripts', '--pack-destination', packed], { cwd: repo });
   archive = path.join(packed, JSON.parse(stdout)[0].filename);
-  // Som i cli/MACOS.md, men uden den valgfrie OpenCode-motor.
-  try { await npm(['install', '--omit=optional', '--ignore-scripts', '--no-audit', '--no-fund', '--no-save', '--prefer-offline', archive], { cwd: target }); }
+  installed = path.join(target, 'package');
+  // Den kontrollerede udpakning svarer til tar -xzf: kun arkivets tilladte almindelige filer skrives i den nye mappe.
+  for (const [name, content] of unpack(await fs.readFile(archive))) {
+    const file = path.join(installed, name);
+    await fs.mkdir(path.dirname(file), { recursive: true });
+    await fs.writeFile(file, content);
+  }
+  // Den nye installationsvej, men uden den valgfrie OpenCode-motor; motorprøven bruger repoets låste motor.
+  try { await npm(['ci', '--prefix', './package', '--omit=optional', '--ignore-scripts', '--no-audit', '--no-fund', '--prefer-offline'], { cwd: target }); }
   catch (error) {
     // Uden net og uden pakkerne i npm's cache kan installationen ikke prøves her. Så springes de prøver over, der kræver den, med grunden.
     // Kun npm's egne fejlkoder for et register, der ikke kan nås, eller en pakke, der mangler i cachen offline, giver det. Alle andre fejl,
@@ -45,7 +64,6 @@ before(async () => {
     if (!code) throw error;
     unavailable = `npm-registret kan ikke nås, og npm's cache mangler pakkens afhængigheder (${code}). Prøven kræver net eller en fyldt npm-cache.`;
   }
-  installed = path.join(target, 'node_modules', 'aura-harness');
 });
 after(() => base && fs.rm(base, { recursive: true, force: true }));
 
@@ -56,9 +74,30 @@ test('npm-pakken følger CLI-kontrakten og får motorens plugin-SDK og kommandob
   const own = JSON.parse(await fs.readFile(path.join(repo, 'package.json'), 'utf8'));
   const desktop = JSON.parse(await fs.readFile(path.join(repo, 'desktop', 'package.json'), 'utf8'));
   // De direkte afhængigheder har samme præcise versioner som desktopappen, så CLI'en og appen starter den samme motor med det samme
-  // plugin-SDK. Deres egne afhængigheder er ikke låst i npm-pakken (se øverst).
+  // plugin-SDK. Den publicerbare låsefil skal være identisk med den kontrollerede kildefil.
   for (const name of ['@opencode-ai/plugin', '@anthropic-ai/sandbox-runtime']) assert.equal(own.dependencies?.[name], desktop.dependencies[name], name);
   assert.equal(own.dependencies['@opencode-ai/plugin'], VERSION);
+  assert.ok(files.has('npm-shrinkwrap.json'), 'den transitive låsefil kommer med i npm-pakken');
+  assert.deepEqual(files.get('npm-shrinkwrap.json'), await fs.readFile(path.join(repo, 'npm-shrinkwrap.json')));
+  assert.deepEqual(JSON.parse(files.get('npm-shrinkwrap.json')).packages[''].dependencies, own.dependencies);
+});
+
+test('den udpakkede CLI beholder sikkerhedsrettelserne fra shrinkwrap efter npm ci i pakkens rod', async t => {
+  if (unavailable) return t.skip(unavailable);
+  const lock = JSON.parse(await fs.readFile(path.join(installed, 'npm-shrinkwrap.json'), 'utf8'));
+  const request = createRequire(path.join(installed, 'package.json'));
+  const plugin = await dependency(request, '@opencode-ai/plugin');
+  const sandbox = await dependency(request, '@anthropic-ai/sandbox-runtime');
+  const effect = await dependency(plugin.require, 'effect');
+  const resolved = [effect, await dependency(effect.require, 'toml'), await dependency(plugin.require, 'zod'),
+    await dependency(sandbox.require, 'node-forge'), await dependency(sandbox.require, 'zod')];
+  for (const { manifest: { name, version } } of resolved) {
+    const locked = new Set(Object.entries(lock.packages).filter(([file]) => file === `node_modules/${name}` || file.endsWith(`/node_modules/${name}`)).map(([, pkg]) => pkg.version));
+    assert.ok(locked.has(version), `${name}@${version} skal være en af de kontrollerede versioner: ${[...locked].join(', ')}`);
+  }
+  // sandbox-runtime bruger fortsat v3-API'et. Den rettede Zod-pakke skal bevare denne indgang.
+  const { z } = sandbox.require('zod/v3');
+  assert.deepEqual(z.object({ command: z.string() }).parse({ command: 'syntetisk' }), { command: 'syntetisk' });
 });
 
 test('motorens plugin-opstart lykkes fra den installerede pakke', async t => {

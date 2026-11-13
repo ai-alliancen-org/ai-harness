@@ -22,14 +22,14 @@ På Windows erstattes projektstien med fx `C:\Projekter\Min app`. Både CMD og P
 
 Installationen henter den relevante, versionslåste OpenCode-motor som en valgfri npm-afhængighed. Aura ændrer ikke din øvrige OpenCode-opsætning. `doctor` kontrollerer, at motorversionen er præcis den forventede, og forklarer, hvis npm har udeladt den. Du kan også angive en eksisterende motor med `HARNESS_OPENCODE_PATH`. Node, Git, Docker og projektets pakker installeres ikke ved opstart.
 
-Hvis du vil have kommandoen `aura` til rådighed fra andre mapper, kan du efter den lokale installation køre:
+Fra andre mapper kan du efter den lokale installation starte den samme kontrollerede installation med dens fulde sti:
 
 ```sh
-npm install --global . --ignore-scripts --no-audit --no-fund
-aura doctor
+node "/sti/til/aura/cli/aura.cjs" doctor
+node "/sti/til/aura/cli/aura.cjs" chat "/sti/til/mit projekt"
 ```
 
-En administrator kan i stedet distribuere en gennemgået lokal npm-pakke. Pakken er ikke publiceret i npm-registret; brug ikke en tilfældig pakke med et lignende navn. Brug heller ikke administratorrettigheder blot for at omgå organisationens installationspolitik.
+Det bevarer de afhængigheder, `npm ci` har installeret fra `npm-shrinkwrap.json`. En global installation fra repositoryet er ikke kvalificeret til at bevare sikkerhedsrettelserne. Næste CLI-pakkes låste installationsvej står i [udkastet til næste udgivelse](../docs/releases/cli-naeste-udkast.md). Pakken er ikke publiceret i npm-registret; brug ikke en tilfældig pakke med et lignende navn. Brug heller ikke administratorrettigheder blot for at omgå organisationens installationspolitik.
 
 ## Første projekt
 
