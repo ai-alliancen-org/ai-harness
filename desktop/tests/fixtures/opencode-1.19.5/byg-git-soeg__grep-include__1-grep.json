@@ -1,0 +1,94 @@
+{
+ "opencode": "1.19.5",
+ "aura": "1cfa7a6+ændringer",
+ "scenario": "byg-git-soeg",
+ "outcome": "idle",
+ "case": "grep-include",
+ "askIndex": 1,
+ "asksInStep": 1,
+ "layout": {
+  "mode": "build",
+  "git": true,
+  "copy": false,
+  "model": "kontraktmodel",
+  "worktree": "${ROOT}",
+  "directory": "${ROOT}"
+ },
+ "sequence": [
+  "del:pending",
+  "spørg:grep",
+  "del:running",
+  "svar:once",
+  "del:completed"
+ ],
+ "request": {
+  "id": "per_1c4c67e70001IYO43h95W2aLRg",
+  "sessionID": "ses_e3b398532ffeoRuSmwWI1ujThB",
+  "permission": "grep",
+  "patterns": [
+   "useState"
+  ],
+  "metadata": {
+   "pattern": "useState",
+   "include": "*.js"
+  },
+  "always": [
+   "*"
+  ],
+  "tool": {
+   "messageID": "msg_1c4c67e66001dI1eh4cJ6iMQ3S",
+   "callID": "kald-3-0"
+  }
+ },
+ "toolPartAtAsk": {
+  "status": "pending",
+  "tool": "grep",
+  "input": {}
+ },
+ "policyInput": {
+  "id": "per_1c4c67e70001IYO43h95W2aLRg",
+  "sessionID": "ses_e3b398532ffeoRuSmwWI1ujThB",
+  "permission": "grep",
+  "patterns": [
+   "useState"
+  ],
+  "metadata": {
+   "pattern": "useState",
+   "include": "*.js"
+  },
+  "always": [
+   "*"
+  ],
+  "tool": {
+   "messageID": "msg_1c4c67e66001dI1eh4cJ6iMQ3S",
+   "callID": "kald-3-0"
+  },
+  "toolInput": {
+   "tool": "grep",
+   "input": {}
+  }
+ },
+ "recordedAura": {
+  "allowed": false,
+  "source": null,
+  "label": "Læsning: ${ROOT}/*",
+  "target": "${ROOT}/*",
+  "match": {
+   "kind": "grep",
+   "targets": [
+    {
+     "path": "${ROOT}",
+     "subtree": true
+    }
+   ]
+  },
+  "persistable": false,
+  "projectFile": false,
+  "scratch": false,
+  "folder": "${ROOT}",
+  "blockedMode": false
+ },
+ "toolResult": [
+  "Found 1 matches\n${ROOT}/src/app.js:\n  Line 1: const [a] = useState(0); // NEEDLE\n"
+ ]
+}

@@ -1,0 +1,89 @@
+{
+ "opencode": "1.19.5",
+ "aura": "1cfa7a6+ændringer",
+ "scenario": "byg-uden-git-soeg",
+ "outcome": "idle",
+ "case": "webfetch",
+ "askIndex": 1,
+ "asksInStep": 1,
+ "layout": {
+  "mode": "build",
+  "git": false,
+  "copy": false,
+  "model": "kontraktmodel",
+  "worktree": "/",
+  "directory": "${ROOT}"
+ },
+ "sequence": [
+  "del:pending",
+  "spørg:webfetch",
+  "del:running",
+  "svar:once",
+  "del:completed"
+ ],
+ "request": {
+  "id": "per_1c4c68cf80015nfZCgvTkMZFS1",
+  "sessionID": "ses_e3b3979f3ffe5KHrNXt25TaWnK",
+  "permission": "webfetch",
+  "patterns": [
+   "http://127.0.0.1:55542/side"
+  ],
+  "metadata": {
+   "url": "http://127.0.0.1:55542/side",
+   "format": "text"
+  },
+  "always": [
+   "*"
+  ],
+  "tool": {
+   "messageID": "msg_1c4c68cf00015g9EVHdgIg0BPp",
+   "callID": "kald-24-0"
+  }
+ },
+ "toolPartAtAsk": {
+  "status": "pending",
+  "tool": "webfetch",
+  "input": {}
+ },
+ "policyInput": {
+  "id": "per_1c4c68cf80015nfZCgvTkMZFS1",
+  "sessionID": "ses_e3b3979f3ffe5KHrNXt25TaWnK",
+  "permission": "webfetch",
+  "patterns": [
+   "http://127.0.0.1:55542/side"
+  ],
+  "metadata": {
+   "url": "http://127.0.0.1:55542/side",
+   "format": "text"
+  },
+  "always": [
+   "*"
+  ],
+  "tool": {
+   "messageID": "msg_1c4c68cf00015g9EVHdgIg0BPp",
+   "callID": "kald-24-0"
+  },
+  "toolInput": {
+   "tool": "webfetch",
+   "input": {}
+  }
+ },
+ "recordedAura": {
+  "allowed": false,
+  "source": null,
+  "label": "Hjemmeside: http://127.0.0.1:55542",
+  "target": "http://127.0.0.1:55542",
+  "match": {
+   "kind": "webfetch",
+   "origin": "http://127.0.0.1:55542"
+  },
+  "persistable": true,
+  "projectFile": false,
+  "scratch": false,
+  "folder": null,
+  "blockedMode": false
+ },
+ "toolResult": [
+  "Lokal side til webfetch-prøven.\n"
+ ]
+}

@@ -60,7 +60,10 @@ class KomplaiPreview {
   /** Projektets app: oprettet fra forhåndsvisningen eller senest valgt i Udgiv. */
   async link(root) {
     const project = await this.store.project(root);
-    const last = project.deploymentLast, config = project.deploymentConfig;
+    const last = project.deploymentLast, config = project.deploymentConfig, created = project.deploymentCreatedApp;
+    // En app, komplai oprettede ved et afvist forsøg, er den app, næste udgivelse går til, så længe den er projektets valgte
+    // destination (samme regel som deployments.cjs, state().createdApp). Forhåndsvisningen følger den (RN:D2-3).
+    if (created?.appId && config?.provider === 'komplai' && config.appId === created.appId) return { appId: created.appId, name: created.name || null };
     const appId = last?.config?.provider === 'komplai' ? last.appId || last.config.appId : config?.provider === 'komplai' ? config.appId : null;
     return appId ? { appId, name: last?.config?.provider === 'komplai' ? last.target?.name || null : null } : project.komplaiApp?.appId ? project.komplaiApp : null;
   }

@@ -79,7 +79,8 @@ test('Komplai Run når kun motoren efter tilvalg og fjernes igen ved fravalg', a
 });
 
 // Samme regler som OpenCodes tilladelser: * rammer alt, også skråstreger, og den sidste regel, der passer, gælder.
-// Mønstrene er afprøvet mod den rigtige OpenCode 1.18.33 med scripts/verify-app-skills.cjs.
+// Mønstrene blev afprøvet mod den rigtige OpenCode 1.18.33 med scripts/verify-app-skills.cjs, før Auras læsevagt kom ind (dce68ea).
+// Siden da svarer læsevagten først for references/, .env og .git, så den prøve ser ikke længere OpenCodes egne afvisninger af dem.
 const match = (text, pattern) => new RegExp('^' + pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.') + '$', 's').test(text);
 function decide(rules, text) { let result = 'ask'; for (const [pattern, action] of Object.entries(typeof rules === 'string' ? { '*': rules } : rules)) if (match(text, pattern)) result = action; return result; }
 
@@ -99,7 +100,8 @@ test('læseregler virker med stier i forhold til Git-roden og uden Git', () => {
   assert.equal(decide(policy.read, 'referencer/ok.md'), 'allow', 'kun mappen references er privat');
   // Mappen uden for projektet: kun skillmappen er åben. Filer der kan ikke ændres.
   assert.equal(decide(policy.external_directory, `${engine}/config/skills/harness-kodestil/references/*`), 'allow');
-  assert.equal(decide(policy.external_directory, `${engine}/data/*`), 'ask');
+  // Motorens egne data (opencode.db, store.json) er spærret for AI'en (årsag 2); kun skills og tool-output er åbne.
+  assert.equal(decide(policy.external_directory, `${engine}/data/*`), 'deny');
   assert.equal(decide(policy.external_directory, '/Users/test/Documents/andet/*'), 'ask');
   assert.equal(decide(policy.edit, git.skill), 'deny');
   assert.equal(decide(policy.edit, '.git/hooks/pre-commit'), 'deny');

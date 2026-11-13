@@ -455,6 +455,9 @@ body.setup-guided .app-content { margin-left: 0; }
 .composer-status { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-size: 11px; color: var(--muted); margin: 0 20px 8px; min-height: 15px; }
 .composer-status #draft-status { margin: 0; }
 /* Kontekstmålingen står i statuslinjens detaljer. Første lag viser kun denne advarsel nær grænsen. */
+.approve-all-status { color: var(--warning-ink); }
+.approve-all-status[hidden] { display: none; }
+.approve-all-status .text-button { padding: 0 4px; }
 .context-warning { color: var(--warning-ink); }
 .context-warning[hidden] { display: none; }
 /* Funktioner: én kontakt pr. funktion som i en cookie-dialog. Anbefalet står først og er markeret. */
@@ -522,13 +525,18 @@ body.sidebar-collapsed .settings-icon { display: inline-flex; }
 body.sidebar-overlay { --sidebar: 60px; }
 body.sidebar-overlay .sidebar { width: 216px; z-index: 30; box-shadow: 0 12px 40px color-mix(in srgb, var(--shadow) 20%, transparent); background: var(--tint-subtle); }
 
-/* Arbejdsfladen: fire faner ved siden af samtalen. Fanerne ligger oven på hinanden, så skjulte faner bevarer deres tilstand. */
+/* Arbejdsfladen: seks faner ved siden af samtalen. Panelerne ligger oven på hinanden, så skjulte faner bevarer deres tilstand. */
 .work-surface { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--canvas); container: work / inline-size; }
-.work-tabs { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; min-height: 46px; padding: 6px 12px; border-bottom: 1px solid var(--line); background: var(--surface); }
-.work-tab { position: relative; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: var(--muted); font-size: 12px; font-weight: 600; line-height: 1.4; white-space: nowrap; }
+/* Fanerne står altid på én linje og ruller sidelæns, når der ikke er plads (beslutningen 3. november 2026); de brydes aldrig.
+   En fadet kant viser, i hvilken retning der er flere faner: skyggerne står fast i kanterne (scroll), og dækfladerne ruller med
+   indholdet (local) og dækker skyggen, når striben er rullet helt til den side. Uden noget at rulle er begge skygger dækket. */
+.work-tabs { display: flex; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: thin; align-items: center; gap: 4px; min-height: 46px; padding: 6px 12px; border-bottom: 1px solid var(--line);
+  background: linear-gradient(to right, var(--surface) 45%, transparent) left center / 28px 100% no-repeat local, linear-gradient(to left, var(--surface) 45%, transparent) right center / 28px 100% no-repeat local,
+    linear-gradient(to right, color-mix(in srgb, var(--shadow) 22%, transparent), transparent) left center / 14px 100% no-repeat scroll, linear-gradient(to left, color-mix(in srgb, var(--shadow) 22%, transparent), transparent) right center / 14px 100% no-repeat scroll, var(--surface); }
+.work-tab { flex: none; position: relative; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: var(--muted); font-size: 12px; font-weight: 600; line-height: 1.4; white-space: nowrap; }
 .work-tab:hover:not([aria-selected="true"]):not(:disabled) { background: var(--control-hover); border-color: transparent; color: var(--ink); }
 .work-tab[aria-selected="true"] { background: var(--tint); border-color: var(--accent-line); color: var(--accent-text); }
-/* I et smalt panel rykker fanerne tættere, så alle fire står på én linje ved 980 px. Bliver der for lidt plads, brydes de. */
+/* I en smal arbejdsflade rykker fanerne tættere sammen, så flere af dem kan ses på én gang. */
 @container work (max-width: 430px) { .work-tabs { gap: 2px; padding: 6px 8px; } .work-tab { padding: 6px 6px; } .panel-bar { padding-left: 12px; padding-right: 8px; } .panel-scroll, .code-view { padding-left: 14px; padding-right: 14px; } }
 /* Mærket ligger oven på fanens hjørne, så fanerne ikke flytter sig, når det dukker op. */
 .tab-badge { position: absolute; top: -5px; right: -5px; display: inline-grid; place-items: center; min-width: 17px; height: 17px; padding: 0 4px; border: 2px solid var(--surface); border-radius: 999px; background: var(--accent); color: var(--on-accent); font-size: 9.5px; font-weight: 700; line-height: 1; box-sizing: border-box; }
@@ -1283,3 +1291,16 @@ body.key-window { padding: 20px 22px; background: var(--surface); }
 .appearance-preview > i:last-child { margin: 9px; border: 1px solid var(--line); border-radius: 5px; background: linear-gradient(var(--line-strong) 0 0) 8px 8px / 55% 4px no-repeat, linear-gradient(var(--line) 0 0) 8px 16px / 38% 4px no-repeat, linear-gradient(var(--accent) 0 0) right 7px bottom 7px / 22px 8px no-repeat, var(--surface); }
 /* Cloudflares logo har sort skrift og står på en lys plade i mørkt tema. */
 @media (prefers-color-scheme: dark) { img[src$="provider-cloudflare.png"] { padding: 3px; border-radius: 6px; background: #fff; } }
+
+/* Fanen Overblik */
+.overview-body { padding: 20px 22px 32px; max-width: 760px; display: grid; gap: 18px; }
+.overview-lead p { font-size: 15px; line-height: 1.6; margin: 0 0 8px; color: var(--ink); }
+.overview-diagram { border: 1px solid var(--line); border-radius: 12px; padding: 10px; background: var(--surface); overflow-x: auto; }
+.overview-diagram svg { width: 100%; height: auto; min-width: 520px; }
+.so-box { fill: var(--surface); stroke: var(--line); stroke-width: 1.2; }
+.so-app { stroke: var(--accent); } .so-ai { stroke: var(--warning); stroke-width: 2; }
+.so-title { font: 600 13px system-ui, sans-serif; fill: var(--ink); } .so-sub { font: 11px system-ui, sans-serif; fill: var(--muted); }
+.so-line { stroke: var(--muted); stroke-width: 1.4; fill: none; }
+.overview-details > summary { cursor: pointer; font-weight: 600; margin-bottom: 10px; }
+.overview-section h3 { font-size: 13px; margin: 14px 0 6px; } .overview-list { margin: 0; padding-left: 18px; line-height: 1.6; }
+.overview-meta { color: var(--muted); font-size: 12px; }

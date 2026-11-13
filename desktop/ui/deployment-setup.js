@@ -11,7 +11,12 @@
   const titles = { setupConnection: 'Forbind din konto', setupChoice: 'Vælg destination', promteHost: 'Hvor logger du ind med Promte?', promteNotReady: 'Appen er ikke klar til Promte endnu.', promteWorkspace: 'Hvilket arbejdsområde skal modtage appen?', pagesRepository: 'Hvor ligger dit projekt på GitHub?', pagesBranch: 'Hvilken branch vil du udgive?', cloudflareAccount: 'Hvilken Cloudflare-konto bruger du?', cloudflareProject: 'Hvilket Pages-projekt vil du opdatere?', setupConfiguration: 'Gør projektet klar til udgivelse', setupConfigReview: 'Gennemgå opsætningsfilerne', vercelMethod: 'Hvordan vil du bruge Vercel?', vercelGit: 'Forbind dit Git-projekt', tracking: 'Udgivelser fra Git' };
   const names = Object.fromEntries(providers.map(([id, name]) => [id, name]));
   const stateLabels = { READY: 'Udgivet', ERROR: 'Udgivelse fejlede', CANCELED: 'Annulleret', BLOCKED: 'Kræver handling', REJECTED: 'Afvist', QUEUED: 'I kø', BUILDING: 'Bygger', INITIALIZING: 'Forbereder', PREPARED: 'Upload afventer', REVIEWING: 'Under gennemgang', SUBMITTING: 'Udgivelse afventer', UNKNOWN: 'Kontrollér status', AWAITING_UPDATE: 'Afventer udgivelsen', UPLOADED: 'Upload modtaget', REPLACED: 'Nyere version udgivet', UNPUBLISHED: 'Ikke udgivet', REMOVED: 'Fjernet' };
-  const logo = id => `provider-${id}.${id === 'cloudflare' ? 'png' : 'svg'}`;
+  const logos = new Map([
+    ['azure', 'provider-azure.svg'], ['cloudflare', 'provider-cloudflare.png'],
+    ['github-pages', 'provider-github-pages.svg'], ['komplai', 'provider-komplai.svg'],
+    ['promte', 'provider-promte.svg'], ['vercel', 'provider-vercel.svg']
+  ]);
+  const logo = id => logos.get(id);
   window.DeploymentSetupUI = { titles, mount({ api, go, back, busy, rows, heading, invalidate, chooseProvider, prepareReview, input, receipt, openDialog }) {
     const dialog = $('#deployment-dialog');
     const choiceSteps = { 'azure-subscription': 'azureSubscription', 'azure-app': 'azureApp', 'vercel-team': 'vercelTeam', 'vercel-project': 'vercelProject' };
@@ -20,7 +25,11 @@
     let promteSaved = '', promteHost = '';
     const normalizedHost = value => { try { const url = new URL(value); return url.protocol === 'https:' && !url.username && !url.password ? url.origin : ''; } catch { return ''; } };
     let choice = null, connection = null, configReview = null, gitProject = null, tracking = null, polling = null, loginID = null, epoch = 0, refreshing = false, trackingRoot = null, trackingError = false;
-    const provider = () => $('#deploy-provider').value;
+    const provider = () => {
+      const id = $('#deploy-provider').value;
+      if (!logos.has(id)) throw Error('Vælg en udbyder fra listen.');
+      return id;
+    };
     const pages = () => ['github-pages', 'cloudflare'].includes(provider());
     const act = (action, config = input(), extra = {}) => api('deploymentSetup', { action, config, ...extra });
     const open = (kind, id = provider()) => api('deploymentSetupOpen', { provider: id, kind, config: input() });
@@ -206,13 +215,24 @@
       go('files');
     });
     bind('#deployment-promte-logout', async () => { await act('promte-logout'); await loadConnection(); });
+    // Beskeden kan kun sættes i skrivefeltet, når samtalen ikke arbejder, og feltet er tomt (draftMessage i app.js). Ellers slås
+    // Promte-integrationen ikke til, og Udgiv siger hvorfor, så Gør klar ikke ændrer projektet, uden at beskeden sendes (Q:B2-3).
+    // Send er også slået fra, mens projektet åbnes; så siges det, og ikke at AI’en arbejder (window.projectLoading i app.js).
+    const promteBlocked = () => $('#stop').hidden && window.projectLoading?.() ? 'Projektet åbnes stadig. Vent, til det er klar, og vælg så Gør klar til Promte igen.'
+      : !$('#stop').hidden || $('#send').disabled ? 'AI’en arbejder i denne samtale. Vent, til den er færdig, og vælg så Gør klar til Promte igen.'
+      : $('#prompt').value.trim() ? 'Din kladde står i skrivefeltet. Send eller ryd den, og vælg så Gør klar til Promte igen.' : '';
     // Brugerens byggehandling bruger Promte-skillen og den normale afsendelse med eventuelt modelsamtykke.
     bind('#deployment-promte-prepare', async () => {
       const owner = typeof selectedOwner === 'function' ? selectedOwner() : null;
+      const blocked = promteBlocked(); if (blocked) throw Error(`${blocked} Intet er ændret endnu.`);
       await api('featuresSave', { scope: 'projekt', values: { 'integration-promte': true } }); await window.refreshFeatures?.();
       if (!dialog.open || owner?.root !== selectedOwner()?.root || owner?.chat !== selectedOwner()?.chat) return;
+      // Startede en opgave, mens integrationen blev slået til, siges det ærligt: integrationen er slået til, beskeden er ikke sendt.
+      const late = promteBlocked(); if (late) throw Error(`Promte-integrationen er slået til for projektet, men beskeden er ikke sendt. ${late}`);
       // Beskeden skrives, når dialogen er lukket, så fokus ender i skrivefeltet og ikke på Udgiv.
-      dialog.addEventListener('close', () => window.draftMessage?.('Brug projektets Promte-skill til at gøre appen klar til udgivelse hos Promte. Behold indhold, design og funktioner. Gennemfør ændringerne, og kontrollér resultatet.', 'Promte er valgt. AI’en gør appen klar til udgivelse.', { mode: 'free', submit: true, owner }), { once: true });
+      // Noten står, når beskeden er sat i skrivefeltet, også hvis afsendelsen venter. Den siger derfor kun det, der er sket.
+      // En kladde eller en samtale, der arbejder, giver i stedet sin egen besked fra draftMessage i app.js.
+      dialog.addEventListener('close', () => window.draftMessage?.('Brug projektets Promte-skill til at gøre appen klar til udgivelse hos Promte. Behold indhold, design og funktioner. Gennemfør ændringerne, og kontrollér resultatet.', 'Promte-integrationen er slået til for projektet. Beskeden om at gøre appen klar til Promte står i skrivefeltet.', { mode: 'free', submit: true, owner }), { once: true });
       dialog.close();
     });
     bind('#deployment-promte-other', () => back());
@@ -280,14 +300,29 @@
     }
     function statusText(value) {
       if (value?.automatic) return `Vercel · ${value.latest ? stateLabels[value.latest.state] || 'Kontrollér status' : 'Følger Git'}`;
-      const r = value?.last; if (r?.checks?.provider?.status === 'unknown') return `${names[r.config.provider] || 'Udgivelse'} · Status kunne ikke hentes`; return r ? `${names[r.config.provider] || 'Udgivelse'} · ${stateLabels[r.state] || 'Kontrollér status'}` : '';
+      const r = value?.last; if (!r) return '';
+      const name = names[r.config.provider] || 'Udgivelse', view = window.ShareView;
+      if (r.checks?.provider?.status === 'unknown') return `${name} · ${['login', 'organisation'].includes(r.checks.provider.reason) ? 'Log ind igen' : 'Status kunne ikke hentes'}`;
+      // Topknappen siger det samme som kortet: en kontrolleret adresse, der ikke svarer, er ikke en færdig udgivelse.
+      if (view.notReady(r)) return `${name} · Appen er ikke klar endnu`;
+      return `${name} · ${r.state === 'READY' && view.addressUnchecked(r) ? view.UNCHECKED : stateLabels[r.state] || 'Kontrollér status'}`;
+    }
+    // Farven følger kortets tone: kun en bekræftet udgivelse, hvis adresse svarer, står grønt (READY i styles.css).
+    // En adresse, der ikke svarer, står som advarsel (UNKNOWN), og en adresse, der ikke er kontrolleret, står neutralt.
+    function headerState(error) {
+      const r = tracking?.last;
+      if (error || r?.checks?.provider?.status === 'unknown') return 'UNKNOWN';
+      if (tracking?.automatic) return tracking?.latest?.state || r?.state || '';
+      if (r && window.ShareView.notReady(r)) return 'UNKNOWN';
+      if (r?.state === 'READY' && window.ShareView.addressUnchecked(r)) return 'UPLOADED';
+      return r?.state || '';
     }
     function renderHeader(error = trackingError) {
       const button = $('#deployment-status'), has = Boolean(tracking?.automatic || tracking?.last);
       button.hidden = !has || !window.sharingOn?.() || !trackingRoot;
       button.disabled = $('#deploy-button').disabled;
       button.textContent = error ? 'Udgivelse · Status kunne ikke hentes' : statusText(tracking);
-      button.dataset.state = error || tracking?.last?.checks?.provider?.status === 'unknown' ? 'UNKNOWN' : tracking?.latest?.state || tracking?.last?.state || '';
+      button.dataset.state = headerState(error);
       button.title = tracking?.automatic ? 'Se status for udgivelser fra Git' : 'Se seneste udgivelse';
     }
     async function refresh(remote = false) {
@@ -325,7 +360,7 @@
     window.addEventListener('aura:project', event => projectChanged(event.detail?.root));
     new MutationObserver(() => renderHeader()).observe($('#deploy-button'), { attributes: true, attributeFilter: ['hidden', 'disabled'] });
     window.addEventListener('aura:features', () => renderHeader());
-    setInterval(() => { if (trackingRoot && !document.hidden && !$('#workspace').hidden && window.sharingOn?.() && (tracking?.automatic || tracking?.last?.id)) refresh(true).catch(() => {}); }, 30000);
+    setInterval(() => { if (trackingRoot && !document.hidden && !$('#workspace').hidden && window.sharingOn?.() && (tracking?.automatic || (tracking?.last?.id && tracking.last.config?.provider !== 'komplai'))) refresh(true).catch(() => {}); }, 30000);
     dialog.addEventListener('close', () => { void cancelPromteLogin(); ++epoch; clearTimeout(polling); if (loginID) api('hostingCancel').catch(() => {}); loginID = null; configReview = null; });
     providerList();
     return { choose, config, restore, opened, refresh, configurationStep, pages, panel: step => choices.has(step) ? 'setupChoice' : step, render(step) { if (step !== 'setupConnection' && loginID) { clearTimeout(polling); loginID = null; api('hostingCancel').catch(() => {}); } if (step === 'options') $('#deployment-save-settings').hidden = provider() === 'komplai'; if (step === 'providers') providerList(); if (choices.has(step)) renderChoice(choices.get(step)); }, title: step => choices.get(step)?.title || titles[step], reset() { ++epoch; choices.clear(); choice = null; promteSaved = ''; promteHost = ''; promteNames.clear(); $('#deploy-promte-workspace').replaceChildren(); $('#deploy-promte-workspace-id').value = ''; providerList(); } };

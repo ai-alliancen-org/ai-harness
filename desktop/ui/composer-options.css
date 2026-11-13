@@ -1,0 +1,18 @@
+/* Samme semantiske farver og typografi som den eksisterende arbejdsflade. */
+#composer-mode { anchor-name: --composer-mode; }
+#model-chip { anchor-name: --composer-model; }
+.composer-options { width: min(360px, calc(100vw - 32px)); max-width: 360px; max-height: min(580px, calc(100vh - 100px)); overflow-y: auto; padding: 12px; }
+#composer-mode-menu { position-anchor: --composer-mode; inset: auto; bottom: anchor(top); right: anchor(right); margin: 0 0 8px; }
+#composer-model-menu { position-anchor: --composer-model; inset: auto; bottom: anchor(top); left: anchor(left); margin: 0 0 8px; }
+.composer-options .composer-options-title { display: block; padding: 4px 10px 8px; font-size: 13px; }
+.composer-options .composer-option { display: grid; gap: 4px; width: 100%; padding: 10px; border: 1px solid transparent; border-radius: 8px; }
+.composer-options .composer-option strong { font-size: 13px; }
+.composer-options .composer-option span { color: var(--muted); font-size: 12px; line-height: 1.5; }
+.composer-options .composer-option:hover { background: var(--fill); }
+.composer-options .composer-option[aria-pressed="true"] { background: var(--tint); border-color: var(--accent-line); }
+.composer-options label { margin: 10px 10px 4px; font-size: 12px; }
+.composer-options select { width: calc(100% - 20px); margin: 0 10px; }
+.plan-outline { margin: 12px 0; font-size: 12px; line-height: 1.5; }
+.plan-outline dt { margin-top: 8px; font-weight: 600; }
+.plan-outline dd { margin: 2px 0 0; color: var(--muted); }
+.answer-own { border-top: 1px solid var(--line-subtle); padding-top: 12px; }

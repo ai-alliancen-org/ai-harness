@@ -58,11 +58,14 @@ const helpers = require('./ui-test-helpers.cjs');
     // Et nyt projekt starter i Byg; se DESIGN.md. Opgaven bygges efter en plan, så prøven vælger Planlæg.
     assert.equal(await page.inputValue('#work-mode'), 'free'); await helpers.selectMode(page, 'plan');
     // 2. En AI-opgave gemmes automatisk som en version, og kortet tilbyder at fortryde den.
+    // Nye projekter godkender filændringer i projektet uden kort; versioner og fortryd er sikkerhedsnettet
+    // (docs/decisions.md, «Tilføjet under bygningen, 3. november 2026»). Samtalen kvitterer i stedet.
     await page.click('#send'); await page.waitForSelector('#data-dialog[open]'); await page.click('#accept-send');
     await page.waitForSelector('#plan-card:not([hidden])', { timeout: 60000 }); await page.waitForFunction(() => !document.querySelector('#build-plan').disabled);
     await page.click('#build-plan');
-    await helpers.approve(page, 'Tillad for denne opgave', { timeout: 60000 });
+    await page.locator('#messages .answer-record').filter({ hasText: '1 handling godkendt automatisk: projektets filer.' }).waitFor({ timeout: 60000 });
     await heading('Tre mødelokaler'); await helpers.resultOption(page, 'Fortryd opgaven', { timeout: 60000 });
+    assert.equal(await page.locator('#approvals').getByRole('button', { name: 'Afvis', exact: true }).count(), 0, 'en filændring i et nyt projekt giver intet godkendelseskort');
     assert.match((await log())[0], /^AI-opgave: Byg første udkast/); assert.equal(await clean(), true);
     await page.screenshot({ path: path.join(root, 'fortryd-tilbud.png'), animations: 'disabled' });
     // 3. Fortryd sætter filerne tilbage til før opgaven og gemmer det som en ny version.

@@ -38,6 +38,7 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     };
     if (!body.tools?.length) return reply({ content: 'Titel' });
     if (text.includes('hold-a')) { const release = () => reply({ content: 'Opgaven er afsluttet.' }); held.add(release); res.on('close', () => held.delete(release)); return; }
+    if (text.includes('resume-after-startup-stop')) return reply({ content: 'Start efter Stop virkede.' });
     if (body.messages.at(-1)?.role === 'tool') return reply({ content: 'Rettelsen er klar. Prøv siden.' });
     const code = text.includes('opgave-a') ? document('Projektets overskrift', 'Kontakt') : text.includes('opgave-c') ? document('Kopiens overskrift', 'Kontakt') : document('Før', 'Ny kontakt');
     const hasFramework = await fs.access(path.join(folder, 'package.json')).then(() => true, () => false);
@@ -86,7 +87,9 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     await helpers.taskOptions(page); await page.selectOption('#connection-select', connection.id); await page.locator('#model-shortlist button').first().click();
     await send('Ret overskriften. opgave-a'); await row('Ret overskriften').waitFor();
     await newChat();
-    assert.equal(await page.locator('#new').isDisabled(), true); assert.equal(await page.locator('#open').isDisabled(), true);
+    // Siden 0.6.0-beta.1 (5ffe905) kan Nyt projekt og Åbn projekt bruges, mens en anden samtale venter; se README og DESIGN.md.
+    assert.equal(await page.locator('#new').isEnabled(), true, 'Nyt projekt kan bruges, mens en anden samtale venter');
+    assert.equal(await page.locator('#open').isEnabled(), true, 'Åbn projekt kan bruges, mens en anden samtale venter');
     await send('Ret kontakten. opgave-b');
     await page.locator('#copy-notice:not([hidden])').waitFor();
     const copyRoot = await page.locator('#copy-path').textContent(), copyFile = path.join(copyRoot, 'public/index.html');
@@ -100,7 +103,12 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     assert.match(await fs.readFile(copyFile, 'utf8'), /Ny kontakt/); assert.match(await fs.readFile(path.join(project, 'public/index.html'), 'utf8'), /<h1>Før<\/h1>/);
     const blocked = await page.evaluate(async () => window.harness.chatMergeReview({})); assert.equal(blocked.ok, false); assert.match(blocked.error, /Vent på opgaven/);
     await page.locator('#copy-wait:not([hidden])').waitFor();
-    await page.locator('#run-review .check-pending').waitFor({ state: 'hidden' });
+    // Kontrollen efter opgaven genindlæser forhåndsvisningen én gang (checkPreview i ui/app.js). Vent på selve kontrollen i
+    // Aktivitet, så udfyldningen nedenfor ikke nulstilles af genindlæsningen. Markøren .check-pending findes ikke længere.
+    const checkedChat = await page.locator('#project-list .chat-row[aria-current="true"]').getAttribute('data-chat');
+    const previewChecked = async () => (await call('activityList', { chat: checkedChat })).some(entry => entry.title === 'Kontrol af forhåndsvisningen');
+    for (let n = 0; n < 300 && !await previewChecked(); n++) await wait(100);
+    assert.ok(await previewChecked(), 'kontrollen af forhåndsvisningen er kørt efter opgaven i kopien');
     await page.frameLocator('#preview').locator('input').fill('Kopiens navn');
     await newChat(); await helpers.selectMode(page, 'free'); await page.fill('#prompt', 'Arbejd videre i en kopi. hold-a'); await page.click('#send');
     await page.waitForFunction(() => document.querySelector('#data-dialog').open || !document.querySelector('#stop').hidden);
@@ -111,7 +119,7 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     await switchChat('Ret kontakten', copyRoot); assert.equal(await page.frameLocator('#preview').locator('input').inputValue(), 'Kopiens navn');
     await page.locator('#merge-copy:not([disabled])').waitFor(); assert.ok(held.size, 'en tredje samtale må arbejde i sin kopi under indfletningen');
     await page.click('#tab-code'); await page.locator('#code-files button[data-path="public/index.html"]').first().click();
-    assert.match(await page.locator('#code-lines').textContent(), /Ny kontakt/); assert.doesNotMatch(await page.locator('#code-lines').textContent(), /Projektets overskrift/);
+    await page.waitForFunction(() => /Ny kontakt/.test(document.querySelector('#code-lines')?.textContent || ''), null, { timeout: 15000 }); assert.match(await page.locator('#code-lines').textContent(), /Ny kontakt/); assert.doesNotMatch(await page.locator('#code-lines').textContent(), /Projektets overskrift/);
     await page.click('#tab-preview'); checks.push('kode og preview følger kopien; formularer bevares ved samtaleskift; indfletning afvises mens projektet arbejder');
     const icon = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/lS8AAAAASUVORK5CYII=', 'base64');
     await fs.writeFile(path.join(copyRoot, 'ikon.png'), icon);
@@ -289,11 +297,7 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     if (await row(originalChat).count()) await switchChat(originalChat, project);
     if (await page.isVisible('#stop')) { await page.click('#stop'); await page.locator('#stop').waitFor({ state: 'hidden' }); }
     checks.push(`rigtige ${frameworkName}-servere for projekt og kopi bruger forskellige porte; kopi og server ryddes, mens projektets server fortsætter; WebSocket til den anden server afvises`);
-    await newChat(); await helpers.selectMode(page, 'free'); await page.fill('#prompt', 'Stop under opstart. hold-a'); await page.click('#send');
-    await page.waitForFunction(() => document.querySelector('#data-dialog').open || !document.querySelector('#stop').hidden);
-    if (await page.locator('#data-dialog').evaluate(el => el.open)) await page.click('#accept-send');
-    await page.click('#stop'); await page.locator('#stop').waitFor({ state: 'hidden' }); await wait(1000);
-    assert.equal(await page.locator('#run-status').textContent(), 'Stoppet'); checks.push('Stop under opstart bliver ved med at være Stoppet og vises ikke som en fejl');
+    await require('./startup-cancellation-checks.cjs')({ app, page, project, root, requests, newChat, call, checks });
     assert.deepEqual(errors, []); assert.ok(singleImageChecks > 0, 'gennemgangen af ét billede uden modstykke skal faktisk være afprøvet'); await fs.writeFile(path.join(root, 'maalinger.json'), JSON.stringify(measurements, null, 2)); console.log(JSON.stringify({ status: 'bestået', root, checks, requests: requests.length, singleImageChecks, measurements }, null, 1));
   } catch (error) { await shot('fejl').catch(() => {}); console.error('Testmateriale: ' + root); console.error(error); console.error('Skærmstatus:', await page.evaluate(() => ({ focus: document.activeElement?.id, mergeDisabled: document.querySelector('#merge-copy')?.disabled, dialog: document.querySelector('#restore-dialog')?.open, message: document.querySelector('#message')?.textContent, status: document.querySelector('#run-status')?.textContent })).catch(() => null)); console.error('Serverens log:', await page.locator('#server-log').textContent().catch(() => 'ikke tilgængelig')); await fs.writeFile(path.join(root, 'requests.json'), JSON.stringify(requests)); throw error; }
   finally { for (const release of held) release(); await app?.close(); server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }

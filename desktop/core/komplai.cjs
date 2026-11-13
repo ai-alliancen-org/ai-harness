@@ -20,9 +20,11 @@ function organisation(entry) {
 async function json(url, { key, body, method = body ? 'POST' : 'GET', signal, fetcher = fetch } = {}) {
   let response;
   try { response = await fetcher(url, { method, redirect: 'error', signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(15000)]) : AbortSignal.timeout(15000), headers: { Accept: 'application/json', ...(key ? { Authorization: `Bearer ${key}` } : {}), ...(body ? { 'Content-Type': 'application/json' } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}) }); }
-  catch { throw new Error(signal?.aborted ? 'Login blev afbrudt.' : 'komplai kunne ikke kontaktes. Prøv igen, når forbindelsen virker.'); }
-  const bodyText = await readBounded(response, 2_000_000);
-  let data; try { data = JSON.parse(bodyText); } catch { throw new Error('Svaret fra komplai kunne ikke læses.'); }
+  // unreachable og unreadable skelner et kald, der ikke kom igennem, fra et svar, der ikke kunne læses (fx ved fjernelse i workbench.cjs).
+  catch { throw Object.assign(new Error(signal?.aborted ? 'Login blev afbrudt.' : 'komplai kunne ikke kontaktes. Prøv igen, når forbindelsen virker.'), { unreachable: !signal?.aborted }); }
+  let data;
+  try { const bodyText = await readBounded(response, 2_000_000); try { data = JSON.parse(bodyText); } catch { throw new Error('Svaret fra komplai kunne ikke læses.'); } }
+  catch (error) { throw Object.assign(error, { unreadable: true }); }
   if (!response.ok) { const error = new Error(messages[data.error] || (response.status === 401 ? messages.invalid_token : response.status === 403 ? messages.insufficient_scope : 'komplai kunne ikke gennemføre handlingen. Prøv igen.')); error.status = response.status; if (typeof data.error === 'string' && /^[a-z_]{1,50}$/.test(data.error)) error.code = data.error; throw error; }
   return data;
 }
@@ -108,29 +110,48 @@ class KomplaiLogin {
     try {
       const previous = (await store.read()).hosting?.komplai;
       await store.update(state => { state.hosting = { ...state.hosting, komplai: { secret: store.encrypt(result.secret), grantId: result.id, organisationId: organisation.id, organisationName: organisation.name, address: result.address, expiresAt: result.expiresAt } }; });
-      // En erstattet adgang tilbagekaldes, så den ikke ligger tilbage på serveren.
-      if (previous?.secret) await revokePublishing(store.decrypt(previous), this.baseURL, this.fetcher).catch(() => {});
+      // En erstattet adgang tilbagekaldes, så den ikke ligger tilbage på serveren. Kan den gamle adgang ikke læses på denne
+      // computer, kan den ikke tilbagekaldes herfra; den nye adgang gælder alligevel og må ikke rulles tilbage.
+      if (previous?.secret) await Promise.resolve().then(() => revokePublishing(store.decrypt(previous), this.baseURL, this.fetcher)).catch(() => {});
     } catch (error) { await revokePublishing(result.secret, this.baseURL, this.fetcher).catch(() => {}); throw error; }
     return publishingState(store);
   }
 
 }
+// Afviser komplai adgangen som ugyldig eller ukendt (401, 404 med fejlkoden not_found, invalid_token), er den allerede væk på serveren.
+// Så er tilbagekaldelsen lykkedes, og den lokale post kan slettes.
+// En 404 uden komplais egen fejlkode kan være en forkert rute eller adresse, så den tæller ikke som slettet.
+const alreadyGone = error => error?.status === 401 || (error?.status === 404 && error?.code === 'not_found') || error?.code === 'invalid_token';
+async function gone(request) {
+  try { return await request(); }
+  catch (error) { if (alreadyGone(error)) return { revoked: true, alreadyGone: true }; throw error; }
+}
 async function revokePublishing(secret, baseURL = API, fetcher = fetch) {
-  return json(`${baseURL}/publishing/session`, { method: 'DELETE', key: secret, fetcher });
+  return gone(() => json(`${baseURL}/publishing/session`, { method: 'DELETE', key: secret, fetcher }));
 }
 async function publishingState(store, now = Date.now()) {
   const saved = (await store.read()).hosting?.komplai;
   if (!saved?.secret) return { connected: false };
   return { connected: true, organisationId: saved.organisationId, organisationName: saved.organisationName, address: saved.address, expiresAt: saved.expiresAt, expired: Date.parse(saved.expiresAt) <= now };
 }
-/** Log ud tilbagekalder på serveren før den lokale sletning. Ved netværksfejl bevares adgangen, så det kan prøves igen. */
-async function disconnectPublishing(store, baseURL = API, fetcher = fetch) {
+/** Log ud tilbagekalder på serveren før den lokale sletning. Ved netværksfejl bevares adgangen, så det kan prøves igen. En adgang, komplai selv afviser, er allerede væk og slettes lokalt. */
+async function disconnectPublishing(store, baseURL = API, fetcher = fetch, { force = false } = {}) {
   const saved = (await store.read()).hosting?.komplai;
-  if (saved?.secret) await revokePublishing(store.decrypt(saved), baseURL, fetcher);
+  let revoked = !saved?.secret;
+  // «Fjern kun fra denne computer» (force): kan komplai ikke nås, eller kan adgangen ikke læses, fjernes kun den lokale
+  // adgang. Den kan så stadig være gyldig hos komplai, til den udløber, og svaret siger det med revoked: false.
+  if (saved?.secret) {
+    try {
+      let secret;
+      try { secret = store.decrypt(saved); } catch { throw new Error('Udgivelsesadgangen kan ikke læses på denne computer, så Aura kan ikke tilbagekalde den hos komplai. Du kan fjerne den fra denne computer.'); }
+      await revokePublishing(secret, baseURL, fetcher); revoked = true;
+    } catch (error) { if (!force) throw error; }
+  }
   await store.update(state => { if (state.hosting) delete state.hosting.komplai; });
-  return publishingState(store);
+  const state = await publishingState(store);
+  return force ? { ...state, revoked } : state;
 }
 async function disconnect(connection, key) {
-  return json(`${connection.baseURL.replace(/\/v1$/, '')}/session`, { method: 'DELETE', key });
+  return gone(() => json(`${connection.baseURL.replace(/\/v1$/, '')}/session`, { method: 'DELETE', key }));
 }
 module.exports = { API, ISSUER, KomplaiLogin, json, readBounded, disconnect, organisation, publishingState, disconnectPublishing, revokePublishing };

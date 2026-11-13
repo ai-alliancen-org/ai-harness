@@ -242,7 +242,7 @@ test('Promte sender præcis godkendt ZIP, isolerer uploadtoken og gemmer version
   const approvedZip = require('../core/komplai-publish.cjs').zip(original.files);
   assert.ok(uploaded.includes(approvedZip)); assert.equal(uploaded.indexOf(approvedZip), uploaded.lastIndexOf(approvedZip));
   assert.ok(reads.every(host => host === HOST));
-  assert.equal(calls.filter(c => c.url.startsWith('https://app.promte.dk')).length, 1);
+  assert.equal(calls.filter(c => new URL(c.url).origin === 'https://app.promte.dk').length, 1);
 });
 test('Promte blokerer udokumenteret uploadvært og efterlader en kontrollerbar version', async () => {
   const checkpoints = [];

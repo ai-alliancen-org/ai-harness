@@ -4,6 +4,7 @@
 const { createHash } = require('node:crypto');
 const { lineDiff, lineStats } = require('./diff.cjs');
 const { secretContent } = require('./git.cjs');
+const { fileState, isOpaque } = require('./changes.cjs');
 
 const hash = text => text === null || text === undefined ? null : createHash('sha256').update(text).digest('hex');
 const value = text => text === undefined ? null : text;
@@ -17,30 +18,35 @@ function taskAttribution(task, file) {
   if (!entry) return null;
   if (['direct', 'undo', 'merge'].includes(task.kind)) return 'dig';
   if (task.aiFiles?.has(file)) {
-    if (task.aiHashes?.has(file) && task.aiHashes.get(file) !== hash(value(entry.after))) return 'blandet';
+    // En binær fil eller en fil i et ældre tekstformat har ingen tekst efter; aiHash er hashen af det, AI'ens filværktøj ville se.
+    if (task.aiHashes?.has(file) && task.aiHashes.get(file) !== (entry.opaque ? entry.aiHash : hash(value(entry.after)))) return 'blandet';
     return 'ai';
   }
   return task.commands > 0 ? 'kommando' : 'anden';
 }
+// Indholdet før eller efter i en opgaves fil som hash: null, når filen ikke fandtes, og undefined, når Aura ikke kender det.
+const entryKey = (entry, side) => entry.binary ? (entry[`${side}Exists`] === false ? null : entry[`${side}Hash`] ?? undefined) : hash(value(entry[side]));
 // Hele samtalen: filen er kun AI'ens, hvis hver opgave, der ændrede den, startede fra det indhold, den forrige
-// efterlod, AI'en skrev den hver gang, og ingen har ændret den siden.
-function sessionAttribution(file, baseline, current, tasks) {
+// efterlod, AI'en skrev den hver gang, og ingen har ændret den siden. Indholdet sammenlignes som hash, så en binær fil eller
+// en fil i et ældre tekstformat kan følges på samme måde.
+function attribution(file, baselineKey, currentKey, tasks) {
   const touching = tasks.filter(task => task.files.some(item => item.file === file));
   if (!touching.length) return 'anden';
-  let expected = value(baseline), pure = true, ai = false, command = false, user = true;
+  let expected = baselineKey, pure = true, ai = false, command = false, user = true;
   for (const task of touching) {
     const entry = task.files.find(item => item.file === file);
-    const by = taskAttribution(task, file);
-    if (value(entry.before) !== expected) pure = false;
+    const by = taskAttribution(task, file), before = entryKey(entry, 'before'), same = before !== undefined && expected !== undefined && before === expected;
+    if (!same) pure = false;
     if (by === 'ai' || by === 'blandet') ai = true;
     if (by !== 'ai') pure = false;
     if (by === 'kommando') command = true;
-    if (by !== 'dig' || value(entry.before) !== expected) user = false;
-    expected = value(entry.after);
+    if (by !== 'dig' || !same) user = false;
+    expected = entryKey(entry, 'after');
   }
-  if (expected !== value(current)) { pure = false; user = false; }
+  if (expected === undefined || expected !== currentKey) { pure = false; user = false; }
   return pure ? 'ai' : ai ? 'blandet' : command ? 'kommando' : user ? 'dig' : 'anden';
 }
+const sessionAttribution = (file, baseline, current, tasks) => attribution(file, hash(value(baseline)), hash(value(current)), tasks);
 function fileSummary(file, before, after, by) {
   const stats = lineStats(before, after);
   return { file, change: change(before, after), added: stats.added, removed: stats.removed, by, secret: secret(before, after) };
@@ -52,14 +58,21 @@ function totals(files) {
 }
 
 function taskSummary(task) {
-  const files = sorted((task.files || []).map(entry => entry.binary ? { file: entry.file, change: !entry.beforeExists ? 'ny' : !entry.afterExists ? 'slettet' : 'ændret', added: 0, removed: 0, by: taskAttribution(task, entry.file), binary: true, secret: false } : fileSummary(entry.file, value(entry.before), value(entry.after), taskAttribution(task, entry.file))));
+  const files = sorted((task.files || []).map(entry => entry.binary ? { file: entry.file, change: !entry.beforeExists ? 'ny' : !entry.afterExists ? 'slettet' : 'ændret', added: 0, removed: 0, by: taskAttribution(task, entry.file), binary: true, ...(entry.opaque ? { opaque: true } : {}), secret: false } : fileSummary(entry.file, value(entry.before), value(entry.after), taskAttribution(task, entry.file))));
   return { id: task.id, kind: task.kind || 'ai', undone: Boolean(task.undone), label: task.label, mode: task.mode, status: task.status, startedAt: task.startedAt, endedAt: task.endedAt, commands: task.commands || 0, skipped: task.skipped || 0, unavailable: Boolean(task.unavailable), checkpoint: task.checkpoint ? { status: task.checkpoint.status, message: task.checkpoint.message } : null, files, totals: totals(files) };
 }
-// baseline og current er øjebliksbilleder fra changes.capture: { files: Map(sti → tekst), skipped }.
+// En binær fil eller en fil i et ældre tekstformat, der er ændret i samtalen, uden linje-diff. null, når den ikke er ændret.
+function opaqueSummary(file, baseline, current, tasks) {
+  const was = fileState(baseline, file), now = fileState(current, file);
+  if (was === undefined || now === undefined || was?.hash === now?.hash) return null;
+  return { file, change: was === null ? 'ny' : now === null ? 'slettet' : 'ændret', added: 0, removed: 0, by: attribution(file, was?.hash ?? null, now?.hash ?? null, tasks), binary: true, opaque: true, secret: false };
+}
+// baseline og current er øjebliksbilleder fra changes.capture: { files: Map(sti → tekst), skipped, skippedFiles, opaque }.
 function sessionSummary(baseline, current, tasks) {
-  const names = new Set([...baseline.files.keys(), ...current.files.keys()]);
+  const names = new Set([...baseline.files.keys(), ...current.files.keys(), ...(baseline.opaque?.keys() || []), ...(current.opaque?.keys() || [])]);
   const files = [];
   for (const file of names) {
+    if (isOpaque(baseline, current, file)) { const row = opaqueSummary(file, baseline, current, tasks); if (row) files.push(row); continue; }
     const before = value(baseline.files.get(file)), after = value(current.files.get(file));
     if (before === after || baseline.skippedFiles?.has(file) || current.skippedFiles?.has(file)) continue;
     files.push(fileSummary(file, before, after, sessionAttribution(file, before, after, tasks)));
@@ -74,4 +87,4 @@ function fileDetail(file, before, after, by) {
   return { file, change: change(value(before), value(after)), by, secret: hidden, added: diff.added, removed: diff.removed, approximate: diff.approximate, truncated: diff.truncated, skippedAfter: diff.skippedAfter, invisible: !hidden && !diff.hunks.length && value(before) !== value(after), hunks: hidden ? [] : diff.hunks };
 }
 
-module.exports = { taskSummary, sessionSummary, fileDetail, taskAttribution, sessionAttribution, hash };
+module.exports = { taskSummary, sessionSummary, opaqueSummary, fileDetail, taskAttribution, sessionAttribution, hash };

@@ -1,7 +1,7 @@
 {
   "name": "aura-desktop",
   "productName": "Aura",
-  "version": "0.7.0-beta.2",
+  "version": "0.7.0-beta.3",
   "private": true,
   "license": "EUPL-1.2",
   "feedback": {
@@ -24,6 +24,7 @@
     "test:chat-feedback": "node scripts/verify-chat-feedback.cjs",
     "test:conversation-progress": "node scripts/verify-conversation-progress.cjs",
     "test:layout": "node scripts/verify-layout.cjs",
+    "test:network-report": "node scripts/verify-network-report.cjs",
     "test:connections": "node scripts/verify-connections.cjs",
     "test:openai-azure": "node scripts/verify-openai-azure.cjs",
     "test:mistral": "node scripts/verify-mistral.cjs",
@@ -62,10 +63,12 @@
     "test:workspace": "node scripts/verify-workspace.cjs",
     "test:planning": "node scripts/verify-planning.cjs",
     "test:approvals": "node scripts/verify-approvals.cjs",
+    "test:approval-cards": "node scripts/verify-approval-cards.cjs",
     "test:preview-edit": "node scripts/verify-preview-edit.cjs",
     "test:history": "node scripts/verify-history.cjs",
     "test:chats": "node scripts/verify-chats.cjs",
     "test:concurrent": "node scripts/verify-concurrent.cjs",
+    "test:startup-cancel": "node scripts/verify-startup-cancellation.cjs",
     "test:project-list": "node scripts/verify-project-list.cjs",
     "test:output-limit": "node scripts/verify-output-limit.cjs"
   },
@@ -80,9 +83,21 @@
   "author": "AI Alliancen",
   "dependencies": {
     "@anthropic-ai/sandbox-runtime": "0.0.81",
-    "@opencode-ai/plugin": "1.18.33",
+    "@opencode-ai/plugin": "1.19.5",
     "electron-updater": "6.8.11",
     "pdfjs-dist": "6.4.299",
     "semver": "7.8.5"
+  },
+  "overrides": {
+    "effect": "4.0.0-beta.103",
+    "toml": "5.0.1",
+    "zod": "4.6.6",
+    "node-forge": "1.4.3",
+    "app-builder-lib": {
+      "minimatch@>=7 <11.0.1": "11.0.1"
+    },
+    "@electron/universal": {
+      "minimatch@>=7 <11.0.1": "11.0.1"
+    }
   }
 }

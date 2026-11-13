@@ -53,12 +53,13 @@ test('rigtig OS-isolation tillader projektarbejde og spærrer hemmeligheder, and
   await assert.rejects(fs.access(path.join(f.other, 'skrevet.txt')));
   assert.equal(await fs.readFile(path.join(f.scratch, 'ok.txt'), 'utf8'), 'ok');
 });
-test('rigtig netværksisolation afviser net uden for pakkeregistrene og direkte loopback', async t => {
+test('rigtig netværksisolation afviser net uden for pakkeregistrene (loopback er lukket, se b1-sandkasse)', async t => {
   if (!['darwin', 'linux'].includes(process.platform)) return t.skip('Denne platforms isolation understøttes ikke.');
   const f = await fixture(t);
   const result = await f.execute('/usr/bin/curl --max-time 5 --fail --silent --show-error https://example.com');
   assert.notEqual(result.code, 0); assert.match(result.stderr, /403|denied|refused|beskyttelse|isolation/i);
   const direct = await f.execute('/usr/bin/curl --noproxy "*" --max-time 3 --fail --silent --show-error http://127.0.0.1:9');
+  // Port 9 lytter ingen på, så forbindelsen afvises af maskinen; loopback er lukket (b1-sandkasse), så forbindelsen afvises uanset porten.
   assert.notEqual(direct.code, 0);
 });
 test('npm installerer en fast pakke i projektet gennem det tilladte register', async t => {
@@ -78,4 +79,64 @@ test('pakkens installationsscript og underprocesser har samme filgrænse', async
   const result = await f.execute('npm install --offline --no-audit --no-fund');
   assert.equal(result.code, 0, result.stderr);
   assert.deepEqual(JSON.parse(await fs.readFile(path.join(f.root, 'pakkescript-resultat.json'))), { read: false, write: false });
+});
+test('en lang sti til opgavens midlertidige mappe giver ikke EADDRINUSE: runnerens egen socket ligger i en kort, privat mappe', async t => {
+  if (!['darwin', 'linux'].includes(process.platform)) return t.skip('Denne platforms isolation understøttes ikke.');
+  // sandbox-runtime lytter på join(os.tmpdir(), 'srt-mux-<pid>-<n>.sock'). Et unix-socketnavn må højst være 104 byte på macOS og 108 på Linux,
+  // og Node afkorter et længere navn uden fejl. Er opgavens TMPDIR (<scratch>/tmp) én byte kortere end grænsen, peger det afkortede navn på
+  // selve mappen, og listen fejler med EADDRINUSE (fund 2 i gennemgangen af beta 3). Det sker fx for et projekt i en dyb OneDrive-mappe.
+  const limit = process.platform === 'darwin' ? 104 : 108;
+  const base = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), 'aura-sokkel-')));
+  t.after(() => fs.rm(base, { recursive: true, force: true }));
+  const name = limit - 6 - Buffer.byteLength(base);
+  if (name < 1) return t.skip(`Systemets midlertidige mappe er for lang til prøven: ${base}`);
+  const root = path.join(base, 'p'), scratch = path.join(base, 's'.repeat(name));
+  await fs.mkdir(root); await fs.mkdir(scratch);
+  assert.equal(Buffer.byteLength(path.join(scratch, 'tmp')), limit - 1);
+  const configured = await sandbox.prepare({ workspaceRoot: root, scratchRoot: scratch, directory: path.join(base, 'policy') });
+  // Kommandoen venter lidt, så runnerens korte mappe kan ses, mens den kører.
+  const payload = Buffer.from(JSON.stringify({ command: 'echo hej | tr a-z A-Z && printf %s "$TMPDIR" && sleep 1', cwd: configured.workspaceRoot })).toString('base64url');
+  // N:A-4: en anden isoleret kommando på samme maskine (fra Aura eller en anden prøve) har sin egen aura-srt-mappe i /tmp. Prøven kigger
+  // derfor kun efter denne runners mappe, som har runnerens proces-id i navnet. En fremmed mappe under kørslen må ikke give en fejl.
+  const foreign = await fs.mkdtemp('/tmp/aura-srt-anden-proeve-'); t.after(() => fs.rm(foreign, { recursive: true, force: true }));
+  const { spawn } = require('node:child_process');
+  const child = spawn(configured.node, [configured.runner, configured.policyPath, payload], { cwd: root, env: { PATH: process.env.PATH } });
+  const own = `aura-srt-${child.pid}-`, seen = new Set();
+  let stdout = '', stderr = '';
+  child.stdout.on('data', chunk => { stdout += chunk; }); child.stderr.on('data', chunk => { stderr += chunk; });
+  const exit = new Promise(resolve => child.once('exit', code => resolve(code)));
+  let done = false; exit.then(() => { done = true; });
+  while (!done) { for (const entry of await fs.readdir('/tmp')) if (entry.startsWith(own)) seen.add(entry); await new Promise(resolve => setTimeout(resolve, 25)); }
+  assert.equal(await exit, 0, stderr);
+  // Kommandoen får stadig opgavens egen midlertidige mappe.
+  assert.equal(stdout, 'HEJ\n' + path.join(configured.scratchRoot, 'tmp'));
+  // Runnerens korte mappe fandtes under kørslen og er fjernet igen. Den fremmede mappe er ikke rørt.
+  assert.equal(seen.size, 1, `runnerens egen mappe (${own}…) blev ikke set under kørslen`);
+  assert.deepEqual((await fs.readdir('/tmp')).filter(entry => entry.startsWith(own)), []);
+  await fs.access(foreign);
+});
+
+// N:A-2: på Linux lægger SRT også broerne til proxyen (claude-http-*.sock) i os.tmpdir() under initialize og binder dem ind i sandkassen, før
+// filsystemet lægges på. Auras denyRead ['/'] giver en tom tmpfs over /tmp, så socat i sandkassen ikke kan nå en bro i runnerens korte mappe.
+// Mappen skal derfor stå i allowRead på Linux. Prøven kører den rigtige runner med en attrap for sandbox-runtime og den platform, den angiver.
+for (const platform of ['linux', 'darwin']) test(`runnerens korte socketmappe på ${platform}: ${platform === 'linux' ? 'kan læses i sandkassen, så broen til proxyen kan nås' : 'politikken er uændret'}`, async t => {
+  if (!['darwin', 'linux'].includes(process.platform)) return t.skip('Denne platforms isolation understøttes ikke.');
+  const f = await fixture(t), work = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), 'aura-srt-attrap-')));
+  t.after(() => fs.rm(work, { recursive: true, force: true }));
+  const out = path.join(work, 'initialize.json'), stub = path.join(work, 'sandbox-runtime.mjs'), hooks = path.join(work, 'hooks.mjs'), register = path.join(work, 'register.mjs');
+  await fs.writeFile(stub, `import fs from 'node:fs'; import os from 'node:os';\nexport const SandboxManager = {\n  async initialize(config) { fs.writeFileSync(new URL('./initialize.json', import.meta.url), JSON.stringify({ platform: process.platform, tmpdir: os.tmpdir(), filesystem: config.filesystem })); },\n  isSandboxingEnabled: () => true,\n  async wrapWithSandboxArgv() { return { argv: ['/bin/sh', '-c', 'exit 0'], env: {} }; },\n  async reset() {},\n  async checkDependenciesAsync() { return { errors: [], warnings: [] }; }\n};\n`);
+  await fs.writeFile(hooks, `export async function resolve(specifier, context, next) { return specifier === '@anthropic-ai/sandbox-runtime' ? { url: new URL('./sandbox-runtime.mjs', import.meta.url).href, shortCircuit: true } : next(specifier, context); }\n`);
+  await fs.writeFile(register, `import { register } from 'node:module';\nregister(new URL('./hooks.mjs', import.meta.url));\nObject.defineProperty(process, 'platform', { value: process.env.AURA_TEST_PLATFORM });\n`);
+  const payload = Buffer.from(JSON.stringify({ command: 'true', cwd: f.configured.workspaceRoot })).toString('base64url');
+  await run(f.configured.node, ['--import', register, f.configured.runner, f.configured.policyPath, payload], { cwd: f.root, timeout: 30000, env: { PATH: process.env.PATH, AURA_TEST_PLATFORM: platform } });
+  const seen = JSON.parse(await fs.readFile(out, 'utf8')), policy = JSON.parse(await fs.readFile(f.configured.policyPath, 'utf8'));
+  assert.equal(seen.platform, platform);
+  // Socketmappen er kort og privat; den er fjernet igen efter kørslen.
+  assert.match(seen.tmpdir, /^\/tmp\/aura-srt-\d+-[A-Za-z0-9]+$/);
+  await assert.rejects(fs.access(seen.tmpdir));
+  assert.ok(policy.config.filesystem.denyRead.includes('/'), 'forudsætningen: alt andet end det tilladte er spærret for læsning');
+  const readable = seen.filesystem.allowRead.some(item => (item.path || item) === seen.tmpdir);
+  assert.equal(readable, platform === 'linux', platform === 'linux' ? 'broernes mappe kan læses i sandkassen' : 'macOS bruger porte, så politikken er uændret');
+  assert.deepEqual(seen.filesystem.allowRead.filter(item => (item.path || item) !== seen.tmpdir), policy.config.filesystem.allowRead, 'resten af politikken er uændret');
+  assert.deepEqual({ ...seen.filesystem, allowRead: null }, { ...policy.config.filesystem, allowRead: null });
 });

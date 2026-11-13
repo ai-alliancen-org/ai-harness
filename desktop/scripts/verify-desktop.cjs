@@ -64,6 +64,9 @@ const root = path.join(__dirname, '..', '..');
     assert.equal(await page.locator('#messages').textContent(), '');
     await page.fill('#prompt', '');
     const preview = page.frameLocator('#preview');
+    // Siden i forhåndsvisningen får sine mål lidt efter iframe-elementet, fordi rammen kører i sin egen proces. previewSize venter på
+    // sidens egne mål og fejler med den sidst sete størrelse, hvis de aldrig kommer (tests/c1-skaermmaal-vagt.test.cjs). Ventetiderne logges.
+    const { previewSize } = require('./ui-test-helpers.cjs'), waits = [];
     const all = await fs.readdir(testRoot); const projectDir=path.join(testRoot,all.find(x=>x.startsWith('projekt-')));
     const publicIndex=path.join(projectDir,'public/index.html');
     // Før første version viser ruden kun en pladsholder. Når siden er ændret, vises den rigtige side med logoet.
@@ -77,12 +80,14 @@ const root = path.join(__dirname, '..', '..');
     for (const [preset, w, h] of [['desktop',1920,1080],['tablet',768,1024],['phone',390,844]]) {
       await page.selectOption('#viewport-preset',preset);
       await page.waitForFunction(([w,h])=>{const f=document.querySelector('#preview');return f.clientWidth===w&&f.clientHeight===h;},[w,h]);
-      assert.deepEqual(await preview.locator('body').evaluate(()=>[innerWidth,innerHeight]),[w,h]);
+      assert.deepEqual(await previewSize(page, preview, [w, h], { waits }),[w,h]);
     }
+    // Modprøve i selve kørslen: vagten skal kunne fyre. Et bevidst forkert mål giver sidens målte 390 × 844, ikke målet.
+    assert.deepEqual(await previewSize(page, preview, [391, 844], { timeout: 500 }), [390, 844]);
     await require('./ui-test-helpers.cjs').previewOptions(page); await page.click('#viewport-rotate');
-    assert.deepEqual(await preview.locator('body').evaluate(()=>[innerWidth,innerHeight]),[844,390]);
+    assert.deepEqual(await previewSize(page, preview, [844, 390], { waits }),[844,390]);
     await page.fill('#viewport-width','1024'); await page.locator('#viewport-width').press('Tab');
-    assert.equal(await preview.locator('body').evaluate(()=>innerWidth),1024);
+    assert.deepEqual(await previewSize(page, preview, [1024], { waits }),[1024]);
     await page.keyboard.press('Escape');
     const divider=await page.locator('#workspace-divider').boundingBox();
     const originalWidth=(await page.locator('#chat-panel').boundingBox()).width;
@@ -99,6 +104,44 @@ const root = path.join(__dirname, '..', '..');
     assert.equal(await preview.locator('body').evaluate(()=>typeof window.harness),'undefined');
     assert.equal(await preview.locator('body').evaluate(()=>typeof require),'undefined');
     assert.equal(await preview.locator('body').evaluate(async()=>{try{await fetch('https://example.com');return true;}catch{return false;}}),false);
+    // K3: siden følger et link til et andet websted, som appens frame-src stopper, før nogen anmodning sendes. Chromium skal melde
+    // ERR_BLOCKED_BY_CSP (-30) for rammen, og rammen skal være bundet til projektets arbejdsmappe, så hændelsen gælder den. Brugeren
+    // får forklaringen, og ↻ henter siden igen.
+    await page.evaluate(() => { window.auraK3 = []; window.harness.onEvent(event => { if (['preview.failed', 'preview.diagnostic'].includes(event.type)) window.auraK3.push(event); }); });
+    await preview.locator('body').evaluate(() => { setTimeout(() => { location.href = 'https://www.borger.dk/'; }, 50); });
+    await page.locator('#preview-status').filter({ hasText: 'Andre websteder åbnes ikke her' }).waitFor({ timeout: 10000 });
+    // Konsolbeskeden og did-fail-load kommer hver for sig; begge skal være nået frem, før ↻ prøves.
+    await page.waitForFunction(() => ['preview.failed', 'preview.diagnostic'].every(type => window.auraK3.some(event => event.type === type)), null, { timeout: 10000 });
+    await page.waitForTimeout(500);
+    const k3 = await page.evaluate(() => window.auraK3), failed = k3.find(event => event.type === 'preview.failed');
+    assert.equal(failed.code, -30, JSON.stringify(k3));
+    assert.equal(failed.workspaceRoot && await fs.realpath(failed.workspaceRoot), await fs.realpath(projectDir), `rammen er bundet til projektets arbejdsmappe: ${JSON.stringify(k3)}`);
+    assert.ok(k3.some(event => event.type === 'preview.diagnostic' && event.diagnostic?.kind === 'navigation' && event.diagnostic.origin === 'https://www.borger.dk'), JSON.stringify(k3));
+    // Gennemgå forhåndsvisning står også af den blokerede forbindelse til example.com ovenfor; derfor afgør beskedens tekst, ikke knappen.
+    await page.waitForFunction(() => /borger\.dk/.test(document.querySelector('#server-diagnostics')?.textContent || ''), null, { timeout: 10000 });
+    assert.equal(await page.locator('#preview-problem').isVisible(), true);
+    await page.click('#refresh');
+    await preview.locator('h1').filter({ hasText: 'En levende fælleshave' }).waitFor({ timeout: 10000 });
+    await page.waitForFunction(() => !/borger\.dk/.test(document.querySelector('#server-diagnostics')?.textContent || ''), null, { timeout: 10000 });
+    await page.locator('#preview-status').filter({ hasText: 'Lokal forhåndsvisning' }).waitFor({ timeout: 10000 });
+    // Q:C2-2 (fund 22): en mappe uden / til sidst sendes videre til samme adresse med / (302 fra protokollen aura-preview), så sidens
+    // relative links peger ind i mappen, som hos GitHub Pages. Aura genindlæser siden, når filerne i public/ ændres (preview:revision);
+    // prøven venter på den genindlæsning, så navigationen ikke krydser den.
+    await preview.locator('body').evaluate(() => { window.auraFoerOm = true; });
+    await fs.mkdir(path.join(projectDir, 'public/om'), { recursive: true });
+    await fs.writeFile(path.join(projectDir, 'public/om/kontakt.html'), '<!doctype html><html lang="da"><meta charset="utf-8"><title>Kontakt</title><h1>Kontakt haven</h1></html>');
+    await fs.writeFile(path.join(projectDir, 'public/om/index.html'), '<!doctype html><html lang="da"><meta charset="utf-8"><title>Om haven</title><h1>Om haven</h1><a id="videre" href="kontakt.html">Kontakt</a></html>');
+    for (let i = 0; i < 100 && await preview.locator('body').evaluate(() => window.auraFoerOm === true).catch(() => true); i++) await page.waitForTimeout(100);
+    assert.equal(await preview.locator('body').evaluate(() => window.auraFoerOm === true), false, 'Aura genindlæste siden efter de nye filer');
+    await preview.locator('h1').filter({ hasText: 'En levende fælleshave' }).waitFor({ timeout: 10000 });
+    await preview.locator('body').evaluate(() => { location.href = '/om'; });
+    await preview.locator('h1').filter({ hasText: 'Om haven' }).waitFor({ timeout: 10000 });
+    assert.equal(await preview.locator('body').evaluate(() => location.pathname), '/om/', 'adressen har fået / til sidst');
+    await preview.locator('#videre').click();
+    await preview.locator('h1').filter({ hasText: 'Kontakt haven' }).waitFor({ timeout: 10000 });
+    assert.equal(await preview.locator('body').evaluate(() => location.pathname), '/om/kontakt.html', 'det relative link peger ind i mappen');
+    await page.click('#refresh');
+    await preview.locator('h1').filter({ hasText: 'En levende fælleshave' }).waitFor({ timeout: 10000 });
     await fs.rename(publicIndex, publicIndex + '.backup');
     await page.locator('#preview-status').filter({hasText:'Kan ikke læse siden'}).waitFor({timeout:10000});
     await fs.rename(publicIndex + '.backup', publicIndex);
@@ -123,6 +166,6 @@ const root = path.join(__dirname, '..', '..');
     await app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows().find(w => w.webContents.getURL().startsWith('harness://')).setSize(980,720));
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth <= window.innerWidth),true);
     assert.deepEqual(errors,[]);
-    console.log(JSON.stringify({passed:['designpakke genbrugt efter genstart og slettede originaler','projektoprettelse','annulleret dialog','logo og reference','ægte preview','automatisk opdatering fra disk','skærmstørrelser, rotation, egne mål, skalering og trækbar skillelinje','ingen Node eller IPC i preview','genåbning efter genstart','eksisterende projekt bevaret'],testRoot,projectDir,screenshots:[path.join(testRoot, 'opstart.png'),path.join(testRoot, 'arbejdsflade.png')]}));
+    console.log(JSON.stringify({passed:['designpakke genbrugt efter genstart og slettede originaler','projektoprettelse','annulleret dialog','logo og reference','ægte preview','automatisk opdatering fra disk','skærmstørrelser, rotation, egne mål, skalering og trækbar skillelinje','ingen Node eller IPC i preview','link til et andet websted forklares for sin egen arbejdsmappe, og ↻ henter siden igen','en mappe uden / sendes videre til mappen med /, og relative links virker','genåbning efter genstart','eksisterende projekt bevaret'],waits,testRoot,projectDir,screenshots:[path.join(testRoot, 'opstart.png'),path.join(testRoot, 'arbejdsflade.png')]}));
   } finally {if(app) await app.close().catch(()=>{});}
 })().catch(error=>{console.error(error);process.exitCode=1;});

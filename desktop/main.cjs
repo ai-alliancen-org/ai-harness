@@ -8,6 +8,8 @@ const { DevServer, inspect: inspectRuntime } = require('./core/dev-server.cjs');
 const { WorkspaceRegistry } = require('./core/workspaces.cjs');
 const { AsyncLocalStorage } = require('node:async_hooks');
 const { normalizeRuntimeConfig } = require('./core/project-runtime.cjs');
+// Den gemte opstart læses tolerant, så et projekt altid kan åbnes, også hvis den gemte opstart er ugyldig.
+const { storedRuntime, storedRuntimeNotice } = require('./core/preview-config.cjs');
 const { GitHub } = require('./core/github.cjs');
 const { Deployments } = require('./core/deployments.cjs');
 const { Publishing } = require('./core/publishing.cjs');
@@ -21,6 +23,8 @@ const { fileDetail } = require('./core/change-review.cjs');
 const { OwnTools } = require('./core/own-tools.cjs');
 const uiFiles = require('./core/ui-files.cjs');
 const connections = require('./core/connections.cjs');
+const networkJournal = require('./core/network-journal.cjs');
+const networkReport = require('./core/network-report.cjs');
 // Nøgler og GitHub-token indtastes kun i nøglevinduet. Hovedvinduet får en engangskvittering.
 const { KeyWindow, connectionPurpose, githubPurpose } = require('./core/key-window.cjs');
 
@@ -42,6 +46,9 @@ let ownTools, updates, updating = false;
 let appearance;
 const requests = new AsyncLocalStorage(), operations = new Set(), spaces = new Map();
 let selectedRoot = null;
+// Forhåndsvisningens session i appens vindue. Den kender hver rammes arbejdsmappe, så en side, der ikke kunne vises, meldes for
+// den arbejdsmappe, rammen hører til, og ikke for den viste (K3).
+let appPreview = null;
 function currentWorkbench() { return requests.getStore()?.bench || registry?.selected; }
 // En IPC-handling beholder projektets ejer, også hvis brugeren skifter fane under et await.
 const workbench = new Proxy({}, { get(_target, key) { const owner = currentWorkbench(), value = owner?.[key]; return typeof value === 'function' ? value.bind(owner) : value; } });
@@ -80,7 +87,7 @@ async function selectSpace(root, owner = currentWorkbench()) {
     ctx = { root, owner, key: owner.store.projectKey(root), preview: null, externalPreview: null, forceStatic: false };
     spaces.set(root, ctx);
     ctx.ready = (async () => {
-      ctx.runtimeConfig = normalizeRuntimeConfig((await owner.store.project(owner.project.root)).runtime || {});
+      ctx.runtimeConfig = storedRuntime((await owner.store.project(owner.project.root)).runtime);
       ctx.detectedRuntime = await inspectRuntime(root, ctx.runtimeConfig).catch(error => ({ kind: 'unknown', supported: false, reason: error.message }));
       ctx.devServer = makeServer(ctx); await ctx.devServer.activate(root);
       if (!['vite','astro','services'].includes(ctx.detectedRuntime.kind) && (await openProject(root)).staticPreview) ctx.preview = previewSession.staticPreview(ctx);
@@ -102,7 +109,7 @@ function supportReport() {
   return require('./core/diagnostics.cjs').diagnostics({ version: app.getVersion(), platform: process.platform, arch: process.arch, packaged: app.isPackaged, versions: require('./core/runtime.cjs').get()?.versions, project: Boolean(currentProject()), running: workbench?.running, preview: currentSpace().devServer?.state, failures });
 }
 function shutdown() {
-  if (!shuttingDown) shuttingDown = (async () => { keyWindow.close(); github?.cancel(); deploymentSetup?.promte.cancelAll(); await registry?.close(); await closeSpaces(); })().finally(() => { shuttingDown = null; });
+  if (!shuttingDown) shuttingDown = (async () => { keyWindow.close(); github?.cancel(); deploymentSetup?.promte.cancelAll(); await registry?.close(); await closeSpaces(); await networkJournal.flush(); })().finally(() => { shuttingDown = null; });
   return shuttingDown;
 }
 const uiURL = 'harness://app/index.html';
@@ -136,7 +143,11 @@ function handle(channel, action) {
     catch (error) {
       recordFailure(channel.startsWith('git:') ? 'git' : channel.startsWith('connections:') ? 'forbindelse' : 'app', ['EACCES','EPERM'].includes(error.code) ? 'adgang' : error.code === 'ENOENT' ? 'mangler-fil' : 'handling');
       const messages = { EEXIST: 'Der findes allerede en mappe med det projektnavn. Vælg et andet navn eller en anden placering.', ENOENT: 'En nødvendig fil eller mappe findes ikke. Kontrollér projektmappen.', EACCES: 'Aura har ikke adgang til mappen. Tillad mappeadgang i computerens indstillinger, og prøv igen, eller vælg en anden mappe.', EPERM: 'Computeren blokerer adgang til mappen. Tillad mappeadgang i indstillingerne, og prøv igen, eller vælg en anden mappe.' };
-      return { ok: false, error: messages[error.code] || error.message };
+      // En fejl i AI-forbindelsen bærer sit omfang med, så brugerfladen kun beder om at gennemgå forbindelsen, når det er
+      // forbindelsen, der fejler (fund 13). Andre omfang sendes ikke. En opgave, der fejler under opstarten, fx under
+      // sammenfatningen, bærer fejlens type med til resultatkortet (fund 12). Kun en kort typebetegnelse sendes, og et tidspunkt
+      // fra et langt Retry-After kun som tal.
+      return { ok: false, error: messages[error.code] || error.message, ...(error.scope === 'connection' ? { scope: 'connection' } : {}), ...(typeof error.failure === 'string' && /^[a-z]{2,16}$/.test(error.failure) ? { failure: error.failure, ...(Number.isFinite(error.retryAt) ? { retryAt: error.retryAt } : {}) } : {}) };
     }
   });
 }
@@ -183,6 +194,19 @@ handle('project:choose-location', () => exclusive(async () => {
   if (!selection.canceled) chosenParent = await require('./core/projects.cjs').checkProjectAccess(selection.filePaths[0]);
   return projectLocation();
 }));
+// Et nyt projekt uden sikkerhedsnet venter på sine standarder (beslutning (c), core/new-project-defaults.cjs). Når funktionen,
+// automatiske versioner eller en gemt version fuldender nettet, gives de én gang, og ledige samtaler forbereder næste opgave med
+// de nye valg. Før en opgave forberedes, ses der også efter, så en rettelse uden for Aura tæller. En fejl lader projektet spørge.
+async function settleDefaults(bench, root) {
+  const given = await require('./core/new-project-defaults.cjs').settle(bench, root).catch(() => false);
+  if (given) {
+    for (const chat of bench.chats.values()) if (!chat.running && !chat.sending && !chat.starting && !chat.finishing) chat.prepared = null;
+    // Brugeren får at vide, hvad Aura har slået til, uanset hvilket trin der fuldendte sikkerhedsnettet (ui/history.js).
+    const approvals = await bench.approvalsPolicy.settings(root);
+    sendEvent({ type: 'approvals.defaults', root, files: approvals.autoProjectFiles, commands: approvals.autoCommands });
+  }
+  return given;
+}
 handle('project:create', input => exclusive(async () => {
   const startup = await new Preferences(workbench.store).available({ ...input.startup, tests: input.tests });
   const parent = chosenParent || defaultProjectParent();
@@ -193,7 +217,6 @@ handle('project:create', input => exclusive(async () => {
   // Med Versioner og fortryd får nye projekter Git fra start og en version efter hver AI-opgave, så de altid kan fortrydes.
   // Et hostingønske eller en designpakke under en slået fra funktion følger ikke med projektet. Brugerens gemte standarder bevares.
   const projectStartup = { ...startup.values, ...(features.deling ? {} : { hosting: '' }), ...(features.design ? {} : { designID: '' }) };
-  await workbench.approvalsPolicy.applyNewProjectDefaults(created.root, { commandsAvailable: (await require('./core/command-sandbox.cjs').support()).available === true });
   // Nye projekter får designets netliste som standard (beslutning for beta 2). Eksisterende projekter ændres ikke.
   await workbench.store.saveProject(created.root, { startup: projectStartup, runtime: { network: require('./core/project-runtime.cjs').DESIGN_PREVIEW_NETWORK }, ...(features.versioner ? { autoCheckpoint: true } : {}) });
   let versionWarning = '';
@@ -201,6 +224,9 @@ handle('project:create', input => exclusive(async () => {
     try { await workbench.git.startProject(created.root); }
     catch (error) { versionWarning = `Versioner kunne ikke slås til: ${error.message} Projektet er oprettet, og du kan gemme versioner senere.`; }
   }
+  // Filændringer uden kort og kommandoer i sandkassen kræver sikkerhedsnettet: versioner, automatiske versioner og Git, der kan
+  // gemme dem (beslutning (c), 10. november 2026). Ellers spørger projektet som før, til nettet kommer (settleDefaults).
+  await require('./core/new-project-defaults.cjs').created(currentWorkbench(), created.root);
   // De seneste valg er udgangspunktet for næste projekt. Brugeren kan glemme dem under Flere valg.
   await new Preferences(workbench.store).save(startup.values);
   const opened = await openProject(created.root);
@@ -364,6 +390,18 @@ function requireIdleProject() {
   if (['installing', 'starting', 'stopping'].includes(currentSpace().devServer?.state)) throw new Error('Vent på opstarten af forhåndsvisningen, eller stop den først.');
   return currentProject().root;
 }
+handle('network:report', () => networkJournal.snapshot());
+handle('network:save', async input => {
+  if (!['json', 'csv'].includes(input?.format)) throw new Error('Vælg CSV eller JSON.');
+  // Only main owns records. The renderer can choose filters, never export content.
+  const report = networkReport.select(networkJournal.snapshot(), input?.filters);
+  const chosen = await dialog.showSaveDialog(window, { title: 'Gem netværksrapport', defaultPath: `Aura-netvaerk.${input.format}`, filters: [{ name: 'Netværksrapport', extensions: [input.format] }] });
+  if (chosen.canceled || !chosen.filePath) return false;
+  await fs.writeFile(chosen.filePath, networkReport.serialize(report, input.format), { mode: 0o600 });
+  return true;
+});
+// Ryd rapporten i dialogen Auras netværkskald: sletter journalen, også filen, og sender den tomme rapport tilbage.
+handle('network:clear', () => networkJournal.clear());
 handle('support:report', () => supportReport());
 handle('support:save', async () => {
   const report = supportReport();
@@ -469,8 +507,12 @@ handle('git:restore', input => exclusive(async () => {
   }
   if (restored) workbench.log({ kind: 'restore', title: 'Filerne er sat tilbage', detail: `${label.trim() || 'Gendannet version'} · ${restored.paths.length === 1 ? '1 fil' : `${restored.paths.length} filer`}${saved ? ' · gemt som ny version' : ''}`, status: 'completed' }, requestChatID());
   if (error) workbench.log({ kind: 'error', title: 'Gendannelsen gik ikke helt igennem', detail: error, status: 'error' }, requestChatID());
-  // activate kontrollerer journalen, også efter genstart eller en delvis gendannelse.
-  if (!inCopy) { const restoredState = await restoration.previous(root); if (restoredState) await workbench.invalidatePlan(restoredState.id); }
+  // activate kontrollerer journalen, også efter genstart eller en delvis gendannelse. Kan kopien fra før gendannelsen ikke læses,
+  // nulstilles planen som i activate, og svaret siger det, i stedet for at handlingen fejler, når filerne er sat tilbage (Q:C2-5 d).
+  if (!inCopy) {
+    try { const restoredState = await restoration.previous(root); if (restoredState) await workbench.invalidatePlan(restoredState.id); }
+    catch (failure) { await workbench.invalidatePlan(crypto.randomUUID()); error = [error || (restored?.files ? 'Filerne er sat tilbage.' : ''), error === failure.message ? '' : failure.message, 'Den gamle plan er nulstillet.'].filter(Boolean).join(' '); }
+  }
   const reopened = null;
   // Ændringen står under Ændringer som din. Billedet efter tages i baggrunden af samme side i samme størrelse.
   // En opgave i denne samtale, der er fortrudt, kan ikke fortrydes igen fra kortet.
@@ -494,6 +536,7 @@ handle('git:save', value => exclusive(async () => {
   const { note = '', view } = typeof value === 'string' || value === undefined ? { note: value || '' } : value;
   const root = requireIdleProject(), result = await workbench.git.saveAll(root, note || '');
   if (result.saved) workbench.log({ kind: 'checkpoint', title: 'Du gemte en version', detail: note || 'Uden beskrivelse', status: 'completed' }, requestChatID());
+  if (result.head) await settleDefaults(currentWorkbench(), root);
   // Et billede af forhåndsvisningen hører til den nye version. Før-billedet er det seneste af samme side og størrelse.
   if (result.head && view && Number.isFinite(view.width)) void (async () => {
     const shot = { page: currentPage(), width: view.width, height: view.height }, data = await captureView(shot);
@@ -508,6 +551,7 @@ handle('git:review', () => exclusive(() => workbench.git.review(requireIdleProje
 handle('git:commit', input => exclusive(async () => {
   const root = requireIdleProject(), result = await workbench.git.commit(root, input);
   workbench.log({ kind: 'checkpoint', title: 'Du gemte en version med valgte filer', detail: String(input?.message || ''), status: 'completed' }, requestChatID());
+  await settleDefaults(currentWorkbench(), root);
   return result;
 }));
 handle('git:automatic', value => exclusive(async () => {
@@ -519,6 +563,7 @@ handle('git:automatic', value => exclusive(async () => {
     if (block) throw new Error(block);
   }
   await workbench.store.saveProject(root, { autoCheckpoint: value });
+  if (value) await settleDefaults(currentWorkbench(), root);
   return value;
 }));
 
@@ -564,7 +609,9 @@ handle('deployment:open', async kind => {
   const state = await deployments.state(requireProject());
   if(kind==='settings') return shell.openExternal(await deployments.settings(requireProject()));
   if (!state.last) throw new Error('Ingen udgivelse registreret.');
-  const url = kind === 'portal' ? state.last.target.portal : state.last.url;
+  // «Åbn kørslen på GitHub» på en Pages-kvittering (Q:D1-1): kun den kørsel, statuskontrollen fandt i udgivelsens eget repository.
+  const run = `https://github.com/${state.last.config?.repository}/actions/runs/${state.last.runId}`;
+  const url = kind === 'portal' ? state.last.target.portal : kind === 'workflow' ? (Number.isSafeInteger(state.last.runId) && state.last.workflowURL === run ? run : null) : state.last.url;
   if (!url || !/^https:\/\//.test(url)) throw new Error('Intet link tilgængeligt.');
   return shell.openExternal(url);
 });
@@ -599,6 +646,8 @@ handle('komplai:publish-state', () => require('./core/komplai.cjs').publishingSt
 handle('komplai:publish-overview', () => deployments.providers.komplai.overview());
 handle('komplai:publish-address', value => deployments.providers.komplai.address(value?.slug, value?.appId));
 handle('komplai:publish-disconnect', () => exclusive(() => require('./core/komplai.cjs').disconnectPublishing(workbench.store)));
+// «Fjern kun fra denne computer»: kan Log ud ikke gennemføres, fjernes adgangen lokalt. Svaret siger med revoked, om komplai også tilbagekaldte den.
+handle('komplai:publish-forget', () => exclusive(() => require('./core/komplai.cjs').disconnectPublishing(workbench.store, undefined, undefined, { force: true })));
 handle('connections:state', () => workbench.state(requestChatID()));
 handle('connections:save', value => exclusive(() => {
   // Hovedvinduet må aldrig bære en nøgle. Den indtastes i nøglevinduet, som gemmer den selv.
@@ -631,7 +680,7 @@ handle('key:cancel', () => { keyWindow.cancel(); return true; });
 handle('connections:remove', value => exclusive(() => workbench.removeConnection(value)));
 handle('connections:models', value => workbench.models(value));
 handle('connections:routes', value => workbench.routes(value.connectionID, value.modelID));
-handle('agent:prepare', value => exclusive(() => workbench.prepare(chatInput(value))));
+handle('agent:prepare', value => exclusive(async () => { await settleDefaults(currentWorkbench(), currentProject()?.root); return workbench.prepare(chatInput(value)); }));
 handle('agent:send', value => {
   if (!currentProject()) throw new Error('Åbn et projekt først.');
   value = chatInput(value);
@@ -641,6 +690,7 @@ handle('agent:send', value => {
 });
 handle('agent:stop', value => workbench.stop(chatInput(value)));
 handle('agent:reply', value => workbench.reply(chatInput(value)));
+handle('agent:approve-all-off', value => workbench.approveAllOff(chatInput(value)));
 handle('agent:question', value => workbench.question(chatInput(value)));
 // Afklaring og plan: briefen er brugerens egne ord, og planen kan rettes af brugeren. Intet sendes, før næste besked.
 handle('plan:brief', value => exclusive(() => workbench.saveBrief(value)));
@@ -683,22 +733,31 @@ handle('skills:save', value => exclusive(async () => {
 // Funktioner: standarden for alle projekter og undtagelser for det åbne projekt. Ændringer gælder fra næste opgave.
 async function projectSettings() {
   const root = requireProject(), config = await workbench.store.project(root);
-  return { runtime: normalizeRuntimeConfig(config.runtime || {}), approvals: await workbench.approvalsPolicy.settings(root), commandSandbox: await require('./core/command-sandbox.cjs').support() };
+  // pendingDefaults: et nyt projekt uden sikkerhedsnet spørger, til nettet er der (beslutning (c)). pendingReason siger, hvad der
+  // mangler. Har brugeren selv valgt projektets automatik, venter projektet ikke længere (core/new-project-defaults.cjs waiting).
+  // runtimeNotice: en gemt opstart, Aura ikke kunne bruge det hele af, siges i Projektets indstillinger i stedet for tavst (Q:C1-4).
+  const approvals = await workbench.approvalsPolicy.settings(root), pendingReason = await require('./core/new-project-defaults.cjs').waiting(workbench, root, approvals);
+  return { runtime: storedRuntime(config.runtime), runtimeNotice: storedRuntimeNotice(config.runtime), approvals, commandSandbox: await require('./core/command-sandbox.cjs').support(), pendingDefaults: Boolean(pendingReason), pendingReason };
 }
 handle('project:settings', projectSettings);
+// Systemoversigten udledes af projektets filer, aldrig af modelkald. Kun navne på hemmeligheder, aldrig værdier.
+handle('project:overview', async () => { requireProject(); return require('./core/system-overview.cjs').analyze(workspaceRoot()); });
 handle('project:settings-save', value => exclusive(async () => {
   const root = requireProject();
   if (!value || typeof value !== 'object') throw new Error('Vælg en projektindstilling.');
   const runtime = value.runtime === undefined ? null : normalizeRuntimeConfig(value.runtime);
-  for (const name of ['autoProjectFiles', 'autoCommands']) if (value[name] !== undefined && typeof value[name] !== 'boolean') throw new Error('Ugyldigt valg af Auto-godkend.');
-  if (value.autoCommands === true) { const sandbox = await require('./core/command-sandbox.cjs').support(); if (!sandbox.available) throw new Error(sandbox.reason); }
+  for (const name of ['autoProjectFiles', 'autoCommands', 'autoCommandsUnisolated']) if (value[name] !== undefined && typeof value[name] !== 'boolean') throw new Error('Ugyldigt valg af Auto-godkend.');
+  // Afgørelsen ligger i approvals-policy.cjs: Windows må vælge uden isolation efter advarslen, en Mac eller Linux uden sandkasse kan ikke.
+  const commands = require('./core/approvals-policy.cjs').projectCommandSettings(value, value.autoCommands === true ? await require('./core/command-sandbox.cjs').support() : null);
   if (runtime) await workbench.store.saveProject(root, { runtime });
   if (value.autoProjectFiles !== undefined) await workbench.approvalsPolicy.setProjectFiles(root, value.autoProjectFiles);
-  if (value.autoCommands !== undefined) await workbench.approvalsPolicy.setCommands(root, value.autoCommands);
+  if (commands) await workbench.approvalsPolicy.setCommands(root, commands.enabled, { unisolated: commands.unisolated });
+  // Brugerens eget valg af projektets automatik går forud for de standarder, et nyt projekt venter på (beslutning (c)).
+  if (value.autoProjectFiles !== undefined || commands) await require('./core/new-project-defaults.cjs').chosen(workbench.store, root);
   if (value.revoke !== undefined) await workbench.approvalsPolicy.revoke(root, value.revoke);
   for (const chat of workbench.chats.values()) if (!chat.running && !chat.sending && !chat.starting && !chat.finishing) chat.prepared = null;
   for (const ctx of spaces.values()) if (ctx.owner === currentWorkbench() && !['running','starting','installing','stopping'].includes(ctx.devServer?.state)) {
-    ctx.runtimeConfig = normalizeRuntimeConfig((await workbench.store.project(root)).runtime || {});
+    ctx.runtimeConfig = storedRuntime((await workbench.store.project(root)).runtime);
     ctx.detectedRuntime = await inspectRuntime(ctx.root, ctx.runtimeConfig);
     ctx.devServer.configure(ctx.runtimeConfig);
   }
@@ -707,6 +766,8 @@ handle('project:settings-save', value => exclusive(async () => {
 handle('features:get', () => workbench.features.get(currentProject()?.root));
 handle('features:save', value => exclusive(async () => {
   const result = await workbench.features.save(currentProject()?.root, value);
+  // Slår funktionen versionerne til for et åbent projekt, der venter på sikkerhedsnettet, får det sine standarder nu.
+  for (const bench of registry.values()) if (bench.project) await settleDefaults(bench, bench.project.root);
   for (const bench of registry.values()) for (const chat of bench.chats.values()) if (!chat.running && !chat.sending && !chat.starting && !chat.finishing) chat.prepared = null;
   return result;
 }));
@@ -715,6 +776,9 @@ handle('preview:attach', value => exclusive(async () => {
   if (!value) { await currentSpace().devServer.stop(); currentSpace().forceStatic = true; currentSpace().externalPreview = null; if (currentSpace().preview) await currentSpace().preview.close(); const next = await openProject(workspaceRoot()); currentSpace().preview = next.staticPreview ? previewSession.staticPreview(currentSpace()) : null; return currentSpace().preview?.url || null; }
   let url; try { url = new URL(value); } catch { throw new Error('Angiv en lokal serveradresse.'); }
   if (!['http:', 'https:'].includes(url.protocol) || !['localhost', '127.0.0.1', '[::1]'].includes(url.hostname) || url.username || url.password || url.search || url.hash) throw new Error('Brug en lokal http- eller https-adresse uden login eller parametre.');
+  // Appens frame-src (ui/index.html) kan ikke have en IPv6-adresse som kilde, så rammen ville stå tom, og ↻ ville give samme
+  // blokering. localhost er den samme computer og når samme server (K3).
+  if (url.hostname === '[::1]') throw new Error(`Forhåndsvisningen kan ikke vise adresser med [::1]. Brug ${url.protocol}//localhost${url.port ? `:${url.port}` : ''}${url.pathname} i stedet. localhost er din egen computer, så det er den samme server.`);
   if (registry.servers().some(server => server === url.origin || server.startsWith(url.origin + '/'))) throw new Error('Agentens interne server kan ikke bruges som forhåndsvisning.');
   if ([...spaces.values()].some(ctx => ctx.root !== selectedRoot && (ctx.preview?.url?.startsWith(url.origin + '/') || ctx.externalPreview?.startsWith(url.origin + '/')))) throw new Error('Vælg samtalen i sidepanelet for at se dens forhåndsvisning.');
   try { const response = await fetch(url, { redirect: 'error', signal: AbortSignal.timeout(5000) }); await response.body?.cancel(); if (!response.ok) throw new Error(); }
@@ -734,6 +798,26 @@ function komplaiScript(root) { const owner = ownerFor(root); return route => own
 handle('komplai:preview-state', async () => currentProject() ? komplaiPreview.state(currentProject().root) : { active: false });
 handle('komplai:preview-create', async () => { if (!currentProject()) throw new Error('Åbn et projekt først.'); return komplaiPreview.create(currentProject().root); });
 handle('komplai:preview-call', async input => currentProject() ? komplaiPreview.call(currentProject().root, input, workspaceRoot()) : { status: 503, body: { error: 'unavailable' } });
+// Samtykke pr. adresse: kun brugerens klik i forhåndsvisningens panel når hertil. Adressen skal være set blokeret, og reglerne for https, vært og type ligger i grantAddress.
+handle('preview:allow', value => exclusive(async () => {
+  const root = requireProject(), ctx = currentSpace();
+  const seen = [...(ctx.blocked?.values() || []), ...(ctx.detectedRuntime?.diagnostics || [])];
+  // grantAddress kontrollerer den nye liste, før den gemmes: en liste over loftet når aldrig lageret.
+  const next = require('./core/preview-policy.cjs').grantAddress(storedRuntime((await workbench.store.project(root)).runtime), seen, { kind: value?.kind, origin: value?.origin });
+  await workbench.store.saveProject(root, { runtime: next });
+  ctx.blocked?.delete(`${value.kind}:${value.origin}`);
+  for (const chat of workbench.chats.values()) if (!chat.running && !chat.sending && !chat.starting && !chat.finishing) chat.prepared = null;
+  // Samtykket gælder straks i alle projektets arbejdsmapper, også mens en server kører. En kørende server beholder sin gennemgåede
+  // opstart og får kun den nye netliste; brugerfladen genindlæser bagefter siden.
+  for (const space of spaces.values()) if (space.owner === ctx.owner) {
+    space.runtimeConfig = next;
+    if (!space.devServer) continue;
+    space.detectedRuntime = await inspectRuntime(space.root, space.runtimeConfig).catch(error => ({ kind: 'unknown', supported: false, reason: error.message }));
+    space.devServer.useNetwork(next.network);
+    if (!['running', 'starting', 'installing', 'stopping'].includes(space.devServer.state)) space.devServer.configure(space.runtimeConfig);
+  }
+  return projectSettings();
+}));
 handle('preview:runtime', async () => ({ ...await currentSpace().devServer.status(), root: currentProject()?.root, workspaceRoot: workspaceRoot() }));
 // Kontrol af forhåndsvisningen efter en opgave: blev siden vist, og skrev den fejl i konsollen? Aura klikker ikke i siden.
 const previewLog = { documents: [], errors: [] };
@@ -759,7 +843,34 @@ let imageSessionReady = null, captureQueue = Promise.resolve();
 function previewAllowed(url) { return Boolean(previewSession.contextForURL(spaces.values(), url)); }
 function previewDiagnostic(ctx, diagnostic) {
   if (!ctx) return;
+  // Hovedprocessen husker de blokeringer, den selv har set (højst 20), så samtykket kun kan gælde en adresse, forhåndsvisningen faktisk blokerede.
+  // Blokeringen ændrer aldrig netlisten; kun brugerens klik gør det (preview:allow).
+  if (diagnostic?.origin && ['scripts', 'styles', 'images'].includes(diagnostic.kind)) {
+    ctx.blocked = ctx.blocked || new Map(); ctx.blocked.set(`${diagnostic.kind}:${diagnostic.origin}`, { kind: diagnostic.kind, origin: diagnostic.origin });
+    while (ctx.blocked.size > 20) ctx.blocked.delete(ctx.blocked.keys().next().value);
+  }
   sendEvent({ type: 'preview.diagnostic', root: ctx.owner.project.root, workspaceRoot: ctx.root, diagnostic });
+}
+// Appens frame-src-besked står i appens egen konsol og siger ikke, hvilken ramme der blev stoppet. Har kun én arbejdsmappe en
+// bundet ramme, er det dens, og uden bundne rammer er det den viste. Har flere, afgør did-fail-load det ud fra selve rammen, så en
+// skjult arbejdsmappes side ikke forklares i den viste (K3).
+function frameOwners() {
+  try { return [...new Set(window.webContents.mainFrame.frames.map(frame => appPreview?.contextForFrame(frame)).filter(Boolean))]; } catch { return []; }
+}
+function frameBlockSpace(owners = frameOwners()) {
+  return owners.length === 1 ? owners[0] : owners.length ? null : spaceFor();
+}
+// Har flere arbejdsmapper en bundet ramme (det almindelige efter et projektskift), og melder Electron ikke -30 for samme adresse
+// kort før eller efter konsolbeskeden, forklares blokeringen i den viste arbejdsmappe. De skjulte rammer er inert, så et klik på et
+// link kan kun ske i den viste. Har den viste ingen bundet ramme, kom blokeringen fra en skjult side, og den forklares ikke dér.
+const frameFailures = [];
+const recentFrameFailure = (origin, since) => frameFailures.some(item => item.origin === origin && item.at >= since);
+function explainFrameBlock(blocked) {
+  const owners = frameOwners(), owner = frameBlockSpace(owners);
+  if (owner !== null) return previewDiagnostic(owner, blocked);
+  const shown = spaceFor(), at = Date.now();
+  if (!shown || !owners.includes(shown) || recentFrameFailure(blocked.origin, at - 2000)) return;
+  setTimeout(() => { if (spaces.has(shown.root) && !recentFrameFailure(blocked.origin, at - 2000)) previewDiagnostic(shown, blocked); }, 800);
 }
 function configurePreviewSession(ses) {
   return previewSession.installSession(ses, {
@@ -882,7 +993,8 @@ handle('preview:contains', async value => {
 handle('preview:prepare', value => exclusive(async () => {
   const review = await currentSpace().devServer.prepare(value?.action, value?.scripts === true);
   // Brugerens gennemgang huskes, når brugeren trykker Start, så AI'en senere kan starte forhåndsvisningen uden en ny dialog.
-  currentSpace().pendingConsent = { token: review.token, fingerprint: review.project?.fingerprint || null, scripts: review.scripts === true };
+  // Handlingen huskes med: en installationsgennemgang viser ikke startkommandoen og giver derfor intet samtykke til at starte.
+  currentSpace().pendingConsent = { token: review.token, action: review.action, fingerprint: review.project?.fingerprint || null, scripts: review.scripts === true };
   return review;
 }));
 handle('preview:execute', token => exclusive(async () => {
@@ -890,16 +1002,18 @@ handle('preview:execute', token => exclusive(async () => {
   const space = currentSpace(), pending = space.pendingConsent; space.pendingConsent = null;
   space.forceStatic = false;
   const result = await space.devServer.execute(token);
-  if (pending?.token === token && pending.fingerprint) await space.owner.store.saveProject(space.owner.project.root, { previewConsent: { fingerprint: pending.fingerprint, scripts: pending.scripts, at: Date.now() } });
+  if (pending?.token === token && pending.action === 'start' && pending.fingerprint) await space.owner.store.saveProject(space.owner.project.root, { previewConsent: { fingerprint: pending.fingerprint, scripts: pending.scripts, at: Date.now() } });
   return result;
 }));
 // AI'ens værktøj aura_preview: starter forhåndsvisningen, hvis brugeren har godkendt netop dette projekts pakker og opstart.
 const previewBridge = require('./core/preview-bridge.cjs');
-const aiPreview = (root, action) => require('./core/ai-preview.cjs').aiPreview(spaceFor(root), action);
+// Et statisk projekt vises med det samme, når AI'en beder om forhåndsvisningen, også i en samtale i baggrunden (fund 23, beta 3).
+const aiPreview = async (root, action) => { const preview = require('./core/ai-preview.cjs'); return preview.aiPreview(await preview.resolveSpace(root, { spaceFor, ownerFor, selectSpace }), action, { startStatic: () => startStatic(root) }); };
 
 handle('preview:stop', () => currentSpace().devServer.stop().then(() => currentSpace().devServer.snapshot()));
 
 app.whenReady().then(async () => {
+  await networkJournal.configure({ directory: path.join(app.getPath('userData'), 'harness', 'network-journal') });
   app.setAboutPanelOptions({ applicationName: DISPLAY_NAME, applicationVersion: app.getVersion() });
   Menu.setApplicationMenu(Menu.buildFromTemplate([
     { label: DISPLAY_NAME, submenu: [
@@ -984,7 +1098,7 @@ app.whenReady().then(async () => {
   session.defaultSession.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
   session.defaultSession.setPermissionCheckHandler(() => false);
   session.defaultSession.on('will-download', event => event.preventDefault());
-  configurePreviewSession(session.defaultSession);
+  appPreview = configurePreviewSession(session.defaultSession);
   session.defaultSession.webRequest.onCompleted(details => {
     if (details.resourceType === 'subFrame' && previewAllowed(details.url)) remember(previewLog.documents, { at: Date.now(), status: details.statusCode, url: details.url });
   });
@@ -993,7 +1107,11 @@ app.whenReady().then(async () => {
     window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
     // Fejl, som forhåndsvisningens side selv skriver i konsollen. Kun previewets ramme; appens egne meddelelser tælles ikke.
     window.webContents.on('console-message', event => {
-      if (event.level !== 'error' || !previewAllowed(event.frame?.url || '')) return;
+      if (event.level !== 'error') return;
+      // Appens egen frame-src stopper, at forhåndsvisningens ramme åbner et andet websted, fx et link i siden. Det står kun i appens
+      // konsol, og rammen bliver ellers tom uden forklaring. frameBlockSpace afgør, hvilken arbejdsmappes ramme det var.
+      if (String(event.frame?.url || '').startsWith('harness://app/')) { const blocked = previewSession.diagnosticForFrameBlock(event); if (blocked) explainFrameBlock(blocked); return; }
+      if (!previewAllowed(event.frame?.url || '')) return;
       const diagnostic = previewSession.diagnosticForConsole(event);
       if (diagnostic) previewDiagnostic(previewSession.contextForURL(spaces.values(), event.frame?.url), diagnostic);
       const clean = require('./core/dev-server.cjs').cleanOutput;
@@ -1004,6 +1122,28 @@ app.whenReady().then(async () => {
       if (isMainFrame || !picking.active) return;
       let frame = null; try { frame = webFrameMain.fromId(processId, routingId); } catch { return; }
       if (frame && fromPreview(frame.url)) injectPicker().catch(() => {});
+    });
+    // En side i forhåndsvisningens ramme, der ikke kunne indlæses, fx når serveren er stoppet, eller et link går til et andet
+    // websted. Brugerfladen siger det i statuslinjen i stedet for at påstå, at siden vises (K3 b). Kun rammer direkte i appens
+    // side; -3 er en indlæsning, der blev afløst af en ny.
+    window.webContents.on('did-fail-load', (_event, errorCode, _description, validatedURL, isMainFrame, processId, routingId) => {
+      if (isMainFrame || errorCode === -3) return;
+      let frame = null; try { frame = webFrameMain.fromId(processId, routingId); } catch { return; }
+      if (!frame || frame.parent?.url !== uiURL) return;
+      // Rammen er bundet til sin arbejdsmappe (K3): hændelsen gælder den, også når en anden arbejdsmappe vises. En ramme, hvis
+      // arbejdsmappe er lukket, meldes ikke. En ubundet ramme meldes for den arbejdsmappe, hvis adresse den ikke kunne vise (N:B2-3),
+      // og ellers som før for den viste.
+      const bound = appPreview?.contextForFrame(frame);
+      if (bound === null) return;
+      const ctx = bound || previewSession.contextForURL(spaces.values(), validatedURL);
+      sendEvent({ type: 'preview.failed', url: String(validatedURL || '').slice(0, 300), code: errorCode, ...(ctx ? { root: ctx.owner.project.root, workspaceRoot: ctx.root } : {}) });
+      // -30 er ERR_BLOCKED_BY_CSP: appens frame-src stoppede rammens navigation, fx et link til et andet websted. Rammen siger her
+      // selv, hvilken arbejdsmappe forklaringen hører til.
+      if (ctx && errorCode === -30) {
+        const blocked = require('./core/preview-policy.cjs').blockedNavigation(validatedURL);
+        frameFailures.push({ origin: blocked.origin, at: Date.now() }); while (frameFailures.length > 20) frameFailures.shift();
+        previewDiagnostic(ctx, blocked);
+      }
     });
     // ⌘K (Ctrl+K på Windows og Linux) åbner kommandopaletten, også når fokus står i forhåndsvisningen.
     window.webContents.on('before-input-event', (event, input) => {

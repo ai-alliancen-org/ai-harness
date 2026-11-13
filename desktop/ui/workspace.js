@@ -1,8 +1,8 @@
-// Arbejdsfladen ved siden af samtalen: Forhåndsvisning, Ændringer, Kode og Aktivitet.
+// Arbejdsfladen ved siden af samtalen: Forhåndsvisning, Plan, Ændringer, Overblik, Kode og Aktivitet.
 // Fanerne ligger oven på hinanden og skjules kun visuelt, så previewets formularer, rulning og andre fanes tilstand
 // bevares ved faneskift. Kun brugeren skifter fane; AI'ens hændelser markerer en fane, men skifter aldrig væk.
 (() => {
-  const tabs = ['preview', 'plan', 'changes', 'code', 'activity'];
+  const tabs = ['preview', 'plan', 'changes', 'overview', 'code', 'activity'];
   let active = 'preview';
   const tab = name => $(`#tab-${name}`), panel = name => $(`#panel-${name}`);
   const visuallyHidden = text => node('span', text, 'visually-hidden');
@@ -10,6 +10,16 @@
   const clock = at => new Date(at).toLocaleTimeString('da-DK', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   const duration = ms => !Number.isFinite(ms) || ms < 0 ? '' : ms < 1000 ? 'under 1 s' : elapsedText(ms);
 
+  // Den valgte fane skal altid kunne ses (DESIGN.md). I en smal arbejdsflade og ved større tekst står fanerne på én linje og ruller
+  // sidelæns (styles.css), så striben rulles, til hele den valgte fane står inden for den. Kun striben rulles; siden flytter sig ikke.
+  function reveal(name = active) {
+    const strip = $('.work-tabs'), item = tab(name);
+    if (!strip || !item || item.hidden) return;
+    const box = strip.getBoundingClientRect(), own = item.getBoundingClientRect(), margin = 8;
+    if (!box.width || !own.width) return;
+    if (own.left < box.left + margin) strip.scrollLeft -= box.left + margin - own.left;
+    else if (own.right > box.right - margin) strip.scrollLeft += Math.min(own.right - (box.right - margin), own.left - (box.left + margin));
+  }
   function show(name, { focus = false } = {}) {
     if (!tabs.includes(name)) return;
     active = name;
@@ -19,12 +29,16 @@
       panel(item).classList.toggle('is-active', selected); panel(item).inert = !selected;
     }
     if (focus) tab(name).focus();
+    reveal(name);
     if (name === 'plan') { $('#plan-badge').hidden = true; window.planning?.render(); }
     if (name === 'changes') { badge('changes', 0); if (changes.mode === 'session' && (changes.stale || !changes.data)) action(() => loadChanges()); }
+    if (name === 'overview') window.systemOverview?.show();
     if (name === 'code') { if (!code.files || code.stale) action(loadCodeList); action(checkCodeFile); }
     if (name === 'activity') { activity.unseen = false; updateActivityBadge(); if (activity.toBottom) { activity.toBottom = false; requestAnimationFrame(() => { $('#activity-scroll').scrollTop = $('#activity-scroll').scrollHeight; }); } }
   }
   for (const item of tabs) tab(item).addEventListener('click', () => show(item));
+  // Når vinduet, skillelinjen, sidepanelet eller tekststørrelsen ændrer fladens bredde, holdes den valgte fane synlig.
+  if (typeof ResizeObserver === 'function') new ResizeObserver(() => reveal()).observe($('.work-tabs'));
   // Piletasterne springer over en skjult fane, fx Plan, når planlægning er slået fra.
   $('.work-tabs').addEventListener('keydown', event => {
     const visible = tabs.filter(item => !tab(item).hidden), index = visible.indexOf(active);
@@ -114,7 +128,7 @@
     if (!session && view.changedSince) notes.push(`${plural(view.changedSince, 'fil er', 'filer er')} ændret igen, efter at opgaven sluttede, fx fortrudt. Vælg Hele samtalen for at se, hvordan de er nu.`);
     $('#changes-others').textContent = notes.join(' '); $('#changes-others').hidden = !notes.length;
     const skipped = view.skipped || 0;
-    $('#changes-skipped').textContent = view.unavailable ? 'Ændringerne kunne ikke læses for denne opgave. Gennemgå filerne under Kode.' : skipped ? `${plural(skipped, 'fil er', 'filer er')} udeladt, fordi de er binære, store eller beskyttede.` : '';
+    $('#changes-skipped').textContent = view.unavailable ? 'Ændringerne kunne ikke læses for denne opgave. Gennemgå filerne under Kode.' : skipped ? `${plural(skipped, 'fil er', 'filer er')} udeladt, fordi de er binære, store, beskyttede eller gemt i et ældre tekstformat.` : '';
     $('#changes-skipped').hidden = !view.unavailable && !skipped;
     renderFileRows(view);
     const keep = view.files.some(file => file.file === changes.file) ? changes.file : view.files[0]?.file;
@@ -159,7 +173,8 @@
     $('#changes-open-code').hidden = detail.change === 'slettet';
     const notes = [help(detail.by)];
     if (detail.secret) notes.push('Filen kan indeholde en nøgle eller adgangskode, så linjerne vises ikke her.');
-    if (detail.binary) notes.push('Filen er binær, så den har ingen linje-diff. Åbn den under Kode.');
+    if (detail.opaque) notes.push('Filen er binær eller gemt i et ældre tekstformat (ikke UTF-8), så Aura kan ikke vise linjerne, og Fortryd sætter den ikke tilbage. Brug Versioner, hvis den skal tilbage.');
+    else if (detail.binary) notes.push('Filen er binær, så den har ingen linje-diff. Åbn den under Kode.');
     if (detail.invisible) notes.push('Forskellen ligger i usynlige tegn, fx linjeskift eller mellemrum i slutningen af filen.');
     if (detail.approximate) notes.push('Filen er ændret så meget, at den vises som fjernet og skrevet på ny.');
     if (detail.truncated) notes.push('Ændringen er lang. Kun begyndelsen vises; se hele filen under Kode.');
@@ -343,6 +358,22 @@
     if (references.length >= 10) { message('Du kan henvise til højst 10 filer i én besked.', true); return; }
     references.push(ref); renderReferences(); $('#prompt').focus();
   };
+  // En henvisning, der ikke passer til filen længere (filen er slettet, eller linjerne findes ikke mere), giver samme fejl ved
+  // hvert Send. Kernen skriver filens sti foran sin afvisning (chat-session prepare). Henvisningerne til den fil kontrolleres
+  // med samme læsning som Kode-fanen, og de, der ikke kan bruges, fjernes fra beskeden (fund 13, Q:B2-2).
+  async function dropStale(errorMessage) {
+    const text = String(errorMessage || ''), stale = [];
+    // readable: Kode kan stadig vise filen som tekst, så brugeren kan henvise til den igen.
+    let readable = false;
+    for (const ref of references.filter(item => text.startsWith(`${item.path}: `))) {
+      let usable = false;
+      try { const file = await call('codeRead', ref.path); readable = file?.kind === 'text'; usable = readable && (!ref.from || (ref.to ?? ref.from) <= file.text.split('\n').length); } catch { readable = false; /* filen kan ikke læses */ }
+      if (!usable) stale.push(ref);
+    }
+    if (!stale.length) return null;
+    references = references.filter(ref => !stale.includes(ref)); renderReferences();
+    return { path: stale[0].path, labels: stale.map(referenceLabel), readable };
+  }
 
   // ---------- Filhenvisninger i samtalen ----------
   // En sti i AI'ens svar bliver et link, når filen findes i projektet og kan vises. Andet forbliver almindelig tekst.
@@ -499,6 +530,7 @@
     if (event.type === 'activity' && event.root === current?.root && mine(event)) putEntry(event.entry);
     if (event.type === 'run.status' && mine(event)) {
       activity.running = ['starting', 'working'].includes(event.status); updateActivityStatus(); updateActivityBadge();
+      if (!activity.running) staleOverview();
     }
     if (event.type === 'changes.updated' && event.root === current?.root && !mine(event)) { code.stale = true; return; }
     if (event.type === 'changes.updated' && event.root === current?.root) {
@@ -508,14 +540,17 @@
       else { changes.stale = true; changes.source = event.task; changes.file = ''; }
       if (active === 'code') action(checkCodeFile);
     }
+    if (event.type === 'run.review' && mine(event)) staleOverview();
     if (event.type === 'run.review' && !mine(event)) { action(async () => { await loadCodeList(); linkifyAll(); }); return; }
     if (event.type === 'run.review' && event.files?.length && active !== 'changes') badge('changes', event.files.length, event.files.length === 1 ? 'ændret fil' : 'ændrede filer');
     if (event.type === 'run.review') action(async () => { await loadCodeList(); linkifyAll(); });
     if (event.type === 'plan.ready' && mine(event) && active !== 'plan') { $('#plan-badge').hidden = false; $('#plan-badge').replaceChildren(visuallyHidden('ny plan')); }
   });
+  // Overblikket udledes af projektets filer: det er gammelt ved projektskift, samtaleskift og efter en afsluttet opgave.
+  function staleOverview() { if (active === 'overview') { window.systemOverview?.stale(); window.systemOverview?.show(); } else window.systemOverview?.invalidate(); }
   // Et nyt projekt starter i Forhåndsvisning med tomme faner.
   async function onProject() {
-    show('preview'); $('#plan-badge').hidden = true;
+    show('preview'); window.systemOverview?.invalidate(); $('#plan-badge').hidden = true;
     Object.assign(changes, { data: null, source: '', file: '', stale: true, latest: '', mode: 'session', sessionSource: '', versionView: null }); badge('changes', 0); applyMode(); window.versions?.reset();
     $('#changes-source').replaceChildren(option('', 'Ingen opgaver endnu')); $('#changes-source').disabled = true;
     $('#changes-overview').hidden = true; $('#changes-diff').hidden = true; $('#changes-empty').hidden = false; $('#changes-notice').hidden = true;
@@ -528,6 +563,7 @@
   }
   // En anden samtale åbnes: Ændringer under Denne samtale og Aktivitet følger den. Kode og Versioner gælder projektet.
   async function onChat() {
+    staleOverview();
     $('#plan-badge').hidden = true; badge('changes', 0);
     Object.assign(changes, { data: null, file: '', stale: true, latest: '', sessionSource: '' });
     if (changes.mode === 'session') { changes.source = ''; $('#changes-source').replaceChildren(option('', 'Ingen opgaver endnu')); $('#changes-source').disabled = true; $('#changes-overview').hidden = true; $('#changes-diff').hidden = true; $('#changes-empty').hidden = false; $('#changes-notice').hidden = true; if (active === 'changes') await action(() => loadChanges()); }
@@ -536,5 +572,5 @@
     if (code.path) { const selected = active; await openFile(code.path); show(selected); }
     activity.running = running; await action(loadActivity); updateActivityStatus();
   }
-  window.workspace = { show, onProject, onChat, showVersions, showVersion, openFile, showChange, linkify, linkifyAll, references: () => references.map(ref => ({ ...ref })), clearReferences: () => { references = []; target = null; renderReferences(); }, setTarget: value => { target = value ? { id: value.id, label: value.label } : null; renderReferences(); }, target: () => target && { ...target }, get active() { return active; } };
+  window.workspace = { show, onProject, onChat, showVersions, showVersion, openFile, showChange, linkify, linkifyAll, references: () => references.map(ref => ({ ...ref })), dropStale, clearReferences: () => { references = []; target = null; renderReferences(); }, setTarget: value => { target = value ? { id: value.id, label: value.label } : null; renderReferences(); }, target: () => target && { ...target }, get active() { return active; } };
 })();

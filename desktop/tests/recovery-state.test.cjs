@@ -115,3 +115,46 @@ test('the existing renderer retains Build only when main confirms the plan survi
     else assert.equal(v.draft.mode, retained ? 'build' : 'plan');
   }
 });
+
+// Årsag 3 (m2): en baggrundssamtale i Planlæg eller Samtale må ikke blive til Byg, fordi en tidligere plan findes.
+test('run.status bærer opgavens arbejdsmåde, og en mislykket Planlæg- eller Samtale-opgave i baggrunden bevarer sin arbejdsmåde', async t => {
+  const f = await fixture(t);
+  await f.send('plan'); await f.finish(plan);
+  for (const mode of ['plan', 'chat']) {
+    await f.send(mode);
+    f.bench.chat.event({ type: 'engine.error', message: 'Synthetic transport failure' }); await f.bench.chat.finishing;
+    const status = f.events.filter(e => e.type === 'run.status').at(-1);
+    assert.equal(status.status, 'error'); assert.equal(status.planRetained, true);
+    assert.equal(status.mode, mode, 'hændelsen bærer opgavens arbejdsmåde');
+    const source = await fs.readFile(path.join(__dirname, '../ui/app.js'), 'utf8');
+    const start = source.indexOf("  if (event.type === 'run.status') {"), end = source.indexOf("  if (event.type === 'message.updated')", start);
+    const v = { plan: { id: 'p' }, planCard: true, lastSentText: 'Prøv igen', draft: { mode }, approvals: { replaceChildren() {} } };
+    require('node:vm').runInNewContext(source.slice(start, end), { event: status, active: false, v, activePlan: null, $: () => ({ value: '', hidden: false }), setRunning() {}, updateWorkMode() {}, saveChatDraft() {}, window: {} });
+    assert.equal(v.draft.mode, mode, `kladden bliver ikke til Byg efter en mislykket ${mode}-opgave`);
+  }
+  // En mislykket Byg-opgave beholder planen og Byg som før.
+  await f.send('build'); f.bench.chat.event({ type: 'engine.error', message: 'Synthetic transport failure' }); await f.bench.chat.finishing;
+  assert.equal(f.events.filter(e => e.type === 'run.status').at(-1).mode, 'build');
+});
+
+// Årsag 3 (m2): en mislykket Planlæg-besked står ikke flere gange i afklaringen ved Prøv igen.
+test('en Planlæg-besked uden svar står kun én gang i afklaringen efter fejl eller Stop og Prøv igen', async t => {
+  for (const outcome of ['error', 'stop']) await t.test(outcome, async t => {
+    const f = await fixture(t);
+    for (let attempt = 0; attempt < 3; attempt++) {
+      await f.send('plan');
+      if (outcome === 'stop') await f.bench.chat.stop();
+      else { f.bench.chat.event({ type: 'engine.error', message: 'Synthetic transport failure' }); await f.bench.chat.finishing; }
+    }
+    assert.deepEqual(f.bench.chat.planConversation, [], 'ingen af de mislykkede forsøg står i afklaringen');
+    await f.send('plan'); await f.finish('Hvem skal bruge siden?');
+    assert.deepEqual(f.bench.chat.planConversation, ['Synthetic user request'], 'et besvaret forsøg står én gang');
+  });
+});
+test('en Planlæg-besked, som AI’en nåede at svare på, bliver i afklaringen ved en fejl', async t => {
+  const f = await fixture(t); await f.send('plan');
+  const chat = f.bench.chat;
+  chat.runRoles.set('svar', 'assistant'); chat.runText.set('svar', { id: 'svar', messageID: 'svar', text: 'Et spørgsmål først.' });
+  chat.event({ type: 'engine.error', message: 'Synthetic transport failure' }); await chat.finishing;
+  assert.deepEqual(chat.planConversation, ['Synthetic user request']);
+});

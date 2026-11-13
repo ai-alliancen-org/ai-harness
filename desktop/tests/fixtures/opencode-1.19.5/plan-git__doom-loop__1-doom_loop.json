@@ -1,0 +1,53 @@
+{
+ "opencode": "1.19.5",
+ "aura": "d0c3fca+ændringer",
+ "scenario": "plan-git",
+ "outcome": "idle",
+ "case": "doom-loop",
+ "askIndex": 1,
+ "asksInStep": 1,
+ "layout": {
+  "mode": "plan",
+  "git": true,
+  "copy": false,
+  "model": "kontraktmodel",
+  "worktree": "${ROOT}",
+  "directory": "${ROOT}"
+ },
+ "sequence": [
+  "del:pending",
+  "del:running",
+  "del:pending",
+  "del:running",
+  "del:pending",
+  "del:running",
+  "spørg:doom_loop",
+  "svar:once",
+  "del:completed"
+ ],
+ "request": {
+  "id": "per_1abd2a708001jENPNoMwgLQLeW",
+  "sessionID": "ses_e542d601affehVTQ3V1ieZtYav",
+  "permission": "doom_loop",
+  "patterns": [
+   "read"
+  ],
+  "metadata": {
+   "tool": "read",
+   "input": {
+    "filePath": "${ROOT}/notes.txt"
+   }
+  },
+  "always": [
+   "read"
+  ]
+ },
+ "toolPartAtAsk": null,
+ "policyInput": null,
+ "recordedAura": null,
+ "toolResult": [
+  "<path>${ROOT}/notes.txt</path>\n<type>file</type>\n<content>\n1: Hej verden NEEDLE\n\n(End of file - total 1 lines)\n</content>",
+  "<path>${ROOT}/notes.txt</path>\n<type>file</type>\n<content>\n1: Hej verden NEEDLE\n\n(End of file - total 1 lines)\n</content>",
+  "<path>${ROOT}/notes.txt</path>\n<type>file</type>\n<content>\n1: Hej verden NEEDLE\n\n(End of file - total 1 lines)\n</content>"
+ ]
+}

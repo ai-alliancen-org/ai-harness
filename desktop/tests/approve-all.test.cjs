@@ -31,3 +31,16 @@ test('en kommando automatiseres kun, når sandkassen kører i denne motor', () =
 test('søgning automatiseres aldrig, fordi resultatet kan vise beskyttede filer', () => {
   assert.equal(approveAllApplies(true, { ...kort, match: { kind: 'grep' } }, { sandbox: true }), false);
 });
+
+// Tilstanden skal kunne ses og slås fra: kernen melder hver ændring, og en gentagelse melder intet.
+test('«Godkend alt» melder tilstanden og kan slås fra', () => {
+  const { ChatSession } = require('../core/chat-session.cjs');
+  const sendte = [], session = Object.create(ChatSession.prototype);
+  session.approveAll = false; session.emit = event => sendte.push(event);
+  session.setApproveAll(true); session.setApproveAll(true);
+  assert.deepEqual(sendte, [{ type: 'approve-all', enabled: true }]);
+  assert.deepEqual(session.approveAllOff(), { approveAll: false });
+  session.approveAllOff();
+  assert.deepEqual(sendte, [{ type: 'approve-all', enabled: true }, { type: 'approve-all', enabled: false }]);
+  assert.equal(session.approveAll, false);
+});

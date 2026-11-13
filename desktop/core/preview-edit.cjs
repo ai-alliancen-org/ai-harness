@@ -187,6 +187,10 @@ function fitOf(text, index, length, tag) {
   return open && close && open[1].toLowerCase() === tag && close[1].toLowerCase() === tag ? 'tag' : 'text';
 }
 const lineOf = (text, index) => text.slice(0, index).split('\n').length;
+// Kun en fil i gyldig UTF-8 rettes direkte. Ellers læses æ, ø og å som erstatningstegn, og en rettelse ville skrive
+// hele filen tilbage uden dem, også i linjer, brugeren ikke rørte. Fortryd kunne heller ikke hente dem (fund 18, beta 3).
+const validUTF8 = bytes => { try { new TextDecoder('utf-8', { fatal: true }).decode(bytes); return true; } catch { return false; } };
+async function utf8File(root, file) { try { return validUTF8(await fs.readFile(path.join(root, ...projectFiles.normalize(file).split('/')))); } catch { return false; } }
 async function findText(root, raw, { tag = '', pageFile = '' } = {}) {
   const pattern = textPattern(raw);
   if (!pattern) return { matches: [], truncated: false };
@@ -199,23 +203,29 @@ async function findText(root, raw, { tag = '', pageFile = '' } = {}) {
     let text;
     try { const data = await projectFiles.readFile(root, file); if (data.kind !== 'text') continue; text = data.text; } catch { continue; }
     bytes += text.length; if (bytes > LIMITS.bytes) { truncated = true; break; }
-    const ext = path.extname(file).toLowerCase(), hidden = hiddenRanges(text, ext);
+    const ext = path.extname(file).toLowerCase(), hidden = hiddenRanges(text, ext), first = matches.length;
     pattern.lastIndex = 0;
     for (const match of text.matchAll(pattern)) {
       if (hidden.some(([start, end]) => match.index >= start && match.index < end)) continue;
-      matches.push({ file, index: match.index, length: match[0].length, line: lineOf(text, match.index), fit: fitOf(text, match.index, match[0].length, tag) });
-      if (matches.length >= LIMITS.matches) return { matches, truncated: true };
+      const fit = fitOf(text, match.index, match[0].length, tag);
+      // Står teksten i en streng, huskes strengens citationstegn, så rettelsen ikke kan afslutte strengen (fund 21, beta 3).
+      matches.push({ file, index: match.index, length: match[0].length, line: lineOf(text, match.index), fit, quote: fit === 'string' ? text[match.index - 1] : '', utf8: true });
+      if (matches.length >= LIMITS.matches) break;
     }
+    // Ugyldig UTF-8 bliver altid til erstatningstegnet, når filen læses. Kun da læses filens bytes og kontrolleres.
+    if (matches.length > first && text.includes('\uFFFD') && !(await utf8File(root, file))) for (const match of matches.slice(first)) match.utf8 = false;
+    if (matches.length >= LIMITS.matches) return { matches, truncated: true };
   }
   return { matches, truncated };
 }
 // Et sikkert sted at rette: én forekomst på den viste side, ellers én i hele projektet, ellers én med det rette tag.
+// Står den i en fil, der ikke er UTF-8, er kilden kendt, men teksten overlades til AI'en.
 function chooseSource(matches, { pageFile = '' } = {}) {
   const one = list => list.length === 1 ? list[0] : null;
   const tagged = list => list.filter(match => match.fit === 'tag');
   const page = matches.filter(match => match.file === pageFile);
   const match = (pageFile && (one(page) || one(tagged(page)))) || one(matches) || one(tagged(matches));
-  if (match) return { match, reason: 'ok' };
+  if (match) return { match, reason: match.utf8 === false ? 'encoding' : 'ok' };
   return { match: null, reason: matches.length ? 'many' : 'none' };
 }
 // Hvilken side der vises. Statisk forhåndsvisning serverer mappen public; Astro bruger src/pages.
@@ -229,13 +239,19 @@ function pageFileFor(relativeURL, kind) {
 // ---------- Tekstrettelse ----------
 const HTML_LIKE = new Set(['.html', '.htm', '.astro', '.vue', '.svelte']), SCRIPT = new Set(['.jsx', '.tsx', '.js', '.ts', '.mjs']);
 class EditError extends Error { constructor(message, code) { super(message); this.code = code; } }
+// Teksten står på kortet i første lag, så den bruger ikke fagordet UTF-8 (DESIGN.md, Rolige skærme). Det tekniske navn får AI'en i referenceText.
+const ENCODING = 'Filen er gemt i et ældre tekstformat, så Aura retter den ikke selv: æ, ø og å i filen kunne gå tabt. Bed AI’en ændre teksten.';
 // Den nye tekst skrevet, så den betyder det samme i filen. Tegn, der kræver en kodeændring, overlades til AI'en.
-function replacementFor(file, text, fit) {
+// I en streng er strengens eget citationstegn et sådant tegn: det ville afslutte strengen og give en syntaksfejl.
+// I en skabelon (Vue, Svelte, Astro) kan strengen stå inde i en attribut, fx :tekst="'Mødelokale A'", hvor det andet citationstegn
+// afgrænser attributten. Aura kan ikke se det, så her overlades begge lige citationstegn til AI'en (fund N:C2-2, beta 3).
+function replacementFor(file, text, fit, quote = '') {
   const ext = path.extname(file).toLowerCase();
   const refuse = () => { throw new EditError('Teksten indeholder tegn, som kræver en ændring i koden. Bed AI’en rette den.', 'chars'); };
   if (fit === 'string') {
-    if (!SCRIPT.has(ext) && !['.astro', '.vue', '.svelte'].includes(ext)) refuse();
-    if (/[`\\]|\$\{/.test(text)) refuse();
+    const template = ['.astro', '.vue', '.svelte'].includes(ext);
+    if (!SCRIPT.has(ext) && !template) refuse();
+    if (/[`\\]|\$\{/.test(text) || !['"', "'", '`'].includes(quote) || text.includes(quote) || (template && /["']/.test(text))) refuse();
     return text;
   }
   if (HTML_LIKE.has(ext)) { if (ext !== '.html' && ext !== '.htm' && /[{}]/.test(text)) refuse(); return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
@@ -251,6 +267,7 @@ function editability(selection, source) {
   if (selection.shadow) return { possible: false, reason: 'Elementet ligger i en indkapslet komponent, så Aura retter det ikke selv.' };
   if (source.reason === 'none') return { possible: false, reason: 'Aura fandt ikke teksten i projektets filer. Den bliver måske sat sammen i koden eller hentet fra data.' };
   if (source.reason === 'many') return { possible: false, reason: 'Teksten står flere steder i koden, så Aura ved ikke, hvilket sted den skal rette.' };
+  if (source.reason === 'encoding') return { possible: false, reason: ENCODING, code: 'encoding' };
   return { possible: true, reason: '' };
 }
 // Finder kilden igen lige før rettelsen, så filen læses, som den er nu, og kun den fil, brugeren så, ændres.
@@ -262,10 +279,15 @@ async function applyTextEdit(root, selection, value) {
   if (text === selection.raw) throw new EditError('Teksten er uændret.', 'same');
   const found = await findText(root, selection.raw, { tag: selection.tag, pageFile: selection.pageFile });
   const { match } = chooseSource(found.matches, { pageFile: selection.pageFile });
-  if (!match || match.file !== selection.source?.file) throw new EditError('Filen er ændret, siden du valgte elementet. Vælg det igen i forhåndsvisningen.', 'moved');
-  const replacement = replacementFor(match.file, text, match.fit);
+  const moved = () => new EditError('Filen er ændret, siden du valgte elementet. Vælg det igen i forhåndsvisningen.', 'moved');
+  if (!match || match.file !== selection.source?.file) throw moved();
+  if (match.utf8 === false) throw new EditError(ENCODING, 'encoding');
+  const replacement = replacementFor(match.file, text, match.fit, match.quote);
   const target = path.join(root, ...projectFiles.normalize(match.file).split('/'));
   const before = (await projectFiles.readFile(root, match.file)).text;
+  // Sidste kontrol før skrivningen: filen skal kunne skrives tilbage byte for byte, så kun den valgte tekst ændres.
+  const bytes = await fs.readFile(target);
+  if (!Buffer.from(before, 'utf8').equals(bytes)) throw validUTF8(bytes) ? moved() : new EditError(ENCODING, 'encoding');
   const after = before.slice(0, match.index) + replacement + before.slice(match.index + match.length);
   await fs.writeFile(target, after);
   return { file: match.file, line: match.line, before, after, oldText: selection.raw, newText: text };
@@ -285,6 +307,9 @@ function referenceText(selection) {
   if (selection.selector) lines.push(`- Placering i siden: ${selection.selector}`);
   if (selection.source) lines.push(`- Sandsynlig kilde: ${selection.source.file}, linje ${selection.source.line} (Aura fandt teksten dér)`);
   else if (selection.sourceNote) lines.push(`- Kilde: ${selection.sourceNote}`);
+  // AI'ens egne værktøjer læser også filer som UTF-8, så den skal vide, at denne fil kræver en bevidst konvertering.
+  // Filens egen tegnsætsangivelse skal rettes med, ellers vises æ, ø og å forkert hos værter, der ikke selv angiver tegnsættet.
+  if (selection.edit?.code === 'encoding') lines.push('- Tekstformat: kildefilen er ikke gemt som UTF-8 (fx Windows-1252). Almindelig redigering ville erstatte filens æ, ø og å med erstatningstegn. Konvertér først hele filen til UTF-8 fra dens rigtige tegnsæt. Ret også en tegnsætsangivelse i filen, fx <meta charset="windows-1252">, til utf-8. Fortæl brugeren det.');
   if (selection.secret) lines.push('- Indhold: udeladt, fordi det kan indeholde en nøgle eller adgangskode');
   else if (selection.html) lines.push(`- HTML i siden: ${selection.html}`);
   lines.push('Ret kun dette element og det, der hører til det, medmindre brugeren beder om andet.');

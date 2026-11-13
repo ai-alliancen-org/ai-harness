@@ -6,8 +6,9 @@ const { randomUUID, createHash } = require('node:crypto');
 const { stripVTControlCharacters } = require('node:util');
 const runtime = require('./runtime.cjs');
 const net = require('node:net');
-const { normalizeRuntimeConfig, detectServices, inspectPreviewDependencies, serviceDirectory } = require('./project-runtime.cjs');
+const { startFileDigest, normalizeRuntimeConfig, detectServices, inspectPreviewDependencies, serviceDirectory } = require('./project-runtime.cjs');
 const { npmInstallPolicy, npmFailure } = require('./npm-policy.cjs');
+const secrets = require('./secrets.cjs');
 const run = promisify(execFile);
 const active = state => ['installing', 'starting', 'running', 'stopping'].includes(state);
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -22,11 +23,16 @@ function environment(source = process.env) {
   return { ...env, NO_COLOR: '1', FORCE_COLOR: '0', ASTRO_TELEMETRY_DISABLED: '1', npm_config_update_notifier: 'false' };
 }
 function cleanOutput(value) {
-  return stripVTControlCharacters(value).replace(/[\x00-\x08\x0b-\x1f\x7f]/g, '')
+  // Det fælles modul kører først, mens Authorization-hoved, Bearer og KEY=værdi står intakte; de gamle mønstre tager resten.
+  // Omvendt rækkefølge ville lade det gamle mønster skjule ordet Bearer og efterlade selve nøglen.
+  return secrets.redact(stripVTControlCharacters(value).replace(/[\x00-\x08\x0b-\x1f\x7f]/g, ''))
     .replace(/\b(?:sk-[\w-]{8,}|gh[pousr]_[\w]{10,}|github_pat_[\w]+)\b/g, '[skjult nøgle]')
     .replace(/(https?:\/\/)[^\s/@:]+:[^\s/@]+@/gi, '$1[skjult]@')
     .replace(/((?:api[_-]?key|token|password|secret|authorization)\s*[:=]\s*)[^\s,;]+/gi, '$1[skjult]');
 }
+// Nyt output skæres ned, før det renses: en enkelt lang bid fra en proces må ikke koste mere at rense end det, loggen kan rumme.
+const CHUNK_LIMIT = 64_000;
+const appendOutput = (previous, addition) => cleanOutput(previous + String(addition).slice(-CHUNK_LIMIT)).slice(-16000);
 // Mange servere (Vite, Next, Astro) vælger selv deres port og lytter kun på "localhost", som kan være ::1. Serverens egen
 // "Local: http://localhost:5173/"-linje er derfor den sikreste kilde. Kun lokale adresser tæller, og den sidste vinder.
 function announcedURL(text) {
@@ -70,18 +76,25 @@ async function inspect(root, config = {}) {
   const [project, diagnostics] = await Promise.all([inspectRuntime(root, config), inspectPreviewDependencies(root, config)]);
   return { ...project, diagnostics };
 }
+// Overgang fra beta 2 (fund 24 og Q:C2-4, beta 3): dengang talte netlisten med i samtykkets fingeraftryk. Det gamle fingeraftryk
+// beregnes med projektets aktuelle netliste og formlen fra core/project-runtime.cjs i beta 2. ai-preview.cjs lader et samtykke til det
+// gælde, når pakker, opstart og netliste er de samme som dengang, og skriver det om til det nye. Uden netliste er de to ens.
+const legacyDigest = detected => detected.config.network ? createHash('sha256').update(JSON.stringify({ config: detected.config, files: detected.files })).digest('hex') : null;
+const legacy = value => value ? { legacyFingerprint: value } : {};
 async function inspectRuntime(root, config = {}) {
-  const detected = await detectServices(root, config);
-  if (detected.config.mode === 'static') return { kind: 'static', supported: false, installed: true, reason: 'Enkel hjemmeside viser projektets public-mappe uden en projektserver.', runtimeConfig: detected.config, services: [], fingerprint: detected.fingerprint };
+  const detected = await detectServices(root, config), old = legacyDigest(detected);
+  if (detected.config.mode === 'static') return { kind: 'static', supported: false, installed: true, reason: 'Enkel hjemmeside viser projektets public-mappe uden en projektserver.', runtimeConfig: detected.config, services: [], fingerprint: detected.fingerprint, ...legacy(old) };
   const normal = await inspectFramework(root);
-  if (!detected.config.services?.length && ['vite', 'astro'].includes(normal.kind) && normal.supported) return { ...normal, runtimeConfig: detected.config, services: [], fingerprint: createHash('sha256').update(normal.fingerprint + detected.fingerprint).digest('hex') };
-  if (!detected.services.length || !detected.config.services?.length && /anden pakkehåndtering|flere arbejdsområder/.test(normal.reason || '')) return { ...normal, runtimeConfig: detected.config, services: [], fingerprint: detected.fingerprint };
+  if (!detected.config.services?.length && ['vite', 'astro'].includes(normal.kind) && normal.supported) return { ...normal, runtimeConfig: detected.config, services: [], fingerprint: createHash('sha256').update(normal.fingerprint + detected.fingerprint).digest('hex'), ...legacy(old && createHash('sha256').update(normal.fingerprint + old).digest('hex')) };
+  if (!detected.services.length || !detected.config.services?.length && /anden pakkehåndtering|flere arbejdsområder/.test(normal.reason || '')) return { ...normal, runtimeConfig: detected.config, services: [], fingerprint: detected.fingerprint, ...legacy(old) };
   const services = [], installs = [], fingerprints = [detected.fingerprint];
   for (const service of detected.services) {
     const cwd = await serviceDirectory(root, service.cwd);
     const detail = await detectServices(cwd, { mode: 'auto' });
     fingerprints.push(detail.fingerprint);
     let pkg; try { pkg = JSON.parse(detail.files['package.json']); } catch {}
+    // Startfilerne, som kommandoen eller dens npm-script peger på, hører med til samtykket.
+    fingerprints.push(await startFileDigest(root, cwd, service.command, service.command[0] === 'npm' && service.command[1] === 'run' ? pkg?.scripts?.[service.command[2]] : null));
     const program = service.command[0], python = /^python(?:3)?(?:\.exe)?$/.test(program);
     const dependencies = { ...pkg?.dependencies, ...pkg?.devDependencies };
     let installed = true;
@@ -103,7 +116,7 @@ async function inspectRuntime(root, config = {}) {
     services.push({ ...service, cwd: service.cwd || '.', installed, python, ...(typeof declaredScript === 'string' ? { declaredScript } : {}) });
   }
   const dependencies = [...new Set(services.flatMap(service => service.python ? ['Python'] : ['Node.js']))];
-  return { kind: 'services', label: services.length === 1 ? services[0].label : `${services.length} lokale tjenester`, supported: true, installed: services.every(s => s.installed), fingerprint: createHash('sha256').update(JSON.stringify(fingerprints)).digest('hex'), reason: '', runtimeConfig: detected.config, services, installs, dependencies, script: services.map(s => s.command.join(' ')).join('\n') };
+  return { kind: 'services', label: services.length === 1 ? services[0].label : `${services.length} lokale tjenester`, supported: true, installed: services.every(s => s.installed), fingerprint: createHash('sha256').update(JSON.stringify(fingerprints)).digest('hex'), ...legacy(old && createHash('sha256').update(JSON.stringify([old, ...fingerprints.slice(1)])).digest('hex')), reason: '', runtimeConfig: detected.config, services, installs, dependencies, script: services.map(s => s.command.join(' ')).join('\n') };
 }
 async function nodeRuntime() {
   const candidates = runtime.get() ? [runtime.get().node] : (process.env.PATH || '').split(path.delimiter).filter(p => path.isAbsolute(p)).map(p => path.join(p, process.platform === 'win32' ? 'node.exe' : 'node'));
@@ -157,6 +170,9 @@ class DevServer {
   configure(config = {}) { if (active(this.state)) throw Error('Stop forhåndsvisningen, før opstarten ændres.'); this.config = normalizeRuntimeConfig(config); this.review = null; return this.config; }
   async runtimeConfig() { return normalizeRuntimeConfig(this.getRuntimeConfig ? await this.getRuntimeConfig(this.root) : this.config); }
   snapshot() { return { root: this.root, state: this.state, url: this.url || null, output: this.output, message: this.message || '', kind: this.kind, services: this.services || [], runtimeConfig: this.activeConfig || null }; }
+  // Brugerens samtykke til en adresse gælder straks, også mens serveren kører. Kun netlisten skiftes; tjenesterne og opstarten er
+  // de gennemgåede. Uden en kørende opstart er der intet at skifte: næste start læser netlisten fra lageret.
+  useNetwork(network) { if (this.activeConfig) this.activeConfig = { ...this.activeConfig, network: normalizeRuntimeConfig({ network }).network }; return this.snapshot(); }
   update(state, message = '') { this.state = state; this.message = message; this.emit(this.snapshot()); }
   async activate(root) { await this.stop(); this.review = null; this.root = root; this.url = null; this.output = ''; this.kind = null; this.update('idle'); }
   async status() { return { ...this.snapshot(), project: this.root ? await inspect(this.root, await this.runtimeConfig()).catch(error => ({ kind: 'unknown', supported: false, reason: error.message })) : null }; }
@@ -210,7 +226,7 @@ class DevServer {
     const output = chunk => {
       if (generation !== this.generation) return;
       // Bevar en afgrænset, maskeret proceslog i hukommelsen. Send aldrig til modellen automatisk.
-      this.output = cleanOutput(this.output + chunk.toString()).slice(-16000); this.emit(this.snapshot());
+      this.output = appendOutput(this.output, chunk); this.emit(this.snapshot());
     };
     child.stdout.on('data', output); child.stderr.on('data', output);
     child.once('error', () => void failure('Programmet kunne ikke startes. Kontrollér adgang til projektet og Node.js.'));
@@ -258,7 +274,7 @@ class DevServer {
     this.update(installing ? 'installing' : 'starting');
     const env = environment();
     if (review.executables.node) env.PATH = [path.dirname(review.executables.node), env.PATH || ''].join(path.delimiter);
-    const append = (label, chunk) => { if (generation === this.generation) { this.output = cleanOutput(this.output + `[${label}] ${chunk}`).slice(-16000); this.emit(this.snapshot()); } };
+    const append = (label, chunk) => { if (generation === this.generation) { this.output = appendOutput(this.output, `[${label}] ${chunk}`); this.emit(this.snapshot()); } };
     const failed = async message => {
       if (generation !== this.generation) return;
       ++this.generation; this.url = null; this.services = [];
@@ -349,4 +365,4 @@ class DevServer {
     return this.stopping;
   }
 }
-module.exports = { announcedURL, DevServer, inspect, environment, cleanOutput, nodeRuntime, terminate, findProgram };
+module.exports = { appendOutput, announcedURL, DevServer, inspect, environment, cleanOutput, nodeRuntime, terminate, findProgram };

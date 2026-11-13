@@ -53,13 +53,25 @@ const helpers = require('./ui-test-helpers.cjs');
     await helpers.taskOptions(page); await page.selectOption('#connection-select', connection.id);
     await page.waitForFunction(() => document.querySelector('#model-select').options.length === 2); await page.locator('#model-shortlist button').first().click();
   }
+  // Et nyt projekt med versioner godkender filændringer i projektet uden kort (docs/decisions.md, «Tilføjet under bygningen,
+  // 3. november 2026»); versioner og fortryd er sikkerhedsnettet. Samtalen kvitterer i stedet, én gang pr. opgave. Uden versioner
+  // spørger projektet som før (brugerens beslutning (c), 10. november 2026), så trin 6 venter på kortet.
+  const autoReceipts = () => page.locator('#messages .answer-record').filter({ hasText: '1 handling godkendt automatisk: projektets filer.' });
+  async function autoApproved(before) {
+    await autoReceipts().nth(before).waitFor({ timeout: 60000 });
+    assert.equal(await page.locator('#approvals').getByRole('button', { name: 'Afvis', exact: true }).count(), 0, 'en filændring i et nyt projekt med versioner giver intet godkendelseskort');
+  }
   async function sendTask(text, expectVersion) {
     if (text) await page.fill('#prompt', text);
-    const before = prompts.length;
+    const before = prompts.length, receipts = await autoReceipts().count();
     await page.click('#send');
     await page.waitForFunction(() => document.querySelector('#data-dialog').open || !document.querySelector('#stop').hidden);
     if (await page.locator('#data-dialog').evaluate(el => el.open)) await page.click('#accept-send');
-    await helpers.approve(page, 'Tillad for denne opgave');
+    if (expectVersion) await autoApproved(receipts);
+    else {
+      await helpers.approve(page, 'Tillad én gang');
+      assert.equal(await autoReceipts().count(), receipts, 'uden versioner godkendes filændringen ikke automatisk');
+    }
     await heading(`Udkast ${writes}`);
     await helpers.resultOption(page, expectVersion ? 'Fortryd opgaven' : 'Se ændringer');
     await page.waitForFunction(() => document.querySelector('#run-status').textContent === 'Klar');
@@ -115,15 +127,24 @@ const helpers = require('./ui-test-helpers.cjs');
     await page.keyboard.press('Escape');
     // Et nyt projekt starter i Byg; se DESIGN.md. Prøven arbejder direkte, som uden planlægning.
     assert.equal(await page.inputValue('#work-mode'), 'free');
-    await page.click('#composer-mode'); await page.selectOption('#work-mode', 'free'); await page.click('[data-close="task-dialog"]');
+    // Arbejdsmåden vælges ved skrivefeltet, også før der er en AI-forbindelse. «Vælg AI» fører uden forbindelse med vilje
+    // til forbindelsesguiden (DESIGN.md), så prøven bruger menuen ved skrivefeltet som brugeren (#53). Knappen er slået fra,
+    // mens oprettelsen holder låsen, så klikket venter, til menuen kan åbne.
+    await page.click('#composer-mode'); await page.locator('#composer-mode-menu').waitFor();
+    assert.deepEqual(await page.locator('#composer-mode-menu .composer-option strong').allTextContents(), ['Samtale', 'Byg'], 'uden planlægning er der to arbejdsmåder');
+    await page.click('#composer-mode-menu [data-mode="chat"]');
+    assert.equal(await page.inputValue('#work-mode'), 'chat'); assert.equal(await page.textContent('#composer-mode'), 'Samtale');
+    await page.click('#composer-mode'); await page.click('#composer-mode-menu [data-mode="free"]');
+    assert.equal(await page.inputValue('#work-mode'), 'free'); assert.equal(await page.textContent('#composer-mode'), 'Byg');
     assert.match(await page.inputValue('#prompt'), /tre fiktive mødelokaler/);
     // 3. Første opgave: kun Git-skillen kan hentes, og appens regler følger funktionerne.
     await helpers.addConnection(page, { name: 'Kontrolleret model', baseURL: `http://127.0.0.1:${server.address().port}/v1` });
     await chooseModel();
+    const firstReceipts = await autoReceipts().count();
     await page.click('#send'); await page.waitForSelector('#data-dialog[open]');
     assert.match(await page.textContent('#data-details'), /Skills, AI’en kan hente\s*Git og samarbejde/);
     await page.click('#accept-send');
-    await helpers.approve(page, 'Tillad for denne opgave');
+    await autoApproved(firstReceipts);
     await heading('Udkast 1'); await helpers.resultOption(page, 'Fortryd opgaven');
     await page.waitForFunction(() => document.querySelector('#run-status').textContent === 'Klar');
     assert.deepEqual(prompts[0].skills, ['harness-git-og-samarbejde']);
@@ -147,7 +168,7 @@ const helpers = require('./ui-test-helpers.cjs');
     assert.equal(await page.inputValue('#work-mode'), 'free', 'et tilvalg ændrer ikke arbejdsmåden');
     // Men slås Planlægning fra, mens man står i Planlæg, falder arbejdsmåden tilbage til standarden, Samtale.
     await page.click('[data-close="features-dialog"]');
-    await page.click('#composer-mode'); await page.selectOption('#work-mode', 'plan'); await page.click('[data-close="task-dialog"]');
+    await helpers.selectMode(page, 'plan');
     await helpers.menuClick(page, '#features-button'); await page.waitForSelector('#features-dialog[open]');
     await page.locator('#features-scope label').filter({ hasText: 'Kun' }).click();
     await page.locator('#features-list .feature-row[data-feature="planlaegning"] button').filter({ hasText: 'Brug standarden' }).click();
@@ -170,13 +191,15 @@ const helpers = require('./ui-test-helpers.cjs');
     await page.locator('#features-always > summary, .features-always > summary').first().click();
     await shot('funktioner-panel');
     await page.click('[data-close="features-dialog"]');
-    await page.click('#composer-mode'); await page.selectOption('#work-mode', 'free'); await page.click('[data-close="task-dialog"]');
+    await helpers.selectMode(page, 'free');
     // 5. Næste opgave starter en ny modelsession med de nye skills og regler.
     const second = await sendTask('Gør overskriften tydeligere.', true);
     assert.deepEqual(second.skills, ['harness-afproevning-og-fejlretning', 'harness-git-og-samarbejde', 'harness-integration-adresser', 'harness-kodestil', 'harness-overdragelse-og-drift', 'harness-udgivelse-og-gendannelse']);
     assert.ok(second.system.includes('Udgiv-knap'));
+    assert.match(second.system, /Integrerede udgivelsesveje, alfabetisk: Azure Static Web Apps, Cloudflare Pages, GitHub Pages, komplai Run, Promte Apps og Vercel/, 'udbyderdetaljerne når modellen, når Udgiv er slået til');
     assert.ok(second.system.includes('slået disse integrationer til: Adresser'));
-    // 6. Uden Versioner og fortryd får et nyt projekt ingen Git, og resultatkortet tilbyder ikke versioner.
+    // 6. Uden Versioner og fortryd får et nyt projekt ingen Git, resultatkortet tilbyder ikke versioner, og projektet spørger,
+    // før AI'en ændrer filer eller kører kommandoer, til sikkerhedsnettet er der (beslutning (c)).
     await helpers.menuClick(page, '#features-button'); await page.locator('#features-scope label').filter({ hasText: 'Alle projekter' }).click();
     await toggle('#features-list', 'versioner').uncheck();
     await page.locator('#features-list .feature-note').filter({ hasText: 'slået til, men kræver Versioner og fortryd' }).waitFor();
@@ -188,8 +211,10 @@ const helpers = require('./ui-test-helpers.cjs');
     project = path.join(documents, 'Aura', 'projekt-cykelruter');
     await assert.rejects(fs.access(path.join(project, '.git')), 'intet Git-repository uden versioner');
     await page.click('#project-menu-toggle'); assert.equal(await page.isVisible('#git-button'), false); await page.keyboard.press('Escape');
+    const waiting = (await page.evaluate(() => window.harness.projectSettings())).value;
+    assert.deepEqual([waiting.approvals.autoProjectFiles, waiting.approvals.autoCommands, waiting.pendingDefaults], [false, false, true], 'uden versioner er intet automatisk, og projektet venter på sikkerhedsnettet');
     await chooseModel();
-    await page.click('#composer-mode'); await page.selectOption('#work-mode', 'free'); await page.click('[data-close="task-dialog"]');
+    await helpers.selectMode(page, 'free');
     const third = await sendTask('', false);
     assert.equal(await page.locator('#run-review button').filter({ hasText: 'Gem version' }).count(), 0);
     assert.ok(third.system.includes('slået versioner fra')); assert.ok(!third.skills.includes('harness-git-og-samarbejde'));
@@ -203,7 +228,7 @@ const helpers = require('./ui-test-helpers.cjs');
     const after = await features();
     assert.equal(after.chosen, 'valgt'); assert.equal(after.defaults.versioner, false); assert.equal(after.defaults.kvalitet, true);
     assert.deepEqual(errors, []);
-    console.log(JSON.stringify({ status: 'bestået', root, checks: ['første start med Vælg selv', 'deling og versioner følges ad', 'startsiden uden design og hosting', 'ⓘ åbner og lukker i og uden for en dialog', 'Git fra start med versioner', 'Del og sikkerhedskopi skjult uden deling', 'direkte arbejde uden planlægning', 'kun aktive skills i motoren', 'appens regler følger funktionerne', 'undtagelse for ét projekt', 'ingen vandret rullebjælke i dialogen', 'integration slået til for ét projekt', 'arbejdsmåden følger planlægning med det samme', 'ændring for alle projekter', 'ny modelsession med nye skills', 'projekt uden Git og uden versionsknapper', 'valget husket efter genstart'] }, null, 2));
+    console.log(JSON.stringify({ status: 'bestået', root, checks: ['første start med Vælg selv', 'deling og versioner følges ad', 'startsiden uden design og hosting', 'ⓘ åbner og lukker i og uden for en dialog', 'Git fra start med versioner', 'Del og sikkerhedskopi skjult uden deling', 'direkte arbejde uden planlægning', 'filændringer i nye projekter godkendes automatisk uden kort', 'kun aktive skills i motoren', 'appens regler følger funktionerne', 'undtagelse for ét projekt', 'ingen vandret rullebjælke i dialogen', 'integration slået til for ét projekt', 'arbejdsmåden følger planlægning med det samme', 'ændring for alle projekter', 'ny modelsession med nye skills', 'projekt uden Git og uden versionsknapper', 'projekt uden versioner spørger før filændringer', 'valget husket efter genstart'] }, null, 2));
   } catch (error) {
     if (page) await page.screenshot({ path: path.join(root, 'fejl.png'), animations: 'disabled' }).catch(() => {});
     console.error(JSON.stringify({ root, errors }));

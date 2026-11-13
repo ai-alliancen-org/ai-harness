@@ -141,7 +141,10 @@ const questions = [
     await card.locator('.question-links button', { hasText: 'Tilbage' }).click();
     assert.equal(await card.locator('.answer-choice[aria-pressed="true"]').count(), 2, 'tilbage bevarer de valgte svar');
     await card.locator('.primary').click();
-    await card.locator('.question-links button', { hasText: 'Skriv dit eget svar' }).click();
+    // Det egne svar ligger bag ét link, så kortet højst viser tre til fire valg ad gangen (AGENTS.md, beta 3).
+    assert.equal(await card.locator('textarea').isVisible(), false, 'eget svar er sammenfoldet, til brugeren vil bruge det');
+    await card.locator('.answer-own summary', { hasText: 'Skriv dit eget svar' }).click();
+    assert.equal(await card.locator('textarea').isVisible(), true, 'eget svar vises efter ét klik');
     await card.locator('textarea').fill('I kommunens bookingsystem senere');
     await card.locator('button[type="submit"]').click();
     await card.waitFor({ state: 'detached' });
@@ -238,13 +241,13 @@ const questions = [
     assert.equal(await page.isVisible('#plan-actions'), true);
     passed('Brief og plan genåbnes under Plan efter en genstart');
 
-    // 980 × 720: fem faner på én linje, og spørgsmålskortet kan læses.
+    // 980 × 720: seks faner på én linje, og spørgsmålskortet kan læses.
     await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(w => w.webContents.getURL().startsWith('harness://')).setSize(980, 720)); await page.waitForTimeout(600);
     const tabs = await page.evaluate(() => ({ rows: new Set([...document.querySelectorAll('.work-tab:not([hidden])')].map(el => Math.round(el.getBoundingClientRect().top))).size, overflow: document.documentElement.scrollWidth > innerWidth }));
-    assert.equal(tabs.overflow, false); assert.equal(tabs.rows, 1, 'fem faner står på én linje ved 980 × 720');
+    assert.equal(tabs.overflow, false); assert.equal(tabs.rows, 1, 'seks faner står på én linje ved 980 × 720');
     const png = await app.evaluate(async ({ BrowserWindow }) => (await BrowserWindow.getAllWindows().find(w => w.webContents.getURL().startsWith('harness://')).webContents.capturePage()).toPNG().toString('base64'));
     await fs.writeFile(path.join(root, 'plan-980.png'), Buffer.from(png, 'base64'));
-    passed('Ved 980 × 720 står de fem faner på én linje uden vandret rulning');
+    passed('Ved 980 × 720 står de seks faner på én linje uden vandret rulning');
     assert.deepEqual(errors, []);
     console.log(JSON.stringify({ status: 'bestået', root, checks: checks.length }, null, 2));
   } catch (error) {

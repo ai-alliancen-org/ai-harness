@@ -7,7 +7,7 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const { Checkpoints } = require('./checkpoints.cjs');
 const { content } = require('./git.cjs');
-const { capture, changes } = require('./changes.cjs');
+const { capture, changes, OPAQUE_UNDO } = require('./changes.cjs');
 const connections = require('./connections.cjs');
 const { ContextUsage } = require('./context-usage.cjs');
 // Motorversionen hører til bindingen: en anden motor kan pakke konteksten anderledes.
@@ -17,7 +17,12 @@ const { projectInstructions, instructionText } = require('./project-instructions
 const { guidanceFor, appRules } = require('./project-guidance.cjs');
 const { startGateway } = require('./gateway.cjs');
 const { toolEntry, toolFiles, approvalTarget, approvalTitles } = require('./activity.cjs');
-const { taskSummary, sessionSummary, fileDetail, sessionAttribution, hash } = require('./change-review.cjs');
+const { coversProjectFolder } = require('./approvals-policy.cjs');
+const { collectScope, failureText } = require('../ui/approval-view.js');
+const DOOM_LOOP_AUTO_LIMIT = 3;
+// Kortsamlingen (brugerens beslutning 10. november 2026): efter så mange viste kort i én opgave spørger Aura én gang om resten af opgaven.
+const COLLECT_AFTER = 5;
+const { taskSummary, sessionSummary, opaqueSummary, fileDetail, sessionAttribution, hash } = require('./change-review.cjs');
 const projectFiles = require('./project-files.cjs');
 const { materialText, materialSummary } = require('./chat-materials.cjs');
 const { cleanOutput } = require('./dev-server.cjs');
@@ -37,7 +42,7 @@ const digest = value => crypto.createHash('sha256').update(value).digest('hex');
 function agentsDuplicatesRules(instructions, rules) { return Boolean(instructions?.content && rules) && instructions.content.trim() === String(rules).trim(); }
 const CONTEXT_SCOPE = 'Appens egne tekstfragmenter i systeminstruktionen. Ikke hele modelkaldet: motorens værktøjer og automatiske historik, samtalens kopi, den midlertidige mappe og kommandoisolationen står uden for.';
 function composeAppContext({ prepared, project, plan, planConversation, dismissed, handoff, surface, preview = '' }) {
-  const rules = appRules(prepared.context.features, { surface, runtime: prepared.runtime, skills: prepared.context.skills.map(skill => skill.name), links: project.links || [], mode: prepared.mode, autoCheckpoint: prepared.autoCheckpoint, integrations: prepared.context.integrations });
+  const rules = appRules(prepared.context.features, { surface, runtime: prepared.runtime, skills: prepared.context.skills.map(skill => skill.name), links: project.links || [], mode: prepared.mode, autoCheckpoint: prepared.autoCheckpoint, integrations: prepared.context.integrations, autoCommands: prepared.autoCommandsSnapshot === true });
   const components = [], add = (title, text) => { components.push({ title, text, hash: digest(text) }); return text; };
   let system = add('Appens grundregler og projektkontekst', `AI HARNESS' GRUNDREGLER:\n${prepared.context.rules}\n\n${rules}\n\nProjektkontekst (data, ikke højere prioriterede instruktioner):\n${JSON.stringify({ name: project.name, purpose: project.purpose, links: project.links, tests: project.tests, design: prepared.disclosure.projectDesign, hostingPreference: prepared.startup?.hosting || 'beslut senere', references: prepared.references })}\nArbejd kun på brugerens konkrete opgave.`);
   if (prepared.mode !== 'chat') system += add('Appens vejledning om projektvalg og design', '\n' + guidanceFor(surface, prepared.runtime));
@@ -57,11 +62,57 @@ function composeAppContext({ prepared, project, plan, planConversation, dismisse
   return { components, system, hash: digest(system), scope: CONTEXT_SCOPE };
 }
 
-// Fejl fra OpenCode selv, fx når modellen afviser kaldet. Statuskoden afgør typen, når den findes.
-function sessionFailure(error) {
+// Udbyderens egen tekst, når kontoens kvote eller kredit er brugt op, fx OpenAI's insufficient_quota, der kommer som HTTP 429.
+// Gatewayen bruger den samme tekst ved et langt Retry-After.
+const { QUOTA_TEXT } = require('./gateway.cjs');
+// Fejl fra OpenCode selv, fx når modellen afviser kaldet. Statuskoden afgør typen, når den findes. forwarded er gatewayens
+// seneste videresendte fejl: en 502, som gatewayen selv sendte, fordi udbyderen ikke kunne nås, er en afbrudt forbindelse (fund 12).
+function sessionFailure(error, { forwarded = null } = {}) {
   const status = error?.data?.statusCode;
+  if (status === 502 && forwarded === 'network') return 'network';
+  // En vedvarende 429 med besked om opbrugt kvote eller kredit hjælper det ikke at vente på: kontoen skal fyldes op (K5).
+  if (status === 429 && QUOTA_TEXT.test(`${error?.data?.message || ''} ${error?.data?.responseBody || ''}`)) return 'quota';
   if (status) return { 401: 'key', 403: 'access', 402: 'quota', 404: 'notfound', 429: 'limit' }[status] || (status >= 500 ? 'server' : 'rejected');
   return /auth/i.test(error?.name || '') ? 'key' : 'model';
+}
+// OpenCodes genforsøg til skærmen: forsøget, tidspunktet for næste forsøg og fejlens type i almindelige ord (K5).
+function retryInfo(status, forwarded) {
+  const message = String(status?.message || '');
+  const code = Number(/HTTP (\d{3})/.exec(message)?.[1]) || (/too many requests/i.test(message) ? 429 : null);
+  return { attempt: Number.isInteger(status?.attempt) ? status.attempt : null, next: Number.isFinite(status?.next) ? status.next : null, status: code, kind: forwarded === 'network' ? 'network' : code === 429 ? 'limit' : code >= 500 ? 'server' : 'model' };
+}
+// Linjen om tidligere samtale i Før du sender. Tidligere samtale nævnes kun, når den følger med (DESIGN.md:57): en fortsat
+// AI-session har beskederne og værktøjsresultaterne, og en ny AI-session får de seneste beskeder som tekst. Linjen afhænger ikke
+// af tilvalget af en ekstra kopi, som appen selv sætter i flere forløb (N:B1-4), og den står alene, så brugerfladen ikke sætter
+// en sætning foran, der kan modsige den (N:B1-5). Uden tidligere samtale er den tom.
+function historyText({ included, continues, earlier }) {
+  if (continues) return earlier || included ? 'I denne samtale kan AI’en bruge tidligere beskeder og værktøjsresultater.' + (included ? ' De seneste beskeder fra før denne AI-session følger også med som tekst.' : '') : '';
+  return included ? 'AI-sessionen er ny, så de seneste beskeder fra samtalen medsendes som tekst. Tidligere værktøjsresultater følger ikke med.' : '';
+}
+// Det, gennemgangen bygger på, uden projektets placering. En samtale, der får sin egen kopi under afsendelsen
+// (Workbench.allocate), arbejder derefter i kopien, og kopien er projektet, som det var, da den blev lavet. Kun stien er en anden,
+// og uden harness.json også navnet, som så kommer af mappens navn (projects.cjs openProject). Q:B1-3.
+function projectBasis(project) {
+  const { root, ...basis } = project || {};
+  if (basis.schemaVersion !== 1) delete basis.name;
+  return basis;
+}
+// Et svar i Planlæg, der stiller brugeren et spørgsmål i almindelig tekst og ikke ligner en plan, er et åbent spørgsmål. Det giver
+// ikke Byg videre (README: et nej eller et åbent spørgsmål giver ikke knappen; Q:C2-5). Kodeblokke tæller ikke med. Et spørgsmål om
+// AI'en må gå i gang, fx «Skal jeg bygge den?», er selve byggeforslaget og ikke et åbent spørgsmål; et spørgsmål med hv-ord er åbent.
+const BUILD_OFFER = /\b(?:jeg|vi)\b.*\b(?:byg(?:ge|ger)?|gå(?:r)? (?:i gang|videre)|sætte(?:r)? i gang|begynde(?:r)?|starte(?:r)?|lave(?:r)? (?:den|det|siden|appen))\b/i;
+function openQuestion(text) {
+  let code = false; const lines = [];
+  for (const line of String(text || '').split('\n')) { if (/^\s*```/.test(line)) { code = !code; continue; } if (!code) lines.push(line.trim()); }
+  const offer = sentence => BUILD_OFFER.test(sentence) && !/^(?:hv|og hv)/i.test(sentence.trim());
+  const open = line => /\?[\s"'»”)*_]*$/.test(line) && !(line.match(/[^.!?]*\?/g) || []).every(offer);
+  return lines.some(open) && !require('../ui/plan-view.js').parsePlan(text).structured;
+}
+// Teksten bag Se detaljer: Auras egen forklaring først og derefter udbyderens egen tekst, hvis gatewayen har fået en (allerede renset).
+function failureMessage(event, p) {
+  const own = String(event.message || p.error?.data?.message || p.error?.message || '');
+  const detail = event.failure?.detail ? `\n\nUdbyderens egen tekst: ${event.failure.detail}` : '';
+  return (own.slice(0, 500) + detail).slice(0, 1000);
 }
 function planningReply(roles, parts) {
   const assistantIDs = [...roles].filter(([, role]) => role === 'assistant').map(([id]) => id);
@@ -71,6 +122,10 @@ function planningReply(roles, parts) {
     text: assistantParts.filter(p => p.messageID === lastID).map(p => p.text || '').join('\n').trim(),
     context: assistantParts.map(p => p.text || '').join('\n').trim()
   };
+}
+// Afklaringen rummer både brugerens svar og tidligere plantekster. Plantekster og brugerens egne rettelser af dem hører til planen, ikke til dens baggrund.
+function withoutPlanTexts(conversation) {
+  return (conversation || []).filter(entry => typeof entry === 'string' && !entry.startsWith('Brugeren har selv rettet planen til:') && !conversationMode.concretePlan(entry));
 }
 // Forbrug i en samtale. Tokens tælles pr. modelkald (OpenCodes step-finish), fordi beskeden kun beholder det sidste kalds tal.
 const emptyUsage = () => ({ input: 0, output: 0, reasoning: 0, cacheRead: 0, cacheWrite: 0, calls: 0, cost: 0, unpriced: 0 });
@@ -93,8 +148,8 @@ class ChatSession {
     this.usageBase = { ...emptyUsage(), ...(data.usage || {}) };
     this.contextUsage = new ContextUsage();
     this.running = false; this.starting = false; this.finishing = null; this.generation = 0; this.task = null; this.prepared = null;
-    this.engine = null; this.gateway = null; this.engineIdentity = null; this.allowProjectEdits = false; this.approveAll = false; this.historyWarning = '';
-    this.taskRules = new Set(); this.approvals = new Map();
+    this.engine = null; this.gateway = null; this.engineIdentity = null; this.allowProjectEdits = false; this.approveAll = false; this.approveAllUnisolated = false; this.historyWarning = '';
+    this.taskRules = new Set(); this.approvals = new Map(); this.cardsShown = 0; this.collectOffer = null;
     this.runUser = null; this.runText = new Map(); this.runRoles = new Map(); this.runSteps = new Map(); this.runPrice = null; this.questions = new Map(); this.closedQuestions = new Set();
     // Ændringer og Aktivitet for denne samtale, så længe appen er åben: udgangspunkt, afsluttede opgaver og loggen.
     // De ligger hos arbejdsbænken, så de bevares, når projektet genåbnes, fx efter en gendannelse.
@@ -116,7 +171,7 @@ class ChatSession {
     return usage;
   }
   // Det, brugerfladen skal bruge for at vise samtalen.
-  view() { return { id: this.id, title: this.title, workspace: this.data, plan: this.plan, lastPlan: this.lastPlan, usage: this.currentUsage(), contextUsage: this.contextUsage.snapshot(), running: this.running, historyWarning: this.historyWarning }; }
+  view() { return { approveAll: this.approveAll === true, approveAllUnisolated: this.approveAll === true && this.approveAllUnisolated === true, id: this.id, title: this.title, workspace: this.data, plan: this.plan, lastPlan: this.lastPlan, usage: this.currentUsage(), contextUsage: this.contextUsage.snapshot(), running: this.running, historyWarning: this.historyWarning }; }
   checkpointEvent(event) {
     if (event.type !== 'git.checkpoint') return;
     this.lastCheckpoint = event;
@@ -153,6 +208,14 @@ class ChatSession {
     await this.persistPlan();
     this.log({ kind: 'plan', title: 'Du gik tilbage til AI’ens plan', status: 'completed' });
     return this.plan;
+  }
+  // En Planlæg-besked, der hverken fik svar eller spørgsmål, står ikke i afklaringen efter en fejl eller Stop. Ellers kommer den med to gange ved Prøv igen.
+  dropUnansweredClarification() {
+    const entry = this.runClarification; this.runClarification = null;
+    if (!entry || this.runMode !== 'plan' || this.runAsked) return;
+    if (planningReply(this.runRoles || new Map(), this.runText || new Map()).text.trim()) return;
+    const index = this.planConversation.lastIndexOf(entry);
+    if (index >= 0) this.planConversation.splice(index, 1);
   }
   async persistPlan() {
     try { this.data = await this.bench.history.savePlan(this.project.root, this.id, this.plan, this.planConversation, this.lastPlan); }
@@ -227,18 +290,17 @@ class ChatSession {
     const approvalSettings = await bench.approvalsPolicy.settings(projectRoot);
     const autoCommandsSnapshot = !['chat', 'plan'].includes(mode) && approvalSettings.autoCommands === true;
     const commandSupport = !['chat', 'plan'].includes(mode) ? await require('./command-sandbox.cjs').support() : { available: false };
-    if (autoCommandsSnapshot && !commandSupport.available) throw new Error(commandSupport.reason);
+    // Uden en sandkasse (Windows) kræver automatiske kommandoer brugerens gemte, eksplicitte valg om at køre uden isolation.
+    const unisolatedPossible = require('./command-sandbox.cjs').canRunUnisolated(commandSupport);
+    const autoCommandsUnisolated = autoCommandsSnapshot && unisolatedPossible && approvalSettings.autoCommandsUnisolated === true;
+    if (autoCommandsSnapshot && !commandSupport.available && !autoCommandsUnisolated) throw new Error(commandSupport.reason);
+    // «Godkend alt» gælder kun for den forbindelse og model, det blev givet til. Skifter de, slås det fra, før sandkassen vælges.
+    this.dropApproveAllIfChanged(selection);
     const commandIsolation = commandIsolationFor({ support: commandSupport, autoCommandsSnapshot, approveAll: this.approveAll === true });
     const startup = settings.startup || null, autoCheckpoint = settings.autoCheckpoint === true;
     const disclosure = connections.disclosure(selection.connection, selection.model, selection.route);
     disclosure.projectChoices = startup ? `Hostingønske: ${startup.hosting || 'beslut senere'}. Teststrategi: ${startup.tests}. Ønsker er ikke en deploymentgodkendelse.` : 'Ingen ekstra opstartsvalg.';
     disclosure.mode = mode;
-    const previousMode = this.runMode || this.data.lastRunMode || this.data.mode;
-    const modelSwitch = Boolean(this.engine?.active && this.engineKey && this.engineKey !== `${selection.connection.id}|${selection.model.id}`);
-    const modeHandoff = handoffNeeded({ messages: this.data.messages, engineActive: Boolean(this.engine?.active), modelSwitch, previousMode, mode });
-    const historyMessages = input.includeHistory === true || modeHandoff ? (this.data?.messages || []).filter(m => m.role !== 'system').slice(-16) : [];
-    disclosure.conversation = historyMessages.map(m => `${m.role === 'user' ? 'Bruger' : 'AI'}: ${m.text}`).join('\n\n').slice(-60000);
-    disclosure.historyIncluded = Boolean(disclosure.conversation);
     const currentProject = await require('./projects.cjs').openProject(this.root);
     disclosure.projectDesign = require('./projects.cjs').designContext(currentProject);
     disclosure.projectGuidance = guidanceFor(bench.surface, settings.runtime);
@@ -270,9 +332,25 @@ class ChatSession {
     // Indsatsen sættes på gatewayen ved hver besked og starter ikke en ny modelsession; samtalens historik bevares.
     const { planContext, conversation, historyIncluded, fileReferences, fileReferenceText, previewReference, previewReferenceText, brief: briefContext, workspace: localWorkspace, effort: chosenEffort, effortLevels, ...consent } = disclosure;
     // Grundregler, skills og funktioner indgår, så en ændring starter en ny modelsession med de nye instruktioner.
-    disclosure.fingerprint = crypto.createHash('sha256').update(JSON.stringify(consent) + JSON.stringify({ connectionRevision: selection.connection.revision || null, rules: context.rules, skills: context.skills, features: context.features, projectInstructions: context.projectInstructions, surface: bench.surface, autoCheckpoint, commandIsolation, autoCommandsSnapshot })).digest('hex');
+    disclosure.fingerprint = crypto.createHash('sha256').update(JSON.stringify(consent) + JSON.stringify({ connectionRevision: selection.connection.revision || null, rules: context.rules, skills: context.skills, features: context.features, projectInstructions: context.projectInstructions, surface: bench.surface, autoCheckpoint, commandIsolation, autoCommandsSnapshot, ...(autoCommandsUnisolated ? { autoCommandsUnisolated } : {}) })).digest('hex');
     // Motorens identitet er adskilt fra fingeraftrykket til gennemgangen, så en ændret startside ikke starter en ny AI-session.
-    disclosure.sessionFingerprint = engineIdentityOf(disclosure, { connectionRevision: selection.connection.revision || null, rules: context.rules, skills: context.skills, features: context.features, projectInstructions: context.projectInstructions, surface: bench.surface, autoCheckpoint, commandIsolation, autoCommandsSnapshot });
+    disclosure.sessionFingerprint = engineIdentityOf(disclosure, { connectionRevision: selection.connection.revision || null, rules: context.rules, skills: context.skills, features: context.features, projectInstructions: context.projectInstructions, surface: bench.surface, autoCheckpoint });
+    const previousMode = this.runMode || this.data.lastRunMode || this.data.mode;
+    // Den nye session har ikke samtalen, når den gemte AI-session hører til en anden identitet end den, der sendes nu. Det gælder også uden aktiv motor
+    // (efter en fejl, et samtaleskift eller en genstart af appen), hvor modelskiftet ellers ikke kunne ses.
+    const savedPrint = this.data.opencode?.fingerprint || null;
+    const modelSwitch = Boolean(this.engine?.active && this.engineKey && this.engineKey !== `${selection.connection.id}|${selection.model.id}`) || Boolean(savedPrint && savedPrint !== disclosure.sessionFingerprint);
+    // Fortsætter samme AI-session (kørende motor eller gemt session med samme identitet)? Modelsessionen følger sessionsfingeraftrykket.
+    // En vedhæftning giver et nyt fingeraftryk til gennemgangen, men ikke en ny session, så forudsigelsen regner på det samme aftryk som
+    // genbruget af motoren. Arbejder en anden samtale i mappen, får opgaven sin egen kopi ved afsendelsen (Workbench.allocate) og
+    // dermed en ny AI-session (Q:B1-2).
+    const sessionPrint = disclosure.sessionFingerprint || disclosure.fingerprint;
+    const holder = bench.claims?.get(this.root), copyExpected = Boolean(holder && holder !== this);
+    const running = !copyExpected && this.engineIdentity === sessionPrint && Boolean(this.engine?.active), saved = !copyExpected && this.data.opencode?.fingerprint === sessionPrint;
+    const modeHandoff = handoffNeeded({ messages: this.data.messages, engineActive: Boolean(this.engine?.active), modelSwitch, previousMode, mode, continues: running || saved });
+    const historyMessages = input.includeHistory === true || modeHandoff ? (this.data?.messages || []).filter(m => m.role !== 'system').slice(-16) : [];
+    disclosure.conversation = historyMessages.map(m => `${m.role === 'user' ? 'Bruger' : 'AI'}: ${m.text}`).join('\n\n').slice(-60000);
+    disclosure.historyIncluded = Boolean(disclosure.conversation);
     // Resuméet før afsendelse vises igen, når modtager, model, vilkår, pris eller delt materiale ændrer sig. Skift fra plan til byg er ikke en ny modtager.
     Object.assign(disclosure, modelConsent.review(selection.connection.id, disclosure, settings, context.projectInstructions?.hash));
     if (chatMaterials) {
@@ -291,19 +369,26 @@ class ChatSession {
     // Forhåndsvisningens størrelse til før/efter-billederne. Kun tal; siden findes i hovedprocessen.
     const view = input.view && Number.isFinite(input.view.width) && Number.isFinite(input.view.height) ? { width: Math.round(input.view.width), height: Math.round(input.view.height) } : null;
     if ((bench.connectionVersions.get(input.connectionID) || 0) !== connectionVersion) throw new Error('Forbindelsen blev ændret. Gennemgå oplysningerne igen.');
-    this.prepared = { mode, chatMaterials, ...selection, disclosure, references, fileRefs: checkedRefs, previewTarget: target, view, context, autoCheckpoint, commandIsolation, commandSandboxSupported: commandSupport.available, autoCommandsSnapshot, startup, runtime: settings.runtime, root: this.root };
+    this.prepared = { mode, chatMaterials, ...selection, disclosure, references, fileRefs: checkedRefs, previewTarget: target, view, context, autoCheckpoint, commandIsolation, commandSandboxSupported: commandSupport.available, commandUnisolatedPossible: unisolatedPossible, autoCommandsUnisolated, autoCommandsSnapshot, startup, runtime: settings.runtime, root: this.root, connectionVersion };
     const prepared = this.prepared;
     // Den tidligere samtale, der efter al sandsynlighed følger med. Den endelige værdi kendes først, når motoren er
     // startet; afviger den, afvises afsendelsen i stedet for at sende en anden tekst end den gennemgåede.
-    // Modelsessionen følger sessionsfingeraftrykket. En vedhæftning giver et nyt fingeraftryk til gennemgangen,
-    // men ikke en ny session, så forudsigelsen skal regne på det samme aftryk som genbruget af motoren.
-    const sessionPrint = disclosure.sessionFingerprint || disclosure.fingerprint;
-    prepared.handoff = this.engineIdentity === sessionPrint && this.engine?.active ? this.engineConversation || '' : this.data.opencode?.fingerprint === sessionPrint ? this.data.opencode.conversation || '' : disclosure.conversation || '';
+    // Teksten, en ny AI-session får: de seneste beskeder, når samtalen har nogen (Q:B1-2). Fortsætter samme session, har
+    // AI'en allerede samtalen, og en ekstra kopi sendes ikke (README: en igangværende modelsession beholder sin egen kontekst).
+    prepared.history = disclosure.conversation || '';
+    prepared.handoff = running ? this.engineConversation || '' : saved ? this.data.opencode.conversation || '' : prepared.history;
+    // Forudsigelsen bindes til afsendelsen: forudsagt ny session starter en ny session, og en forudsagt fortsættelse, der ikke kan
+    // gennemføres, afvises i stedet for at fortsætte i en session uden samtalen (sendPrepared).
+    prepared.sessionContinues = running || saved;
+    // Før du sender viser det, der faktisk sendes med denne besked, og aldrig en kopi, der ikke sendes (test-resume).
+    disclosure.conversation = prepared.handoff; disclosure.historyIncluded = Boolean(prepared.handoff);
+    disclosure.historyRequested = input.includeHistory === true;
+    disclosure.historyText = historyText({ included: disclosure.historyIncluded, continues: running || saved, earlier: (this.data.messages || []).some(message => message.role !== 'system') });
     prepared.messageText = typeof input.text === 'string' ? input.text : null;
     // Projektet, som det står på disken nu. checkContext kontrollerer, at det er uændret ved afsendelsen.
     prepared.project = currentProject;
     // Alt, fragmenterne bygges af. Ændrer noget af det sig inden afsendelsen, er gennemgangen ikke længere gyldig.
-    prepared.guard = JSON.stringify({ project: currentProject, context, startup, runtime: settings.runtime, plan: this.plan, planConversation: this.planConversation, dismissed: this.data.planOffersDismissed });
+    prepared.guard = JSON.stringify({ project: projectBasis(currentProject), context, startup, runtime: settings.runtime, plan: this.plan, planConversation: this.planConversation, dismissed: this.data.planOffersDismissed });
     // I Planlæg er beskeden selv en del af afklaringen, og den lægges til, lige før systeminstruktionen bygges.
     const clarification = mode === 'plan' && typeof input.text === 'string' ? [...this.planConversation, input.text + (disclosure.fileReferenceText || '') + (disclosure.previewReferenceText || '') + materialSummary(chatMaterials)] : [...this.planConversation];
     prepared.previewNote = this.previewNote || '';
@@ -316,8 +401,11 @@ class ChatSession {
   // Grundlaget for de gennemgåede fragmenter skal stå uændret, både før opstarten og igen, lige før beskeden sendes.
   async checkContext(prepared, runPlan = null) {
     const bench = this.bench, root = this.project.root;
+    // Forbindelsen blev gemt igen, fx med en ny nøgle i nøglevinduet, efter gennemgangen. Beskeden siger, hvad der er ændret.
+    if (this.prepared === prepared && (bench.connectionVersions.get(prepared.connection?.id) || 0) !== (prepared.connectionVersion ?? 0)) throw new Error('Forbindelsen blev ændret, mens opgaven startede. Gennemgå oplysningerne, og send igen.');
     const context = await bench.skills.context(root); context.projectInstructions = await projectInstructions(this.root);
-    const settings = await bench.store.project(root), project = await require('./projects.cjs').openProject(prepared.root);
+    // Samtalens mappe nu: projektet eller samtalens kopi, også en kopi, den fik under denne afsendelse (Q:B1-3).
+    const settings = await bench.store.project(root), project = projectBasis(await require('./projects.cjs').openProject(prepared.root));
     const original = JSON.parse(prepared.guard);
     const current = { project, context, startup: settings.startup || null, runtime: settings.runtime, plan: this.plan, planConversation: this.planConversation, dismissed: this.data.planOffersDismissed };
     if (runPlan) {
@@ -329,9 +417,10 @@ class ChatSession {
   }
   async send(input) {
     if (this.archiving || this.data.archived) throw new Error('Hent samtalen fra arkivet, før du fortsætter.');
-    if (this.sending || this.running || this.finishing) throw new Error('Der er allerede en opgave i gang i denne samtale.');
+    if (this.sending || this.running || this.finishing || this.stopping) throw new Error('Der er allerede en opgave i gang i denne samtale.');
     this.sending = true;
-    try { return await this.sendPrepared(input); } finally { this.sending = false; this.starting = false; }
+    const operation = this.sendPrepared(input); this.sendOperation = operation;
+    try { return await operation; } finally { this.sending = false; this.starting = false; if (this.sendOperation === operation) this.sendOperation = null; }
   }
   async sendPrepared(input) {
     if (this.running) throw new Error('Der er allerede en opgave i gang i denne samtale.');
@@ -363,24 +452,27 @@ class ChatSession {
     // Samtalen viser målet som én linje; den fulde beskrivelse af elementet står i Før du sender.
     const text = input.text + (prepared.disclosure.fileReferenceText || '') + (prepared.disclosure.previewReferenceText || '') + materialText(prepared.chatMaterials);
     const shown = input.text + (prepared.disclosure.fileReferenceText || '') + (prepared.disclosure.previewReference ? `\n\nMål i forhåndsvisningen: ${prepared.disclosure.previewReference}` : '');
-    this.runMode = prepared.mode; this.runConnectionID = prepared.connection.id; this.runText = new Map(); this.runTools = new Map(); this.runRoles = new Map(); this.allowProjectEdits = false; this.taskRules = new Set(); this.approvals.clear(); this.runFinish = null; this.runFailure = null;
+    this.runMode = prepared.mode; this.runConnectionID = prepared.connection.id; this.runText = new Map(); this.runTools = new Map(); this.runRoles = new Map(); this.allowProjectEdits = false; this.taskRules = new Set(); this.cardsShown = 0; this.collectOffer = null; this.doomLoopAnswers = 0; this.approvals.clear(); this.runFinish = null; this.runFailure = null; this.runClarification = null; this.runAsked = false; this.runRetry = false;
     this.usageBase = this.currentUsage(); this.runSteps = new Map(); this.runPrice = connections.priceFor(prepared.connection, prepared.model, prepared.route);
     if (prepared.mode === 'plan') {
       if (this.planConversation.join('\n').length + text.length > 120000) throw new Error('Afklaringen er blevet for lang. Start en ny samtale for at lave en ny plan.');
       // Afklaringen gemmes og sendes igen senere, så den får kun vedhæftningernes navn og kontrolsum.
       // En færdig plan bevares, indtil en ny plan erstatter den (beslutning for beta 2): en almindelig besked som "Ja tak" må ikke slette den.
       this.planConversation.push(input.text + (prepared.disclosure.fileReferenceText || '') + (prepared.disclosure.previewReferenceText || '') + materialSummary(prepared.chatMaterials));
+      this.runClarification = this.planConversation.at(-1);
     }
     // Plan og afklaring, som afsendelsen selv har sat dem. Den sidste kontrol må kun afbryde ved en ændring udefra.
     const runPlan = JSON.stringify({ plan: this.plan, conversation: this.planConversation, dismissed: this.data.planOffersDismissed });
     this.runUser = { id: crypto.randomUUID(), role: 'user', text: shown };
     this.running = true; this.starting = true; bench.chatsChanged();
     await this.saveHistory('working', true);
-    this.emit({ type: 'run.status', status: 'starting' });
+    this.emit({ type: 'run.status', status: 'starting', mode: this.runMode });
     const session = this.changes;
     this.lastCheckpoint = null; this.runBefore = null;
     this.task = { id: crypto.randomUUID(), root: this.root, label: input.text, target: prepared.disclosure.previewReference || '', mode: prepared.mode, startedAt: Date.now(), aiFiles: new Set(), aiHashes: new Map(), reads: [], completed: new Set(), commandParts: new Set(), commands: 0 };
     this.log({ id: `run-${this.task.id}`, kind: 'run', task: this.task.id, title: modeTitles[prepared.mode], target: shortText(input.text), detail: `${prepared.disclosure.modelName || prepared.model.id} · ${prepared.disclosure.provider || prepared.connection.name}${prepared.fileRefs?.length ? ` · ${prepared.fileRefs.length === 1 ? '1 filhenvisning' : `${prepared.fileRefs.length} filhenvisninger`}` : ''}${prepared.disclosure.previewReference ? ` · mål: ${prepared.disclosure.previewReference}` : ''}`, status: 'running', started: this.task.startedAt });
+    // Sand, mens samtalen gøres kortere. Mislykkes det, siger Aktivitet det (RN:B1-3).
+    let summarizing = false;
     try {
       await bench.allocate(this); checkStopped(); this.task.root = this.root;
       this.scratchRoot = scratchRootFor(this.root, this.task.id);
@@ -396,6 +488,7 @@ class ChatSession {
       // Automatiske versioner kræver både projektets valg og funktionen Versioner og fortryd.
       if (!this.copy) bench.checkpointOwner = this;
       await this.checkpoints.begin(projectRoot, !this.copy && prepared.autoCheckpoint === true && prepared.context.features.versioner === true && !['chat', 'plan'].includes(prepared.mode), input.text); checkStopped();
+      this.dropApproveAllIfChanged(prepared);
       if (engineRestartNeeded({ identityChanged: this.engineIdentity !== (prepared.disclosure.sessionFingerprint || prepared.disclosure.fingerprint), engineActive: Boolean(this.engine?.active), engineSandbox: this.engineSandbox === true, sandboxNext: Boolean(prepared.commandIsolation) })) {
         await this.close(false); await bench.closeOthers(this); checkStopped();
         this.commandSandbox = prepared.commandIsolation ? await require('./command-sandbox.cjs').prepare({ workspaceRoot: this.root, scratchRoot: scratchAllowedRoot(this.root), directory: path.join(bench.store.root, 'sandboxes', bench.store.projectKey(projectRoot), this.id, 'policy') }) : null;
@@ -410,15 +503,27 @@ class ChatSession {
         const provider = connections.engineProvider(prepared.connection, prepared.model, this.gateway.url, this.gateway.token);
         provider.name = 'Valgt forbindelse'; provider.models[prepared.model.id].name = prepared.model.id;
         checkStopped();
-        // Samtalen fortsætter sin tidligere AI-session, når forbindelse, model og regler er de samme som sidst.
-        const resume = this.data.opencode?.fingerprint === (prepared.disclosure.sessionFingerprint || prepared.disclosure.fingerprint) ? this.data.opencode.session : null;
-        this.engine = bench.engineFactory({ root: this.root, directory: path.join(bench.store.root, 'runtime', bench.store.projectKey(this.root)), provider, model: prepared.model, references: prepared.references, mode: prepared.mode, skills: prepared.context.skills, resume, sandbox: this.commandSandbox, tempRoot: path.join(this.root, '.aura', 'tmp'), preview: require('./preview-bridge.cjs').info(this.root), onEvent: event => { if (this.engine === instance) this.event(event); } });
+        // Samtalen fortsætter sin tidligere AI-session, når forbindelse, model og regler er de samme som sidst, og gennemgangen
+        // forudsagde det. Forudsagde den en ny session, fx fordi opgaven skulle have sin egen kopi, starter en ny, som vist (Q:B1-2).
+        const resume = prepared.sessionContinues !== false && this.data.opencode?.fingerprint === (prepared.disclosure.sessionFingerprint || prepared.disclosure.fingerprint) ? this.data.opencode.session : null;
+        this.engine = bench.engineFactory({ root: this.root, directory: path.join(bench.store.root, 'runtime', bench.store.projectKey(this.root)), provider, model: prepared.model, references: prepared.references, mode: prepared.mode, skills: prepared.context.skills, resume, sandbox: this.commandSandbox, tempRoot: path.join(this.root, '.aura', 'tmp'), preview: require('./preview-bridge.cjs').info(this.root), onEvent: event => { if (this.engine === instance && !this.runStopped) this.event(event); } });
         const instance = this.engine;
         await this.engine.start(); checkStopped(); this.engineIdentity = (prepared.disclosure.sessionFingerprint || prepared.disclosure.fingerprint); this.engineSandbox = Boolean(prepared.commandIsolation); this.engineKey = `${prepared.connection.id}|${prepared.model.id}`;
-        this.engineConversation = this.engine.resumed ? this.data.opencode?.conversation || '' : prepared.disclosure.conversation || '';
+        // Gennemgangen forudsagde, at samme AI-session fortsætter, men den kunne ikke genoptages: OpenCode fandt den ikke, eller
+        // samtalen fik sin egen kopi under afsendelsen. En ny session uden samtalen må ikke svare, som om den kendte den. Intet
+        // sendes; den gemte session glemmes, så næste afsendelse starter en ny AI-session med de seneste beskeder (Q:B1-2). Motoren
+        // siger altid selv, om den genoptog sessionen (engine.cjs start sætter resumed til false eller true).
+        if (prepared.sessionContinues === true && this.engine.resumed === false && (this.data.messages || []).some(message => message.role !== 'system' && message.id !== this.runUser?.id)) {
+          this.data = await bench.history.updateChat(projectRoot, this.id, data => { data.opencode = null; }).catch(() => ({ ...this.data, opencode: null }));
+          throw Object.assign(new Error('Den tidligere AI-session kunne ikke genoptages, så AI’en kender ikke samtalen. Intet er sendt. Send beskeden igen: Aura starter en ny AI-session, og de seneste beskeder følger med som tekst.'), { failure: 'session' });
+        }
+        // En ny session får den tidligere samtale, der blev beregnet til en ny session. Passer den ikke med gennemgangen,
+        // afviser kontrollen nedenfor afsendelsen.
+        this.engineConversation = this.engine.resumed ? this.data.opencode?.conversation || '' : prepared.history ?? prepared.disclosure?.conversation ?? '';
         const opencode = { session: this.engine.session?.id || null, fingerprint: (prepared.disclosure.sessionFingerprint || prepared.disclosure.fingerprint), ...(this.engineConversation ? { conversation: this.engineConversation } : {}) };
         if (opencode.session) this.data = await bench.history.updateChat(projectRoot, this.id, data => { data.opencode = opencode; }).catch(() => this.data);
         if (!this.engine.resumed) this.emit({ type: 'session.new' });
+        if (this.engine.slowStart) this.log({ kind: 'session', title: 'AI-motoren startede langsomt', detail: `Opstarten tog ${Math.round(this.engine.startMs / 1000)} sekunder, hvor den plejer at tage få. Computeren kan være travl, eller et antivirusprogram kan være ved at kontrollere programmet.`, status: 'completed', task: this.task.id });
         this.log(this.engine.resumed ? { kind: 'session', title: 'AI-sessionen fortsætter', detail: 'Samme AI og samme samtale som sidst.', status: 'completed', task: this.task.id } : { kind: 'session', title: 'Ny AI-session', detail: this.engineConversation ? 'Den tidligere samtale følger med som kontekst.' : 'Plan og afklaring følger med.', status: 'completed', task: this.task.id });
       }
       // Grænsen er Auras egen grænse for et kalds input, som motoren også komprimerer efter. Er kontekstvinduet
@@ -440,9 +545,9 @@ class ChatSession {
       this.gateway?.setImages?.([]);
       // Brugeren har valgt at gøre en lang samtale kortere, før beskeden sendes igen.
       if (input.compact === true && (await this.engine.messages().catch(() => [])).length) {
-        this.compacting = true;
+        this.compacting = true; summarizing = true;
         try { await this.engine.summarize(); } finally { this.compacting = false; }
-        checkStopped();
+        summarizing = false; checkStopped();
         this.log({ kind: 'session', title: 'Samtalen er gjort kortere', detail: 'AI’en har sammenfattet samtalen og fortsætter derfra. Planen og filerne er bevaret.', status: 'completed', task: this.task.id });
       }
       // Sidste kontrol, lige før beskeden sendes: grundlaget skal stadig stå uændret.
@@ -455,16 +560,30 @@ class ChatSession {
       // De senest accepterede vilkår huskes for projektet, så de samme oplysninger ikke vises igen ved hver opgave.
       await modelConsent.remember(bench.store, projectRoot, prepared.disclosure.consentKey);
       checkStopped();
-      if (generation === this.generation && this.running && !this.finishing) this.emit({ type: 'run.status', status: 'working' });
+      if (generation === this.generation && this.running && !this.finishing) this.emit({ type: 'run.status', status: 'working', mode: this.runMode });
       return true;
     } catch (error) {
+      // Stop venter på motorens afbrydelse, før den lukker og frigiver mappen. En afbrudt HTTP-kvittering
+      // må ikke lukke motoren, mens den stadig stopper værktøjer.
+      if (this.runStopped && this.stopping) throw new Error('Opgaven blev stoppet før afsendelse.', { cause: error });
       if ((this.copy || bench.checkpointOwner === this)) { this.checkpoints.cancel(); await this.checkpoints.finish(); }
-      this.running = false; bench.release(this);
-      if (!this.runStopped) this.log({ kind: 'error', title: 'Opgaven kunne ikke starte', detail: error.message, status: 'error', task: this.task?.id });
+      this.running = false;
+      // Kender hovedprocessen fejlens type, siger Aktivitet den med samme ord som resultatkortet, også når samtalen ikke kunne
+      // gøres kortere (RN:B1-3).
+      const kind = this.runFailure?.kind || (typeof error?.failure === 'string' ? error.failure : null);
+      if (!this.runStopped) this.log({ kind: 'error', title: kind ? failureText(kind).title : summarizing ? 'Samtalen kunne ikke gøres kortere' : 'Opgaven kunne ikke starte', detail: (kind && summarizing ? 'Samtalen kunne ikke gøres kortere. ' : '') + error.message, status: 'error', task: this.task?.id });
       const diff = this.runStopped && this.runBefore ? await changes(this.root, this.runBefore).catch(() => null) : null;
       const task = await this.finishTask(this.runStopped ? 'stopped' : 'error', diff);
       if (this.runStopped) { this.emit(this.runReview('stopped', diff, task)); this.afterImage(task); }
-      await this.saveHistory(this.runStopped ? 'stopped' : 'error'); await this.close(); this.emit({ type: 'run.status', status: this.runStopped ? 'stopped' : 'error', planRetained: Boolean(this.plan) }); bench.chatsChanged(); throw error;
+      this.dropUnansweredClarification(); await this.saveHistory(this.runStopped ? 'stopped' : 'error'); await this.close(); this.starting = false; this.waiting = false; bench.release(this); this.emit({ type: 'run.status', status: this.runStopped ? 'stopped' : 'error', mode: this.runMode, planRetained: Boolean(this.plan) }); bench.chatsChanged();
+      // Et Stop under opstarten, fx mens samtalen sammenfattes, er et stop og ikke en fejl. Brugerfladen genkender det på teksten.
+      if (this.runStopped) throw new Error('Opgaven blev stoppet før afsendelse.', { cause: error });
+      // Kender hovedprocessen fejlens type, fx en afbrudt forbindelse under sammenfatningen, følger den med fejlen. Så viser
+      // resultatkortet den rigtige vej videre og ikke «Opgaven kunne ikke starte» (fund 12).
+      if (this.runFailure?.kind && error && typeof error === 'object') error.failure = this.runFailure.kind;
+      // Har udbyderen sagt, hvornår den tager imod igen, står tidspunktet også på kortet efter en mislykket sammenfatning.
+      if (Number.isFinite(this.runFailure?.retryAt) && error && typeof error === 'object') error.retryAt = this.runFailure.retryAt;
+      throw error;
     } finally { this.starting = false; }
   }
 
@@ -546,9 +665,16 @@ class ChatSession {
     if (typeof input?.file !== 'string' || typeof input.source !== 'string') throw new Error('Vælg en fil i oversigten.');
     if (input.source === 'session') {
       if (!session.baseline || !session.current) throw new Error('Opdatér oversigten, og vælg filen igen.');
+      const tasks = [...session.tasks, ...(session.liveTask ? [session.liveTask] : [])].filter(task => task.root === this.root && task.startedAt >= session.startedAt);
+      // En binær fil eller en fil i et ældre tekstformat har ingen linje-diff.
+      if (session.baseline.opaque?.has(input.file) || session.current.opaque?.has(input.file)) {
+        const row = opaqueSummary(input.file, session.baseline, session.current, tasks);
+        if (!row) throw new Error('Filen er ikke ændret i denne samtale.');
+        return { ...row, hunks: [] };
+      }
       if (!session.baseline.files.has(input.file) && !session.current.files.has(input.file)) throw new Error('Filen er ikke ændret i denne samtale.');
       const before = session.baseline.files.get(input.file), after = session.current.files.get(input.file);
-      return fileDetail(input.file, before, after, sessionAttribution(input.file, before, after, [...session.tasks, ...(session.liveTask ? [session.liveTask] : [])].filter(task => task.root === this.root && task.startedAt >= session.startedAt)));
+      return fileDetail(input.file, before, after, sessionAttribution(input.file, before, after, tasks));
     }
     const task = session.liveTask?.id === input.source ? session.liveTask : session.tasks.find(item => item.id === input.source);
     const entry = task?.files.find(item => item.file === input.file);
@@ -599,15 +725,17 @@ class ChatSession {
     return { task: task.id, file: result.file, line: result.line, text: result.newText };
   }
   // Fortryd ud fra Auras øjebliksbilleder: kun når hver fil stadig er, som opgaven efterlod den. Ellers ændres intet.
+  // En binær fil eller en fil i et ældre tekstformat har ingen tekst før, så den lades være og nævnes i svaret (kept).
   async undoTask(input) {
     if (this.bench.busyRoot(this.root)) throw new Error('Vent, til AI’en er færdig, før du fortryder.');
     const task = this.changes.tasks.find(item => item.id === input?.task);
     if (!task) throw new Error('Opgaven findes ikke længere i denne samtale. Brug Versioner for at gå længere tilbage.');
     if (task.root !== this.root) throw new Error('Opgaven ændrede en anden arbejdsmappe. Fortryd indfletningen gennem Versioner.');
     if (task.undone) throw new Error('Opgaven er allerede fortrudt.');
-    if (!task.files.length) throw new Error('Opgaven ændrede ingen filer, Aura kan sætte tilbage.');
+    const kept = task.files.filter(entry => entry.opaque).map(entry => entry.file), entries = task.files.filter(entry => !entry.opaque);
+    if (!entries.length) throw new Error(kept.length ? OPAQUE_UNDO : 'Opgaven ændrede ingen filer, Aura kan sætte tilbage.');
     const plan = [];
-    for (const entry of task.files) {
+    for (const entry of entries) {
       const relative = projectFiles.normalize(entry.file);
       if (projectFiles.isProtected(relative)) throw new Error(`${relative} er beskyttet, så Aura sætter den ikke tilbage.`);
       const target = path.join(this.root, ...relative.split('/'));
@@ -625,7 +753,7 @@ class ChatSession {
     task.undone = true;
     const what = task.kind === 'direct' ? 'tekstrettelsen' : task.kind === 'undo' ? 'fortrydelsen' : 'opgaven';
     const undo = this.recordEdit({ kind: 'undo', label: `Fortrudt: ${shortText(task.label, 60)}`, files: plan.map(({ entry, relative }) => ({ file: relative, before: entry.after, after: entry.before })), title: `Du fortrød ${what}`, target: plan.map(item => item.relative).join(', ').slice(0, 300), detail: shortText(task.label, 120), undoes: task.id });
-    return { task: undo.id, files: plan.map(item => item.relative) };
+    return { task: undo.id, files: plan.map(item => item.relative), kept };
   }
 
   // ---------- Hændelser fra motoren ----------
@@ -640,12 +768,26 @@ class ChatSession {
   }
   // Resultatet af forhåndsvisningskontrollen gælder den næste besked og bruges én gang.
   setPreviewNote(text) { this.previewNote = String(text || '').slice(0, 600); }
-  approvalContext() { return { projectRoot: this.project.root, workspaceRoot: this.root, mode: this.runMode || this.prepared?.mode || 'chat', scratchRoot: scratchAllowedRoot(this.root), commandSandbox: Boolean(this.prepared?.commandIsolation && this.commandSandbox && this.engine?.sandbox === this.commandSandbox), commandSandboxSupported: this.prepared?.commandSandboxSupported === true, autoCommandsSnapshot: this.prepared?.autoCommandsSnapshot === true, taskRules: this.taskRules }; }
+  approvalContext() { return { projectRoot: this.project.root, workspaceRoot: this.root, mode: this.runMode || this.prepared?.mode || 'chat', scratchRoot: scratchAllowedRoot(this.root), commandSandbox: Boolean(this.prepared?.commandIsolation && this.commandSandbox && this.engine?.sandbox === this.commandSandbox), commandSandboxSupported: this.prepared?.commandSandboxSupported === true, commandUnisolated: this.commandUnisolatedNow(), autoCommandsUnisolated: this.prepared?.autoCommandsUnisolated === true, autoCommandsSnapshot: this.prepared?.autoCommandsSnapshot === true, grepGuard: this.engine?.grepGuard === true, storeRoot: this.bench.store.root, engineRoot: this.engine?.directory || null, taskRules: this.taskRules }; }
+  // Kommandoer uden isolation: kun på en platform uden sandkasse og kun efter brugerens eksplicitte valg (projektet eller «Godkend alt»).
+  commandUnisolatedNow() { const p = this.prepared; return p?.commandUnisolatedPossible === true && p.commandSandboxSupported !== true && ((p.autoCommandsSnapshot === true && p.autoCommandsUnisolated === true) || (this.approveAll === true && this.approveAllUnisolated === true)); }
   async permissionAsked(event) {
     const engine = this.engine, generation = this.generation, context = this.approvalContext();
     const source = event.properties || {}, request = engine?.pending?.get(source.id), part = source.tool?.callID ? [...(this.runTools?.values() || [])].find(item => item.callID === source.tool.callID) : null;
     const p = structuredClone({ ...source, ...(part ? { toolInput: { ...part.state?.input, tool: part.tool, input: part.state?.input || {} } } : {}) });
     const current = () => this.running && this.engine === engine && generation === this.generation && !this.runStopped && request && engine?.pending?.get(p.id) === request;
+    // Gentagelsesvagten besvares uden kort. OpenCode 1.18.33 og 1.19.5 slutter opgaven med session.error, hvis vagten afvises, også med en besked og
+    // med experimental.continue_loop_on_deny (målt mod den rigtige motor), så Aura svarer "én gang" og lader modellen prøve igen.
+    // Efter tre automatiske svar i samme opgave vises kortet, så brugeren kan stoppe en model, der bliver ved.
+    if (p.permission === 'doom_loop' && current() && (this.doomLoopAnswers || 0) < DOOM_LOOP_AUTO_LIMIT) {
+      try {
+        this.doomLoopAnswers = (this.doomLoopAnswers || 0) + 1;
+        await engine.reply(p.id, true);
+        const tool = typeof p.metadata?.tool === 'string' ? p.metadata.tool : Array.isArray(p.patterns) && typeof p.patterns[0] === 'string' ? p.patterns[0] : '';
+        this.log({ id: `approval-${p.id}`, kind: 'approval', title: 'Gentagelsesvagt: samme kald igen', target: tool.slice(0, 120), detail: 'Aura lod AI’en fortsætte automatisk, uden at du blev spurgt.', status: 'auto', started: Date.now(), ended: Date.now(), task: this.task?.id });
+        return;
+      } catch { this.doomLoopAnswers--; /* Vis kortet, hvis det automatiske svar ikke kunne sendes. */ }
+    }
     // Afvent først policyen, så UI'et aldrig tilbyder en vedvarende regel ud fra rå motordata.
     let result;
     try { result = await this.bench.approvalsPolicy.allowed(context, p); }
@@ -665,15 +807,24 @@ class ChatSession {
       } catch { /* Vis godkendelsen, hvis den automatiske kvittering ikke kunne sendes. */ }
     }
     if (!current()) return;
-    if (approveAllApplies(this.approveAll, descriptor, { sandbox: Boolean(this.commandSandbox) })) {
+    if (approveAllApplies(this.approveAll, descriptor, { sandbox: Boolean(this.commandSandbox), unisolated: this.approveAllUnisolated === true && context.commandUnisolated === true })) {
       await engine.reply(p.id, true); this.approvals.delete(p.id);
       this.log({ id: `approval-${p.id}`, kind: 'approval', title: approvalTitles[p.permission] || descriptor.label, target: descriptor.target, status: 'auto', started: Date.now(), ended: Date.now(), task: this.task?.id });
       this.emit({ type: 'permission.auto', file: descriptor.projectFile ? this.projectEdit(p) : undefined, policy: descriptor, source: 'approve-all' });
       return;
     }
+    // Kortsamlingen (brugerens beslutning 10. november 2026): efter fem viste kort i opgaven spørger Aura én gang, om resten af opgaven må
+    // fortsætte i projektmappen. Spørgsmålet står på det første kort derefter, som et ja dækker (coversProjectFolder), og svaret gælder også
+    // den ventende handling. Et kort, brugerfladen lægger sammen med et vist kort for samme adgang (groupKey), er ikke et nyt kort.
+    const record = this.approvals.get(p.id);
+    const grouped = Boolean(descriptor.match) && [...this.approvals.values()].some(item => item !== record && item.shown && item.descriptor.key === descriptor.key);
+    const collect = !grouped && !this.collectOffer && this.cardsShown >= COLLECT_AFTER && coversProjectFolder(descriptor, context);
+    if (!grouped) this.cardsShown++;
+    if (collect) this.collectOffer = p.id;
+    if (record) record.shown = true;
     this.waiting = true; this.bench.chatsChanged();
     this.log({ id: `approval-${p.id}`, kind: 'approval', permission: p.permission, title: approvalTitles[p.permission] || 'Godkendelse', target: approvalTarget(p, this.root), status: 'waiting', started: Date.now(), task: this.task?.id });
-    this.emit({ ...event, properties: { ...p, policy: { ...descriptor, approveAllAvailable: this.prepared?.commandSandboxSupported === true } } });
+    this.emit({ ...event, properties: { ...p, policy: { ...descriptor, approveAllAvailable: this.prepared?.commandSandboxSupported === true || this.prepared?.commandUnisolatedPossible === true, ...(this.prepared?.commandSandboxSupported !== true && this.prepared?.commandUnisolatedPossible === true ? { approveAllUnisolated: true } : {}), ...(collect ? { collect: collectOf(context) } : {}) } } });
   }
   event(event) {
     const p = event.properties || {}, bench = this.bench, owner = (this.copy || bench.checkpointOwner === this);
@@ -684,9 +835,26 @@ class ChatSession {
       this.log({ kind: 'session', title: phase === 'recovered' ? 'Forbindelsen er genoprettet' : 'Genoptager forbindelsen', detail: details[phase], status: phase === 'recovered' ? 'completed' : 'running', task: this.task?.id });
       return;
     }
+    // OpenCode venter mellem genforsøg efter en forbigående fejl (429, 5xx eller en netfejl). Skærmen får forsøget og
+    // tidspunktet, så ventetiden kan forklares, og får besked, når kaldet går videre (K5).
+    if (event.type === 'session.status') {
+      if (p.status?.type === 'retry' && this.running && !this.runStopped && !this.finishing) {
+        this.runRetry = true; const retry = retryInfo(p.status, this.gateway?.forwardedFailure?.());
+        this.emit({ type: 'model.retry', retry });
+        // Statuslinjen siger det i almindeligt dansk (ui/approval-view.js retryText). Udbyderens egen besked med HTTP-status står i Aktivitet (N:B1-3).
+        this.log({ id: `retry-${this.task?.id || 'opgave'}`, kind: 'session', title: 'Kaldet til AI’en mislykkedes. Aura prøver igen', detail: `${String(p.status.message || '').slice(0, 600)}${Number.isInteger(retry.attempt) ? ` Forsøg ${retry.attempt + 1}.` : ''}`.trim(), status: 'error', task: this.task?.id });
+      }
+      else if (p.status?.type !== 'retry' && this.runRetry) { this.runRetry = false; this.emit({ type: 'model.retry', retry: null }); }
+    }
     if (event.compacting || this.compacting) {
       if (event.type === 'message.part.updated' && p.part?.type === 'step-finish' && this.runSteps && !this.runSteps.has(p.part.id)) { this.runSteps.set(p.part.id, p.part.tokens || {}); this.contextUsage.observe(p.part); this.emit({ type: 'usage', usage: this.currentUsage(), contextUsage: this.contextUsage.snapshot() }); }
-      if (['session.error', 'engine.error'].includes(event.type)) this.runFailure = { kind: event.failure?.kind || sessionFailure(p.error), message: String(event.message || p.error?.data?.message || 'Sammenfatningen mislykkedes.').slice(0, 800) };
+      if (['session.error', 'engine.error'].includes(event.type)) {
+        // Tidspunktet fra et langt Retry-After følger med, også når OpenCodes endelige fejl kommer bagefter uden det.
+        const retryAt = Number.isFinite(event.failure?.retryAt) ? event.failure.retryAt : this.runFailure?.retryAt;
+        this.runFailure = { kind: event.failure?.kind || sessionFailure(p.error, { forwarded: this.gateway?.forwardedFailure?.() }), message: String(event.message || p.error?.data?.message || 'Sammenfatningen mislykkedes.').slice(0, 800), ...(Number.isFinite(retryAt) ? { retryAt } : {}) };
+        // Brugerfladen får fejlen som ved en almindelig opgave, så fx en afvist nøgle markerer forbindelsen Ikke forbundet (RN:B1-3).
+        if (this.running && !this.runStopped) this.emit(event);
+      }
       return;
     }
     if (event.type === 'permission.asked') return this.permissionAsked(event).catch(() => this.emit({ type: 'engine.error', message: 'Godkendelsen kunne ikke vises. Stop opgaven, og prøv igen.' }));
@@ -696,6 +864,7 @@ class ChatSession {
       // hændelse må hverken genåbne et besvaret id eller lande i den næste opgave.
       if (!this.engine || !this.running || this.runStopped || this.finishing || typeof p.id !== 'string' || !Array.isArray(p.questions) || (p.sessionID && p.sessionID !== this.engine.session?.id)) return;
       if (this.questions.has(p.id) || this.closedQuestions.has(p.id)) return;
+      this.runAsked = true;
       this.questions.set(p.id, { questions: p.questions, engine: this.engine, generation: this.generation, sessionID: this.engine.session?.id, submitting: false });
     }
     if (event.type === 'question.asked') { this.waiting = true; bench.chatsChanged(); this.log({ id: `question-${p.id}`, kind: 'question', title: 'Spørgsmål til dig', target: (p.questions || []).map(q => q.question).join('\n').slice(0, 2000), status: 'waiting', started: Date.now(), task: this.task?.id }); }
@@ -705,7 +874,8 @@ class ChatSession {
       this.questions.delete(id); this.waiting = this.approvals.size > 0 || this.questions.size > 0; bench.chatsChanged();
       const entry = this.changes.activity.get(`question-${id}`); if (entry?.status === 'waiting') this.log({ id: entry.id, status: event.type === 'question.rejected' ? 'rejected' : 'answered', ended: Date.now() });
     }
-    if (['session.error', 'engine.error'].includes(event.type) && this.running && !this.runFailure) this.runFailure = { kind: event.failure?.kind || sessionFailure(p.error), status: event.failure?.status || p.error?.data?.statusCode || null, message: String(event.message || p.error?.data?.message || p.error?.message || '').slice(0, 800) };
+    // Har udbyderen sagt, hvornår den tager imod igen (Retry-After over gatewayens loft), følger tidspunktet med til kortet (Q:B1-4).
+    if (['session.error', 'engine.error'].includes(event.type) && this.running && !this.runFailure) this.runFailure = { kind: event.failure?.kind || sessionFailure(p.error, { forwarded: this.gateway?.forwardedFailure?.() }), status: event.failure?.status || p.error?.data?.statusCode || null, message: failureMessage(event, p), ...(Number.isFinite(event.failure?.retryAt) ? { retryAt: event.failure.retryAt } : {}) };
     if (['session.error', 'engine.error'].includes(event.type) && this.running) this.log({ kind: 'error', title: 'Fejl under opgaven', detail: String(event.message || p.error?.data?.message || p.error?.message || 'Modelkaldet mislykkedes.').slice(0, 800), status: 'error', task: this.task?.id });
     if (event.type === 'message.part.updated' && p.part?.type === 'step-finish' && this.runSteps && !this.runSteps.has(p.part.id)) {
       this.runSteps.set(p.part.id, p.part.tokens || {});
@@ -728,7 +898,7 @@ class ChatSession {
       const status = event.type === 'session.idle' ? 'idle' : 'error';
       this.finishing = (owner ? this.checkpoints.finish() : Promise.resolve()).then(async () => {
         if (this.runStopped) return;
-        if (status === 'error') await this.close(false);
+        if (status === 'error') { await this.close(false); this.dropUnansweredClarification(); }
         // En bygget plan kan genåbnes og bygges igen; tidspunktet står ved planen.
         if (status === 'idle' && this.runMode === 'build' && this.plan) { this.plan = { ...this.plan, builtAt: Date.now() }; this.emit({ type: 'plan.updated', root: this.project.root, plan: this.plan }); }
         const reply = planningReply(this.runRoles || new Map(), this.runText || new Map());
@@ -746,8 +916,12 @@ class ChatSession {
           this.emit({ type: 'plan.offer', offered: true });
         }
         if (status === 'idle' && (this.runMode === 'plan' || this.runMode === 'chat' && !this.data.planOffersDismissed) && intent !== 'stay' && concrete) {
-          const chatContext = this.runMode === 'chat' ? this.data.messages.filter(item => item.role !== 'system').slice(-16).map(item => `${item.role === 'user' ? 'Bruger' : 'AI'}: ${item.text}`).join('\n\n').slice(-60000) : '';
-          this.plan = { id: crypto.randomUUID(), text, context: [...this.planConversation, chatContext, reply.context].filter(Boolean).join('\n'), source: 'ai', at: Date.now() };
+          // Opgavens eget svar er planen. Historikken gemmes, mens svaret strømmer ind, så det kan allerede stå i de gemte beskeder;
+          // det hører ikke til baggrunden, ellers sendes planen to gange i Byg (Q:A-7).
+          const ownReply = new Set(this.runText?.keys() || []);
+          const chatContext = this.runMode === 'chat' ? this.data.messages.filter(item => item.role !== 'system' && !ownReply.has(item.id)).slice(-16).map(item => `${item.role === 'user' ? 'Bruger' : 'AI'}: ${item.text}`).join('\n\n').slice(-60000) : '';
+          // Planen sendes kun én gang i Byg, som plan.text. Context rummer brugerens egne svar fra afklaringen og samtalen, aldrig planteksten igen.
+          this.plan = { id: crypto.randomUUID(), text, context: [...withoutPlanTexts(this.planConversation), chatContext].filter(Boolean).join('\n'), source: 'ai', at: Date.now() };
           this.planConversation.push(text); this.emit({ type: 'plan.ready', plan: this.plan });
           this.data = await this.bench.history.updateChat(this.project.root, this.id, data => { data.planOffer = false; });
           this.emit({ type: 'plan.offer', offered: false });
@@ -755,39 +929,60 @@ class ChatSession {
         await this.saveHistory(status);
         const diff = await changes(this.root, this.runBefore);
         const task = await this.finishTask(status, diff);
-        this.emit(this.runReview(status, diff, task, { answered: Boolean(text.trim()), buildOffer: status === 'idle' && this.runMode === 'plan' && Boolean(text.trim()) && intent !== 'stay' && !this.data.planOffersDismissed && !this.plan }));
+        // Byg videre følger et byggeforslag uden genkendelige planafsnit, men ikke et nej eller et åbent spørgsmål (README, Q:C2-5).
+        this.emit(this.runReview(status, diff, task, { answered: Boolean(text.trim()), buildOffer: status === 'idle' && this.runMode === 'plan' && Boolean(text.trim()) && intent !== 'stay' && !openQuestion(text) && !this.data.planOffersDismissed && !this.plan }));
         this.afterImage(task);
       }).catch(async () => { await this.finishTask(status, null).catch(() => {}); this.emit({ ...this.runReview('error', null, null), unavailable: true }); }).finally(() => {
         this.running = false; this.waiting = false; this.allowProjectEdits = false; this.taskRules.clear(); this.approvals.clear(); this.finishing = null; bench.release(this);
-        this.emit({ type: 'run.status', status: this.runStopped ? 'stopped' : status, planRetained: Boolean(this.plan) }); bench.chatsChanged();
+        this.emit({ type: 'run.status', status: this.runStopped ? 'stopped' : status, mode: this.runMode, planRetained: Boolean(this.plan) }); bench.chatsChanged();
       });
     }
     if (['message.part.updated', 'message.part.delta', 'message.updated', 'session.error', 'engine.error', 'permission.asked', 'permission.replied', 'question.asked', 'question.replied', 'question.rejected', 'session.diff'].includes(event.type)) this.emit(event);
   }
   async stop() {
+    if (this.stopping) return this.stopping;
+    const stopping = this.stopRun(); this.stopping = stopping;
+    try { return await stopping; } finally { if (this.stopping === stopping) this.stopping = null; }
+  }
+  async stopRun() {
     if (this.finishing) throw new Error('Afslutningen er i gang. Vent på resultatet.');
-    const bench = this.bench, owner = (this.copy || bench.checkpointOwner === this);
-    this.runStopped = true; this.expireQuestions(); this.allowProjectEdits = false; this.approveAll = false; this.taskRules.clear(); this.approvals.clear(); if (owner) this.checkpoints.cancel(); ++this.generation; this.engineIdentity = null;
+    const bench = this.bench, sending = this.sendOperation, owner = () => this.copy || bench.checkpointOwner === this;
+    this.runStopped = true; this.dropUnansweredClarification(); this.expireQuestions(); this.allowProjectEdits = false; this.setApproveAll(false); this.taskRules.clear(); this.cardsShown = 0; this.collectOffer = null; this.approvals.clear(); if (owner()) this.checkpoints.cancel(); ++this.generation; this.engineIdentity = null;
     this.log({ kind: 'stop', title: 'Du trykkede på Stop', detail: 'AI\'en stopper. Det, den nåede at ændre, står under Ændringer.', status: 'stopped', task: this.task?.id });
     // Godkendelser, der stadig venter, kan ikke længere besvares.
     for (const entry of this.changes.activity.list()) if (['approval', 'question'].includes(entry.kind) && entry.status === 'waiting') this.log({ id: entry.id, status: 'expired', ended: Date.now() });
-    this.gateway?.abort(); await this.engine?.abort().catch(() => {});
-    if (!this.starting) {
-      if (owner) await this.checkpoints.finish();
+    this.gateway?.abort(); await this.engine?.abort({ starting: Boolean(sending) }).catch(() => {});
+    if (sending) { await sending.catch(() => {}); await this.close(false); }
+    if (!this.starting || sending) {
+      if (owner()) { this.checkpoints.cancel(); await this.checkpoints.finish(); }
       const diff = this.runBefore ? await changes(this.root, this.runBefore).catch(() => null) : null;
       const task = await this.finishTask('stopped', diff);
-      this.running = false; this.waiting = false; bench.release(this);
+      this.running = false; this.starting = false; this.waiting = false; bench.release(this);
       // Efter Stop viser resultatkortet, hvad AI'en nåede, og en vej videre.
       this.emit(this.runReview('stopped', diff, task));
       this.afterImage(task);
     }
-    await this.saveHistory('stopped'); this.emit({ type: 'run.status', status: this.starting ? 'starting' : 'stopped', planRetained: Boolean(this.plan) }); bench.chatsChanged();
+    await this.saveHistory('stopped'); this.emit({ type: 'run.status', status: this.starting ? 'starting' : 'stopped', mode: this.runMode, planRetained: Boolean(this.plan) }); bench.chatsChanged();
   }
+  // «Godkend alt» er en tilstand, brugeren skal kunne se og slå fra igen: skærmen får besked hver gang den ændres.
+  setApproveAll(enabled, { unisolated = false } = {}) {
+    enabled = enabled === true; if (this.approveAll === enabled) return;
+    this.approveAll = enabled; this.approveAllKey = enabled ? approveAllKeyOf(this.prepared) : null;
+    // Uden isolation tændes kun efter brugerens eksplicitte valg, og kun hvor der ingen sandkasse findes (reply kontrollerer det).
+    this.approveAllUnisolated = enabled && unisolated === true;
+    this.emit({ type: 'approve-all', enabled, ...(this.approveAllUnisolated ? { unisolated: true } : {}) });
+  }
+  dropApproveAllIfChanged(selection) { if (this.approveAll === true && this.approveAllKey !== approveAllKeyOf(selection)) this.setApproveAll(false); }
+  approveAllOff() { this.setApproveAll(false); return { approveAll: false }; }
   async reply(input) {
     if (!this.engine) throw new Error('Ingen aktiv agent.');
     const ids = input.ids || [input.id], scope = input.scope || 'once';
-    if (!Array.isArray(ids) || !ids.length || ids.length > 100 || ids.some(id => typeof id !== 'string') || new Set(ids).size !== ids.length || !['once', 'task', 'project', 'chat'].includes(scope)) throw new Error('Ugyldig godkendelse.');
-    if (input.allow === true && scope === 'chat' && this.prepared?.commandSandboxSupported !== true) throw new Error('Godkend alt kræver kommandosandkassen.');
+    if (!Array.isArray(ids) || !ids.length || ids.length > 100 || ids.some(id => typeof id !== 'string') || new Set(ids).size !== ids.length || !['once', 'task', 'project', 'chat', 'collect'].includes(scope)) throw new Error('Ugyldig godkendelse.');
+    // Ja til resten af opgaven kan kun gives på det kort, Aura stillede spørgsmålet på (ét pr. opgave). Er det besvaret, findes handlingen ikke længere.
+    if (scope === 'collect' && (input.allow !== true || !this.collectOffer || !ids.includes(this.collectOffer))) throw new Error('Spørgsmålet om resten af opgaven er ikke længere aktuelt.');
+    // Uden sandkasse (Windows) kræver Godkend alt, at brugeren udtrykkeligt har valgt at køre uden isolation efter advarslen.
+    const unisolatedChat = this.prepared?.commandSandboxSupported !== true && this.prepared?.commandUnisolatedPossible === true && input.unisolated === true;
+    if (input.allow === true && scope === 'chat' && this.prepared?.commandSandboxSupported !== true && !unisolatedChat) throw new Error('Godkend alt kræver kommandosandkassen, eller at du udtrykkeligt vælger at køre uden isolation.');
     const records = ids.map(id => this.approvals.get(id));
     const valid = (record, id) => this.running && record && record.engine === this.engine && record.generation === this.generation && !this.runStopped && this.engine.pending.get(id) === record.request;
     for (let i = 0; i < records.length; i++) {
@@ -803,15 +998,33 @@ class ChatSession {
       if (descriptor.fingerprint !== records[0].descriptor.fingerprint) throw new Error('Handlingen er ændret. Gennemgå godkendelsen igen.');
       if (scope === 'task') this.allowProjectEdits = true;
     }
+    // Aktivitet siger, hvad et ja til resten af opgaven dækker.
+    const collectDetail = scope === 'collect' ? collectText(records[0].context) : null;
     for (let i = 0; i < records.length; i++) {
       const record = records[i], id = ids[i]; if (!valid(record, id)) throw new Error('Godkendelsen findes ikke længere.');
       const verified = await this.bench.approvalsPolicy.describe(record.context, record.p);
       if (!valid(record, id) || verified.fingerprint !== record.descriptor.fingerprint) throw new Error('Handlingen er ændret. Gennemgå godkendelsen igen.');
       await record.engine.reply(id, input.allow === true, message); this.approvals.delete(id);
-      this.log({ id: `approval-${id}`, status: input.allow !== true ? (message ? 'corrected' : 'rejected') : scope === 'task' ? 'allowed-task' : scope === 'project' ? 'allowed-project' : 'allowed', ended: Date.now(), ...(message ? { detail: `Din besked: ${message}` } : {}) });
+      this.log({ id: `approval-${id}`, status: input.allow !== true ? (message ? 'corrected' : 'rejected') : ['task', 'collect'].includes(scope) ? 'allowed-task' : scope === 'project' ? 'allowed-project' : 'allowed', ended: Date.now(), ...(message ? { detail: `Din besked: ${message}` } : collectDetail ? { detail: collectDetail } : {}) });
     }
-    if (input.allow === true && scope === 'chat') this.approveAll = true;
+    if (input.allow === true && scope === 'chat') this.setApproveAll(true, { unisolated: unisolatedChat });
+    if (input.allow === true && scope === 'collect') await this.answerCovered(collectDetail);
     this.waiting = this.approvals.size > 0 || this.questions.size > 0; this.bench.chatsChanged();
+  }
+  // Et ja til resten af opgaven gælder også de kort, der allerede venter og er dækket, fx en filændring ved siden af et kommandokort.
+  // Hvert kort afgøres igen af politikken med sin egen kontekst; et kort uden for projektmappen venter stadig på brugeren. Kun viste kort
+  // røres: en forespørgsel, permissionAsked stadig afgør, svarer den selv på, så motoren aldrig får to svar.
+  async answerCovered(detail) {
+    for (const [id, record] of [...this.approvals]) {
+      const valid = () => this.running && !this.runStopped && record.shown === true && record.engine === this.engine && record.generation === this.generation && this.approvals.get(id) === record && this.engine?.pending?.get(id) === record.request;
+      if (!valid()) continue;
+      const verified = await this.bench.approvalsPolicy.allowed(record.context, record.p).catch(() => null);
+      if (!verified?.allowed || verified.descriptor.fingerprint !== record.descriptor.fingerprint || !valid()) continue;
+      try { await record.engine.reply(id, true); } catch { continue; /* Kortet bliver stående, og brugeren kan svare på det. */ }
+      this.approvals.delete(id);
+      this.log({ id: `approval-${id}`, status: 'allowed-task', ended: Date.now(), detail });
+      this.emit({ type: 'permission.auto', file: verified.descriptor.projectFile ? this.projectEdit(record.p) : undefined, policy: verified.descriptor, source: verified.source });
+    }
   }
   // Svar på AI'ens spørgsmål. Svarene sendes til motoren og kommer i briefen med spørgsmålets korte overskrift.
   // Spring over svarer på alle spørgsmål med, at AI'en selv vælger. Et afvist spørgsmål ville stoppe opgaven i OpenCode.
@@ -866,21 +1079,32 @@ class ChatSession {
   }
 }
 // AI'ens arbejdsfiler ligger i projektmappen under .aura/tmp/<opgave>, så de følger projektet (beslutning for beta 2).
-// Sandkassen tændes af projektets automatiske kørsel eller af «Godkend alt i denne samtale». En husket kommando gør det ikke
-// for projektets øvrige opgaver (beslutning for beta 2). Uden understøttet sandkasse tændes den aldrig.
+// Sandkassen tændes af projektets automatiske kørsel eller af «Godkend alt i denne samtale». Kommandoer huskes ikke (beslutning
+// 10. november 2026), og et ja til resten af opgaven tænder den heller ikke. Uden understøttet sandkasse tændes den aldrig.
 // Motoren genstartes kun ved ændret identitet, ved en stoppet motor eller ved skift i sandkassens tilstand (årsag 4).
 // En motor, der allerede har sandkassen, beholder den, også når næste besked ikke kræver den (fx Samtale): sandkassen omslutter kun kommandoer.
 function engineRestartNeeded({ identityChanged, engineActive, engineSandbox, sandboxNext }) { return identityChanged === true || engineActive !== true || (sandboxNext === true && engineSandbox !== true); }
 // AI'ens fælles arbejdsrod i projektet. Sandkassen og godkendelserne bruger den, så de ikke skifter mellem opgaver.
 function scratchAllowedRoot(root) { return path.join(root, '.aura', 'tmp'); }
+// Forbindelse, model og forbindelsens version, som «Godkend alt» blev givet til.
+function approveAllKeyOf(selection) { return selection?.connection && selection?.model ? `${selection.connection.id}|${selection.model.id}|${selection.connection.revision || ''}` : null; }
+// Kommandoer uden isolation findes kun på en platform uden sandkasse og kun efter brugerens eksplicitte valg: projektets gemte valg eller Godkend alt.
+function commandUnisolatedFor({ support, autoCommandsSnapshot = false, autoCommandsUnisolated = false, approveAll = false, approveAllUnisolated = false }) {
+  return require('./command-sandbox.cjs').canRunUnisolated(support) && ((autoCommandsSnapshot === true && autoCommandsUnisolated === true) || (approveAll === true && approveAllUnisolated === true));
+}
 function commandIsolationFor({ support, autoCommandsSnapshot, approveAll }) { return Boolean(support?.available && (autoCommandsSnapshot || approveAll)); }
 // «Godkend alt i denne samtale» automatiserer kort med et match, men aldrig låste handlinger (beskyttede filer og
 // handlinger i Planlæg eller Samtale). Det laver ingen vedvarende regel (beslutning for beta 2).
 // Kommandoer automatiseres kun, når sandkassen faktisk kører i denne motor, og søgning aldrig (resultatet kan indeholde beskyttede filer).
-function approveAllApplies(approveAll, descriptor, { sandbox = false } = {}) {
+// Adgang til mapper uden for projektet og hentning fra nettet automatiseres heller aldrig: de kan nå hemmeligheder eller sende data ud.
+// Uden isolation (Windows, brugerens eksplicitte valg) gælder det kun kommandoer, der ikke nævner beskyttede navne.
+function approveAllApplies(approveAll, descriptor, { sandbox = false, unisolated = false } = {}) {
   const kind = descriptor?.match?.kind;
-  return approveAll === true && Boolean(descriptor?.match) && descriptor.blockedMode !== true && kind !== 'grep' && (kind !== 'bash' || sandbox === true);
+  return approveAll === true && Boolean(descriptor?.match) && descriptor.blockedMode !== true && kind !== 'grep' && kind !== 'external_directory' && kind !== 'webfetch' && (kind !== 'bash' || sandbox === true || (unisolated === true && descriptor.commandProtected !== true));
 }
+// Det, et ja til resten af opgaven dækker i denne opgave (coversProjectFolder): søgning kræver søgevagten og kommandoer sandkassen i motoren.
+function collectOf(context) { return { commands: context?.commandSandbox === true, search: context?.grepGuard === true }; }
+function collectText(context) { return `Resten af opgaven må AI’en ${collectScope(collectOf(context)).covered} uden at spørge.`; }
 // .aura og .aura/tmp må ikke være links (et projekt hentet udefra kunne ellers pege dem ud af projektet), og .aura/tmp holdes
 // ude af Git, versioner og udgivelser med en .gitignore, der ignorerer alt, også sig selv (beslutning for beta 2).
 async function prepareScratch(root, scratchRoot) {
@@ -892,19 +1116,29 @@ async function prepareScratch(root, scratchRoot) {
   }
   await fs.writeFile(path.join(tmp, '.gitignore'), '*\n', { flag: 'w', mode: 0o600 });
   await fs.mkdir(scratchRoot, { recursive: true, mode: 0o700 });
+  // Opgavemapper, der er mere end tre dage gamle, ryddes væk, så AI'ens kladder ikke hober sig op i projektmappen (OneDrive, diskplads).
+  const limit = Date.now() - 3 * 24 * 3600 * 1000;
+  for (const entry of await fs.readdir(tmp, { withFileTypes: true }).catch(() => [])) {
+    if (!entry.isDirectory() || entry.isSymbolicLink() || path.join(tmp, entry.name) === scratchRoot) continue;
+    const stat = await fs.stat(path.join(tmp, entry.name)).catch(() => null);
+    if (stat && stat.mtimeMs < limit) await fs.rm(path.join(tmp, entry.name), { recursive: true, force: true }).catch(() => {});
+  }
 }
 // Motorens identitet er det, motoren er bundet til ved start. Designstatus, plan og beskedtekster følger med den enkelte besked og
-// må ikke genstarte motoren (årsag 4). Arbejdsmåden indgår, fordi tilladelserne er sat ved start.
+// må ikke genstarte motoren (årsag 4). Arbejdsmåden indgår ikke: én motor og én session tjener alle arbejdsmåder med agent pr.
+// besked (8f8eb49). Sandkassens tilstand indgår heller ikke (fund 8); en samtale fra beta.2 får derfor én ny session (fund 51).
 function engineIdentityOf(disclosure, extras) {
   const recipient = Object.fromEntries(['connection', 'model', 'endpoint', 'protocol', 'recipients', 'region'].map(key => [key, disclosure[key] ?? null]));
   return crypto.createHash('sha256').update(JSON.stringify({ recipient, ...extras })).digest('hex');
 }
-// Den nye session har ikke samtalen ved et modelskift. Ved et skift af arbejdsmåde i den samme motor har den.
-function handoffNeeded({ messages, engineActive, modelSwitch, previousMode, mode }) {
+// Den nye session har ikke samtalen ved et modelskift. Ved et skift af arbejdsmåde i den samme motor har den. continues er
+// forudsigelsen i prepare: fortsætter samme AI-session ikke (ingen gemt session, en ny kopi, efter indfletning eller fra en
+// ældre version), får den nye session de seneste beskeder, så AI'en ikke glemmer samtalen (Q:B1-2).
+function handoffNeeded({ messages, engineActive, modelSwitch, previousMode, mode, continues }) {
   if (!messages?.length) return false;
-  return engineActive ? modelSwitch === true : Boolean(previousMode && previousMode !== mode);
+  return modelSwitch === true || continues === false || (!engineActive && Boolean(previousMode && previousMode !== mode));
 }
 function scratchRootFor(root, taskId) { return path.join(root, '.aura', 'tmp', String(taskId)); }
 // Teksten er den samme i hver besked, så udbyderens cache af begyndelsen af samtalen ikke brydes af et skiftende id.
 function scratchInstruction() { return '\nMidlertidige filer og kladder lægger du i mappen .aura/tmp/ i projektmappen. Læg ikke midlertidige filer andre steder.'; }
-module.exports = { composeAppContext, ChatSession, planningReply, sessionFailure, emptyUsage, addStep, scratchRootFor, handoffNeeded, engineIdentityOf, prepareScratch, scratchInstruction, commandIsolationFor, approveAllApplies, engineRestartNeeded, scratchAllowedRoot, agentsDuplicatesRules };
+module.exports = { failureMessage, composeAppContext, ChatSession, planningReply, sessionFailure, emptyUsage, addStep, scratchRootFor, handoffNeeded, engineIdentityOf, prepareScratch, scratchInstruction, commandIsolationFor, commandUnisolatedFor, approveAllApplies, approveAllKeyOf, engineRestartNeeded, scratchAllowedRoot, agentsDuplicatesRules };

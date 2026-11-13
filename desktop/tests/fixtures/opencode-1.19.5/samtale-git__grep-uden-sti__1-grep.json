@@ -1,0 +1,92 @@
+{
+ "opencode": "1.19.5",
+ "aura": "d0c3fca+ændringer",
+ "scenario": "samtale-git",
+ "outcome": "idle",
+ "case": "grep-uden-sti",
+ "askIndex": 1,
+ "asksInStep": 1,
+ "layout": {
+  "mode": "chat",
+  "git": true,
+  "copy": false,
+  "model": "kontraktmodel",
+  "worktree": "${ROOT}",
+  "directory": "${ROOT}"
+ },
+ "sequence": [
+  "del:pending",
+  "spørg:grep",
+  "del:running",
+  "svar:once",
+  "del:completed"
+ ],
+ "request": {
+  "id": "per_1abd2b0b10016Uw2QZWuMVlHMC",
+  "sessionID": "ses_e542d5446ffeqbVj0xq8U26In8",
+  "permission": "grep",
+  "patterns": [
+   "NEEDLE"
+  ],
+  "metadata": {
+   "pattern": "NEEDLE"
+  },
+  "always": [
+   "*"
+  ],
+  "tool": {
+   "messageID": "msg_1abd2b0a500150nKhnhgwVOYMb",
+   "callID": "kald-4-0"
+  }
+ },
+ "toolPartAtAsk": {
+  "status": "pending",
+  "tool": "grep",
+  "input": {}
+ },
+ "policyInput": {
+  "id": "per_1abd2b0b10016Uw2QZWuMVlHMC",
+  "sessionID": "ses_e542d5446ffeqbVj0xq8U26In8",
+  "permission": "grep",
+  "patterns": [
+   "NEEDLE"
+  ],
+  "metadata": {
+   "pattern": "NEEDLE"
+  },
+  "always": [
+   "*"
+  ],
+  "tool": {
+   "messageID": "msg_1abd2b0a500150nKhnhgwVOYMb",
+   "callID": "kald-4-0"
+  },
+  "toolInput": {
+   "tool": "grep",
+   "input": {}
+  }
+ },
+ "recordedAura": {
+  "allowed": false,
+  "source": null,
+  "label": "Læsning: ${ROOT}/*",
+  "target": "${ROOT}/*",
+  "match": {
+   "kind": "grep",
+   "targets": [
+    {
+     "path": "${ROOT}",
+     "subtree": true
+    }
+   ]
+  },
+  "persistable": false,
+  "projectFile": false,
+  "scratch": false,
+  "folder": "${ROOT}",
+  "blockedMode": false
+ },
+ "toolResult": [
+  "Found 2 matches\n${ROOT}/src/app.js:\n  Line 1: const [a] = useState(0); // NEEDLE\n\n\n${ROOT}/notes.txt:\n  Line 1: Hej verden NEEDLE\n"
+ ]
+}

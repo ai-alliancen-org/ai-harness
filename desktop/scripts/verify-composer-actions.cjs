@@ -90,7 +90,8 @@ const helpers = require('./ui-test-helpers.cjs');
     await page.fill('#prompt', 'byg'); await page.locator('#prompt').press('Meta+Enter'); await idle();
     assert.equal(await page.textContent('#composer-mode'), 'Byg');
     assert.equal(await app.evaluate(() => globalThis.composerProbe.prepared.at(-1).selection.mode), 'free');
-    assert.equal(await app.evaluate(() => globalThis.composerProbe.prepared.at(-1).selection.includeHistory), true);
+    // Der er intet tilvalg om en ekstra kopi; kernen sender selv de seneste beskeder, når en ny AI-session starter (Q:B1-2).
+    assert.equal(await app.evaluate(() => Object.hasOwn(globalThis.composerProbe.prepared.at(-1).selection, 'includeHistory')), false);
     await page.evaluate(() => { view.plan = null; activePlan = null; renderRunReview({ mode: 'plan', status: 'idle', answered: true, buildOffer: true }, view); });
     await page.getByRole('button', { name: 'Byg videre', exact: true }).click(); await idle();
     assert.equal(await app.evaluate(() => globalThis.composerProbe.prepared.at(-1).selection.mode), 'free');
@@ -125,7 +126,7 @@ const helpers = require('./ui-test-helpers.cjs');
     await page.screenshot({ path: path.join(root, 'samtaleforslag-klar-til-byg.png') });
     await page.click('#build-plan'); await idle();
     const buildProposal = await app.evaluate(() => ({ prepared: globalThis.composerProbe.prepared.at(-1), sent: globalThis.composerProbe.sent.at(-1) }));
-    assert.equal(buildProposal.prepared.selection.mode, 'build'); assert.equal(buildProposal.prepared.selection.planID, proposal.id); assert.equal(buildProposal.prepared.selection.includeHistory, true);
+    assert.equal(buildProposal.prepared.selection.mode, 'build'); assert.equal(buildProposal.prepared.selection.planID, proposal.id); assert.equal(Object.hasOwn(buildProposal.prepared.selection, 'includeHistory'), false, 'der er intet tilvalg af en ekstra kopi; kernen sender selv de seneste beskeder, når en ny AI-session starter (Q:A-7)');
     assert.equal(buildProposal.prepared.owner.chat, proposalOwner.chat); assert.doesNotMatch(buildProposal.sent.input.text, /Lad os lave en plan/);
     assert.equal((await count()).sent, beforeProposal.sent + 1);
     await page.evaluate(() => {
@@ -208,7 +209,13 @@ const helpers = require('./ui-test-helpers.cjs');
     });
     const savedDeployment = await app.evaluate(() => JSON.stringify(globalThis.composerProbe.savedDeployment));
     await page.click('#deploy-button'); await page.waitForSelector('#deployment-result:not([hidden])'); await page.waitForFunction(() => !document.querySelector('#deployment-fields').disabled);
-    assert.equal(await page.locator('#deployment-komplai-account').isVisible(), true, 'Konto og adgang er synlig efter en tidligere udgivelse.');
+    // Kvitteringen har højst fire synlige kontroller med Luk: højst to hovedknapper og Se detaljer (AGENTS.md). Konto og adgang står
+    // under Se detaljer efter en tidligere udgivelse.
+    const receiptChoices = await page.locator('#deployment-dialog').evaluate(dialog => [...dialog.querySelectorAll('button,select,input[type=checkbox],input[type=radio],summary')].filter(el => el.checkVisibility()).length);
+    assert.ok(receiptChoices <= 4, `Kvitteringen har ${receiptChoices} synlige kontroller.`);
+    assert.equal(await page.locator('#deployment-komplai-account').isVisible(), false, 'Konto og adgang står ikke i kvitteringens første lag.');
+    await page.locator('#deployment-receipt-details > summary').click();
+    assert.equal(await page.locator('#deployment-komplai-account').isVisible(), true, 'Konto og adgang står under Se detaljer efter en tidligere udgivelse.');
     await page.click('#deployment-komplai-account'); await page.waitForSelector('[data-deploy-step="account"]:not([hidden])');
     assert.equal(await page.textContent('#deployment-account-name'), 'Organisation A');
     await page.screenshot({ path: path.join(root, 'komplai-konto-og-log-ud.png') });

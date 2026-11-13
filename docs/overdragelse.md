@@ -40,6 +40,8 @@ Et projekt har flere samtaler. Én samtale ad gangen kan arbejde i projektmappen
 
 Brugerens beslutninger: Flere AI-opgaver på én gang i samme projekt, ikke på tværs af projekter. En kopi bruges kun, når en anden samtale allerede arbejder. Kopier frem for Git-worktrees (begrundelsen står i `decisions.md` under sjette milepæl).
 
+*Ændret 23. oktober 2026 (5ffe905, udgivet i 0.6.0-beta.1): opgaver kan nu også arbejde i flere projekter på én gang, og Nyt projekt og Åbn projekt kan bruges, mens en samtale arbejder eller venter på dig. Grænsen «ikke på tværs af projekter» gælder ikke længere. Se `desktop/README.md` (Projekter og samtaler) og `desktop/DESIGN.md`.*
+
 1. **Kopi:** Når en samtale sender, mens en anden har krav på projektmappen, laves en kopi under appens data (fx `<store.root>/copies/<chat-id>/`). Brug `cp -c -R` på macOS (APFS-klon, hurtig og pladsfri); ellers en almindelig kopi uden `node_modules`, og installer pakker gennem den eksisterende gennemgang. Spring `.git` over eller klon den uændret; kopien må aldrig committe.
 2. **Samtalens rod:** `ChatSession.root` peger på kopien; `project.root` er stadig projektet. Motorens runtime-mappe, `capture`/`changes`, Ændringer, Kode, billeder og stier i godkendelser skal bruge samtalens rod. `claims` skal tillade én arbejdende samtale pr. rod.
 3. **Forhåndsvisning pr. kopi:** En statisk server pr. kopi, og DevServer pr. rod for Vite og Astro. Forhåndsvisningen følger den åbne samtale og siger tydeligt, om den viser projektet eller samtalens kopi.

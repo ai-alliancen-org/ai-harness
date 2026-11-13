@@ -1,3 +1,4 @@
+const network = require('./network-journal.cjs');
 const { randomUUID, createHash } = require('node:crypto');
 const definitions = {
   openai: { name: 'OpenAI API', provider: 'OpenAI', baseURL: 'https://api.openai.com/v1', protocol: 'responses', keyRequired: true, source: 'https://developers.openai.com/api/docs/guides/your-data', checkedAt: '2026-10-15',
@@ -166,7 +167,12 @@ function normalize(input) {
   }
   return { id: input.id || randomUUID(), name: input.name.trim(), kind: input.kind, baseURL, ...extra };
 }
-function ollamaEndpoint(value) { const url = endpoint(value); return new URL(url).pathname === '/' ? url + '/v1' : url; }
+// Ollamas adresse gemmes som serverens rod: modelkataloget ligger på /api/tags og chatten under /v1, og opdagelsen og
+// opsætningen bruger roden. En adresse, der er skrevet med /v1 eller gemt sådan i 0.7.0-beta.2, læses som roden.
+function ollamaRoot(value) { return String(value || '').replace(/\/+$/, '').replace(/\/v1$/, ''); }
+function ollamaEndpoint(value) { return ollamaRoot(endpoint(value)); }
+// En gemt forbindelse, som den bruges nu. Kun Ollamas adresse læses om; alt andet står, som det er gemt.
+function fromStore(connection) { return connection?.kind === 'ollama' && typeof connection.baseURL === 'string' ? { ...connection, baseURL: ollamaRoot(connection.baseURL) } : connection; }
 function azureEndpoint(value) {
   // En fuld adresse fra Azure (med sti og api-version) indeholder ressourcens adresse. Kun den bruges; login i adressen afvises stadig.
   let url; try { url = new URL(value); } catch { throw new Error('Brug ressourcens HTTPS-adresse fra Azure OpenAI eller Foundry, fx https://mit-projekt.openai.azure.com.'); }
@@ -188,6 +194,8 @@ function redact(text, keys = []) {
   let out = String(text).replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, '');
   for (const key of keys) if (typeof key === 'string' && key.length >= 6) out = out.split(key).join('••••');
   out = out.replace(/\b(sk-[A-Za-z0-9_-]{8,}|gh[pousr]_[A-Za-z0-9]{12,}|github_pat_[A-Za-z0-9_]{12,})/g, '••••').replace(/\b(bearer|api-key|x-api-key)(["']?\s*[:=]?\s*["']?)[^\s"',}]+/gi, '$1$2••••').replace(/[A-Za-z0-9+/_=-]{40,}/g, '••••');
+  // Den fælles rensning tager resten: Authorization-hoved, NAVN=værdi, JWT, privat nøgle og udbydertokens.
+  out = require('./secrets.cjs').redact(out);
   return out.length > 600 ? out.slice(0, 600) + ' …' : out;
 }
 // Kendte afvisninger fra udbydernes svar, oversat til dansk. Selve svaret står bag Se detaljer.
@@ -199,7 +207,8 @@ const providerReasons = [
   [/permission|forbidden|not allowed|access denied/i, 'Nøglen har ikke adgang til modellerne. Kontrollér nøglens tilladelser hos udbyderen.']
 ];
 // En fejl har en grund: unreachable og timeout betyder, at serveren ikke kunne nås, rejected at den afviste nøglen.
-const failure = (message, reason, details = '') => Object.assign(new Error(message), { reason, details });
+// Et svar fra serveren har også sin HTTP-status, så fx et råd om nøglen kun gives, når serveren faktisk afviste nøglen.
+const failure = (message, reason, details = '', status = null) => Object.assign(new Error(message), { reason, details }, status ? { status } : {});
 function networkFailure(error) {
   const code = error?.cause?.code || error?.code || '', name = error?.name || '';
   if (name === 'TimeoutError' || name === 'AbortError' || /TIMEOUT/.test(code)) return failure('Serveren svarede ikke inden for 15 sekunder. Kontrollér adresse, netværk og eventuelt Tailscale.', 'timeout', code || name);
@@ -215,38 +224,51 @@ async function readExcerpt(response) {
   try {
     const reader = response.body?.getReader(); if (!reader) return '';
     const chunks = []; let size = 0;
-    while (size < 4096) { const { done, value } = await reader.read(); if (done) break; chunks.push(value); size += value.length; }
+    while (size < 4096) { const { done, value } = await reader.read(); if (done) break; network.observeResponseChunk(response, value); chunks.push(value); size += value.length; }
     await reader.cancel().catch(() => {});
     return Buffer.concat(chunks).toString('utf8').slice(0, 4096);
   } catch { return ''; }
 }
-async function requestJSON(url, { key = '', kind, method = 'GET', body, signal } = {}) {
+// Kalderen afbrød selv kaldet, fx med Ctrl+C under aura login. Et signal med egen tidsgrænse er stadig en tidsgrænse.
+const cancelledBy = signal => signal?.aborted && signal.reason?.name !== 'TimeoutError' ? failure('Kontrollen blev afbrudt.', 'cancelled') : null;
+async function requestJSON(url, { key = '', kind, method = 'GET', body, signal, purpose = 'model-catalog' } = {}) {
   const headers = { accept: 'application/json' };
   if (key) Object.assign(headers, kind === 'anthropic' ? { 'x-api-key': key, 'anthropic-version': '2023-06-01' } : kind === 'azure' ? { 'api-key': key } : { Authorization: `Bearer ${key}` });
   if (body) headers['content-type'] = 'application/json';
+  // Tidsgrænsen på 15 sekunder gælder altid. Et signal fra kalderen stopper selve kaldet, ikke kun ventetiden på det.
+  const limit = AbortSignal.timeout(15000);
   let response;
-  try { response = await fetch(url, { method, headers, body: body && JSON.stringify(body), signal: signal || AbortSignal.timeout(15000), redirect: 'error' }); }
-  catch (error) { throw networkFailure(error); }
-  if (!response.ok) {
-    const excerpt = await readExcerpt(response);
-    let said = excerpt; try { const data = JSON.parse(excerpt); said = data?.error?.message || data?.error || data?.message || data?.detail || excerpt; } catch { /* Svaret er ikke JSON. */ }
-    if (typeof said !== 'string') said = JSON.stringify(said);
-    const known = providerReasons.find(([pattern]) => pattern.test(said))?.[1];
-    const details = redact(`HTTP ${response.status}${said ? ': ' + said : ''}`, [key]);
-    // En Corti-nøgle virker kun i sit eget miljø. Beskeden siger, hvilken adresse appen prøvede, så testeren ved, hvad der skal tjekkes.
-    if (kind === 'corti' && (response.status === 401 || response.status === 403)) throw failure(`Corti afviste nøglen på ${url.startsWith(CORTI.fr) ? 'adressen i Frankrig' : url.startsWith(CORTI['eu-s']) ? 'adressen i EU-S (Sovereign)' : 'adressen i EU'}. ${known ? known + ' ' : ''}Brug en nøgle fra Corti Models i et projekt i EU, EU-S eller Frankrig; en nøgle virker kun i sit eget miljø.`, 'rejected', details);
-    if (response.status === 401 || response.status === 403) throw failure(`Serveren afviste adgangen. ${known || 'Kontrollér API-nøglen og tilladelserne.'}`, 'rejected', details);
-    if (response.status === 429 || response.status === 402) throw failure(known || `Udbyderen svarede med HTTP ${response.status}. Prøv igen senere.`, 'rejected', details);
-    throw failure(`Serveren svarede med HTTP ${response.status}. ${known ? known + ' ' : ''}Ingen anden forbindelse blev valgt.`, response.status >= 500 ? 'server' : 'rejected', details);
+  try { response = await network.observedFetch(url, { method, headers, body: body && JSON.stringify(body), signal: signal ? AbortSignal.any([signal, limit]) : limit, redirect: 'error' }, { category: 'catalog', purpose, provider: kind }); }
+  catch (error) { throw cancelledBy(signal) || networkFailure(error); }
+  try {
+    if (!response.ok) {
+      const excerpt = await readExcerpt(response);
+      let said = excerpt; try { const data = JSON.parse(excerpt); said = data?.error?.message || data?.error || data?.message || data?.detail || excerpt; } catch { /* Svaret er ikke JSON. */ }
+      if (typeof said !== 'string') said = JSON.stringify(said);
+      const known = providerReasons.find(([pattern]) => pattern.test(said))?.[1];
+      const details = redact(`HTTP ${response.status}${said ? ': ' + said : ''}`, [key]);
+      // En Corti-nøgle virker kun i sit eget miljø. Beskeden siger, hvilken adresse appen prøvede, så testeren ved, hvad der skal tjekkes.
+      if (kind === 'corti' && (response.status === 401 || response.status === 403)) throw failure(`Corti afviste nøglen på ${url.startsWith(CORTI.fr) ? 'adressen i Frankrig' : url.startsWith(CORTI['eu-s']) ? 'adressen i EU-S (Sovereign)' : 'adressen i EU'}. ${known ? known + ' ' : ''}Brug en nøgle fra Corti Models i et projekt i EU, EU-S eller Frankrig; en nøgle virker kun i sit eget miljø.`, 'rejected', details, response.status);
+      if (response.status === 401 || response.status === 403) throw failure(`Serveren afviste adgangen. ${known || 'Kontrollér API-nøglen og tilladelserne.'}`, 'rejected', details, response.status);
+      if (response.status === 429 || response.status === 402) throw failure(known || `Udbyderen svarede med HTTP ${response.status}. Prøv igen senere.`, 'rejected', details, response.status);
+      throw failure(`Serveren svarede med HTTP ${response.status}. ${known ? known + ' ' : ''}Ingen anden forbindelse blev valgt.`, response.status >= 500 ? 'server' : 'rejected', details, response.status);
+    }
+    const chunks = []; let size = 0;
+    for await (const chunk of response.body) {
+      network.observeResponseChunk(response, chunk);
+      size += chunk.length;
+      if (size > 8_000_000) throw new Error('Serverens svar er for stort.');
+      chunks.push(chunk);
+    }
+    const text = Buffer.concat(chunks).toString('utf8');
+    let result;
+    try { result = JSON.parse(text); } catch { throw new Error('Serveren returnerede ikke gyldige modeloplysninger.'); }
+    network.finishResponse(response, { outcome: 'completed' });
+    return result;
+  } catch (error) {
+    network.finishResponse(response, { outcome: signal?.aborted || error.name === 'AbortError' ? 'cancelled' : 'failed', error });
+    throw cancelledBy(signal) || error;
   }
-  const chunks = []; let size = 0;
-  for await (const chunk of response.body) {
-    size += chunk.length;
-    if (size > 8_000_000) throw new Error('Serverens svar er for stort.');
-    chunks.push(chunk);
-  }
-  const text = Buffer.concat(chunks).toString('utf8');
-  try { return JSON.parse(text); } catch { throw new Error('Serveren returnerede ikke gyldige modeloplysninger.'); }
 }
 // Tænkning og indsatsniveauer fra kataloget: Corti oplyser capabilities.reasoning og effort.levels, OpenRouter supported_parameters.
 function catalogReasoning(model) {
@@ -257,11 +279,12 @@ function catalogReasoning(model) {
   else if (out.reasoning && Array.isArray(model.supported_parameters)) out.effort = ['low', 'medium', 'high'];
   return out;
 }
-async function listModels(connection, key) {
+// signal er valgfrit og stopper selve netkaldet, fx når brugeren trykker Ctrl+C under aura login eller /model.
+async function listModels(connection, key, { signal } = {}) {
   assertSupported(connection);
   if (definitions[connection.kind].keyRequired && !key) throw new Error('Denne forbindelse kræver en API-nøgle.');
   const ollama = connection.kind === 'ollama';
-  const response = await requestJSON(`${connection.baseURL}${ollama ? '/api/tags' : '/models'}`, { key, kind: connection.kind });
+  const response = await requestJSON(ollama ? `${ollamaRoot(connection.baseURL)}/api/tags` : `${connection.baseURL}/models`, { key, kind: connection.kind, signal });
   const models = response[ollama ? 'models' : 'data'];
   if (!Array.isArray(models)) throw new Error('Serveren returnerede ingen læsbar modelliste.');
   // Azures katalog beskriver modeller, ikke kundens deployment-navne. Vi sender kun til navnet, brugeren har angivet.
@@ -273,10 +296,10 @@ async function listModels(connection, key) {
     local: ollama && !model.remote_host && !/:.*cloud/.test(model.name) ? 'Ikke verificeret' : null
   })).filter(model => typeof model.id === 'string');
 }
-async function routes(connection, key, model) {
+async function routes(connection, key, model, { signal } = {}) {
   assertSupported(connection);
   if (connection.kind !== 'openrouter') return [];
-  const data = await requestJSON(`${connection.baseURL}/models/${model.split('/').map(encodeURIComponent).join('/')}/endpoints`, { key });
+  const data = await requestJSON(`${connection.baseURL}/models/${model.split('/').map(encodeURIComponent).join('/')}/endpoints`, { key, kind: connection.kind, purpose: 'route-catalog', signal });
   return (data.data?.endpoints || []).map(item => ({ id: item.tag || item.provider_name, name: item.provider_name, price: item.pricing || null, policy: item.data_policy || null, capabilities: { tools: item.supported_parameters?.includes('tools') ?? null, vision: typeof item.capabilities?.vision === 'boolean' ? item.capabilities.vision : Array.isArray(item.input_modalities) ? item.input_modalities.includes('image') : null } })).filter(route => route.id);
 }
 function disclosure(connection, model, route = null) {
@@ -363,7 +386,8 @@ function modelLimits(connection, model) {
   const context = documentedContext(connection, model) || 32768;
   // Ukendte modeller får et forsigtigt loft. En tænkende model har brug for plads til både tanker og svar, og en lokal
   // Ollama-model kan bruge op til halvdelen af sin kontekst.
-  const fallback = connection.kind === 'ollama' ? Math.floor(context / 2) : reasons(connection, model) ? 32000 : 4096;
+  // 4.096 skar store filer af; en egen server (fx med GLM eller Mistral) kan næsten altid mere, så den får 16.384 og andre ukendte 8.192.
+  const fallback = connection.kind === 'ollama' ? Math.floor(context / 2) : reasons(connection, model) ? 32000 : connection.kind === 'compatible' ? 16384 : 8192;
   // Et svar må aldrig kunne fylde hele konteksten.
   const output = Math.min(model.limits?.output || k?.output || fallback, OUTPUT_CEILING, Math.floor(context / 2));
   // OpenCode komprimerer ved limit.input minus en reserve; uden den ved konteksten minus svarloftet.
@@ -380,9 +404,13 @@ function contextLimit(connection, model) {
 function engineProvider(connection, model, gatewayURL, token) {
   assertSupported(connection);
   const anthropic = connection.kind === 'anthropic' || (connection.kind === 'zen' && /^claude-/.test(model.id));
+  // Gatewayen afgør, hvornår et kald har ventet for længe, og giver den rigtige forklaring (lokale modeller 10 min, andre 2 min).
+  // OpenCodes egne grænser for svarhoved og bidder (standard 5 min) ligger derfor over gatewayens. Ellers afbryder motoren
+  // først, og en langsom lokal model ligner en afbrudt internetforbindelse (fund 11).
+  const wait = Math.max(300_000, require('./gateway.cjs').idleLimitFor(connection) + 60_000);
   // Mistral sender både tekst og strukturerede tænkeafsnit. Dets adapter bevarer disse gennem streaming og værktøjssvar.
   return { npm: anthropic ? '@ai-sdk/anthropic' : connection.kind === 'mistral' ? '@ai-sdk/mistral' : usesResponses(connection) ? '@ai-sdk/openai' : '@ai-sdk/openai-compatible', name: connection.name,
-    options: { baseURL: gatewayURL, apiKey: token },
+    options: { baseURL: gatewayURL, apiKey: token, headerTimeout: wait, chunkTimeout: wait },
     models: { [model.id]: { name: model.name, tool_call: true, limit: modelLimits(connection, model), ...(usesResponses(connection) ? { options: { store: false, include: ['reasoning.encrypted_content'] } } : {}) } } };
 }
-module.exports = { networkFailure, definitions, accountPages, assertSupported, endpoint, normalize, cleanKey, redact, cortiName, requestJSON, listModels, routes, disclosure, engineProvider, modelLimits, contextLimit, effortLevels, reasons, priceFor, usesResponses, OUTPUT_CEILING, WORKING_WINDOW };
+module.exports = { networkFailure, definitions, accountPages, assertSupported, endpoint, normalize, ollamaRoot, fromStore, cleanKey, redact, cortiName, requestJSON, listModels, routes, disclosure, engineProvider, modelLimits, contextLimit, effortLevels, reasons, priceFor, usesResponses, OUTPUT_CEILING, WORKING_WINDOW };

@@ -83,13 +83,19 @@ test('Tidligere Komplai AI: fjernelse af eget token er lokal, browseradgang tilb
   } finally { globalThis.fetch = original; }
 });
 
-test('Tidligere Komplai AI: fejlet tilbagekaldelse bevarer både den gamle forbindelse og Run', async t => {
+// Q:D2-3: den udgåede forbindelse skal kunne fjernes uden net. Den fjernes fra Aura, svaret siger ærligt, at adgangen ikke er
+// tilbagekaldt hos komplai, og Run bevares (flere tilfælde i tests/komplai-ai-fjern-uden-net.test.cjs).
+test('Tidligere Komplai AI: fejlet tilbagekaldelse fjerner forbindelsen fra Aura, siger det og bevarer Run', async t => {
   const { bench, store } = await fixture(t), original = globalThis.fetch;
   await store.update(state => { state.connections[0].account.authMethod = 'browser'; });
-  const before = await store.read();
+  const runBefore = (await store.read()).hosting.komplai;
   globalThis.fetch = async () => { throw Error('offline'); };
-  try { await assert.rejects(bench.removeConnection(old.id), /kunne ikke kontaktes/); assert.deepEqual(await store.read(), before); }
-  finally { globalThis.fetch = original; }
+  try {
+    const result = await bench.removeConnection(old.id);
+    const after = await store.read();
+    assert.deepEqual(after.connections.map(c => c.id), ['anden-ai']); assert.deepEqual(after.hosting.komplai, runBefore);
+    assert.match(result.removalNotice, /ikke tilbagekaldt hos komplai/);
+  } finally { globalThis.fetch = original; }
 });
 
 test('Historisk forbrug i DKK bevares og blandes ikke med USD efter genåbning', async t => {

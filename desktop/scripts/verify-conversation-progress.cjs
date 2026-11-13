@@ -117,6 +117,10 @@ const { GitVersions } = require('../core/git.cjs');
     await page.locator('#restore-outcomes').filter({ hasText: 'index.html' }).waitFor();
     await page.click('#restore-confirm'); await page.locator('#run-review').filter({ hasText: 'Opgaven er fortrudt' }).waitFor();
     assert.equal(await fs.readFile(target, 'utf8'), '<h1>Før blomsten</h1>');
+    // Den åbne version under Ændringer › Versioner følger fortrydelsen: den svarer nu til filerne, så Gå tilbage hertil vises ikke.
+    await page.waitForFunction(() => document.querySelector('#version-restore').hidden, null, { timeout: 10000 });
+    // Fortryd skifter ikke fane (kun brugeren skifter fane). Brugeren står i Ændringer og vælger selv Forhåndsvisning.
+    await page.click('#tab-preview');
     await page.frameLocator('#preview').locator('h1').filter({ hasText: 'Før blomsten' }).waitFor();
     await page.screenshot({ path: path.join(root, 'fortryd-kvittering.png'), animations: 'disabled' });
     await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(w => w.webContents.getURL().startsWith('harness://')).setSize(980, 720));

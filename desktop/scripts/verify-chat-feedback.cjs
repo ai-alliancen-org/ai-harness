@@ -91,12 +91,14 @@ const helpers = require('./ui-test-helpers.cjs');
     assert.equal(await page.isVisible('#context-warning'), false, 'advarslen forsvinder igen med den rigtige måling');
     const instructions = JSON.stringify(requests[0].messages);
     assert.match(instructions, /Python med FastAPI/); assert.match(instructions, /Node.js med TypeScript/);
-    // Udgivelsesvejledningen fra core/hosting-guidance.cjs når modellen uændret. Udgivelse er ikke slået til i prøven.
+    // Udgivelsesvejledningen fra core/hosting-guidance.cjs når modellen uændret. Udgivelse er ikke slået til i prøven, så
+    // udbyderdetaljerne sendes ikke (docs/decisions.md, bølge 2), men de generelle værn om hosting gør.
     assert.ok(instructions.includes(JSON.stringify(require('../core/hosting-guidance.cjs').guidance(false)).slice(1, -1)), 'hostingvejledningen står i modelkaldet');
-    assert.match(instructions, /Azure Static Web Apps, Cloudflare Pages, GitHub Pages, komplai Run, Promte Apps og Vercel/); assert.match(instructions, /Netlify Drop har vejledning, men ingen uploadintegration/);
+    assert.match(instructions, /Almindelige Python\/Node-servere kan ikke udgives som statiske filer/); assert.match(instructions, /Oplys ikke, at hosting er gratis eller udelukkende i EU/);
+    assert.doesNotMatch(instructions, /Integrerede udgivelsesveje/, 'udbyderdetaljerne sendes ikke uden Udgiv'); assert.doesNotMatch(instructions, /Netlify Drop har vejledning/);
     assert.match(instructions, /pladsholder, ikke et vedtaget design/);
     assert.deepEqual(errors, []);
-    console.log(JSON.stringify({ status: 'bestået', root, requests: requests.length, checks: ['mappeadgang', 'synlig opstart', 'lang tavshed', 'rigtig streaming', 'fire farveformater', 'HTML som tekst', 'manuel rulning', 'seneste svar', 'reduceret bevægelse', 'faktiske tokens', 'kontekstmåling i detaljerne og advarsel nær grænsen', 'Python/Node/hosting i modelkald'] }));
+    console.log(JSON.stringify({ status: 'bestået', root, requests: requests.length, checks: ['mappeadgang', 'synlig opstart', 'lang tavshed', 'rigtig streaming', 'fire farveformater', 'HTML som tekst', 'manuel rulning', 'seneste svar', 'reduceret bevægelse', 'faktiske tokens', 'kontekstmåling i detaljerne og advarsel nær grænsen', 'Python/Node og hostingværn uden udbyderdetaljer i modelkald'] }));
   } catch (error) { if (app) await (await app.firstWindow()).screenshot({ path: path.join(root, 'fejl.png') }).catch(() => {}); console.error('Evidens:', root, errors); throw error; }
   finally { release?.(); finish?.(); await fs.chmod(project, 0o700); await app?.close(); server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

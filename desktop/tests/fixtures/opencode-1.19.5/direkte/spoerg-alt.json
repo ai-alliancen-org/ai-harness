@@ -1,0 +1,100 @@
+{
+ "opencode": "1.19.5",
+ "aura": "d0c3fca+ændringer",
+ "kilde": "scripts/record-opencode-contract.cjs direkte (Auras isolatedEnv og engineConfig med ændrede regler, skills eller mapper)",
+ "eksperiment": "spoerg-alt",
+ "outcome": "idle",
+ "path": {
+  "home": "${BASE}/appdata/runtime/home",
+  "state": "${BASE}/appdata/runtime/state/opencode",
+  "config": "${BASE}/appdata/runtime/config/opencode",
+  "worktree": "${BASE}/Dokumenter/projekt",
+  "directory": "${BASE}/Dokumenter/projekt"
+ },
+ "project": {
+  "id": "global",
+  "worktree": "${BASE}/Dokumenter/projekt",
+  "vcs": "git",
+  "time": {
+   "created": 1793884107811,
+   "updated": 1793884107811
+  },
+  "sandboxes": []
+ },
+ "asked": [
+  {
+   "step": "skill",
+   "permission": "skill",
+   "patterns": [
+    "aura-proeve"
+   ],
+   "always": [
+    "aura-proeve"
+   ],
+   "metadata": {}
+  },
+  {
+   "step": "todowrite",
+   "permission": "todowrite",
+   "patterns": [
+    "*"
+   ],
+   "always": [
+    "*"
+   ],
+   "metadata": {}
+  }
+ ],
+ "results": [
+  {
+   "step": "skill",
+   "status": "completed",
+   "output": "<skill_content name=\"aura-proeve\"> # Skill: aura-proeve # aura-proeve Læs references/ref.md. Base directory for this skill: ${BASE}/Dokumenter/projekt/.aura/skills/aura-proeve Relative paths in this skill (e.g.,"
+  },
+  {
+   "step": "todowrite",
+   "status": "completed",
+   "output": "[ { \"content\": \"Trin\", \"status\": \"pending\", \"priority\": \"high\" } ]"
+  },
+  {
+   "step": "question",
+   "status": "completed",
+   "output": "User has answered your questions: \"Blå eller grøn?\"=\"Blå\". You can now continue with the user's answers in mind."
+  }
+ ],
+ "files": [
+  "${BASE}/appdata/runtime/cache/",
+  "${BASE}/appdata/runtime/cache/opencode/",
+  "${BASE}/appdata/runtime/cache/opencode/bin/",
+  "${BASE}/appdata/runtime/config/",
+  "${BASE}/appdata/runtime/config/.gitignore 63",
+  "${BASE}/appdata/runtime/config/node_modules (link/mappe, ikke gennemgået)",
+  "${BASE}/appdata/runtime/config/opencode/",
+  "${BASE}/appdata/runtime/config/opencode/.gitignore 63",
+  "${BASE}/appdata/runtime/config/opencode/node_modules (link/mappe, ikke gennemgået)",
+  "${BASE}/appdata/runtime/config/opencode/package-lock.json 171",
+  "${BASE}/appdata/runtime/config/opencode/package.json 92",
+  "${BASE}/appdata/runtime/config/package-lock.json 171",
+  "${BASE}/appdata/runtime/config/package.json 92",
+  "${BASE}/appdata/runtime/data/",
+  "${BASE}/appdata/runtime/data/opencode/",
+  "${BASE}/appdata/runtime/data/opencode/log/",
+  "${BASE}/appdata/runtime/data/opencode/log/opencode.log 3508",
+  "${BASE}/appdata/runtime/data/opencode/opencode.db 249856",
+  "${BASE}/appdata/runtime/data/opencode/opencode.db-shm 32768",
+  "${BASE}/appdata/runtime/data/opencode/opencode.db-wal 1425552",
+  "${BASE}/appdata/runtime/data/opencode/repos/",
+  "${BASE}/appdata/runtime/home/",
+  "${BASE}/appdata/runtime/state/",
+  "${BASE}/appdata/runtime/state/opencode/",
+  "${BASE}/appdata/runtime/tmp/",
+  "${BASE}/appdata/runtime/tmp/.bun-501-295fc1275a70d982.dylib 9660064",
+  "${BASE}/appdata/runtime/tmp/.bun-501-c22f2ef692948d9e.node 342608",
+  "${BASE}/appdata/runtime/tmp/opencode/",
+  "${BASE}/Dokumenter/projekt/.aura/skills/",
+  "${BASE}/Dokumenter/projekt/.aura/skills/aura-proeve/",
+  "${BASE}/Dokumenter/projekt/.aura/skills/aura-proeve/references/",
+  "${BASE}/Dokumenter/projekt/.aura/skills/aura-proeve/references/ref.md 27",
+  "${BASE}/Dokumenter/projekt/.aura/skills/aura-proeve/SKILL.md 124"
+ ]
+}

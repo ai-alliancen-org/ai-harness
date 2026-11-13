@@ -54,7 +54,8 @@ test('den nye tekst skrives, så den betyder det samme i filtypen; tegn, der kr�
   assert.equal(edit.replacementFor('src/App.tsx', 'Kaffe & kage', 'tag'), 'Kaffe & kage');
   assert.throws(() => edit.replacementFor('src/App.tsx', 'Pris {pris}', 'tag'), /kræver en ændring i koden/);
   assert.throws(() => edit.replacementFor('src/App.tsx', 'Hej', 'other'), /kræver en ændring i koden/);
-  assert.equal(edit.replacementFor('src/App.tsx', 'Hej "du"', 'string'), 'Hej "du"');
+  // Et citationstegn må stå i en streng med det andet citationstegn; strengens eget tegn afprøves i c2-ret-i-siden.test.cjs.
+  assert.equal(edit.replacementFor('src/App.tsx', 'Hej "du"', 'string', "'"), 'Hej "du"');
   assert.throws(() => edit.replacementFor('src/App.tsx', 'Hej ${navn}', 'string'), /kræver/);
   assert.throws(() => edit.replacementFor('public/index.html', 'Hej', 'string'), /kræver/, 'en attribut i HTML er ikke elementets tekst');
   assert.throws(() => edit.replacementFor('src/pages/index.astro', 'Hej {navn}', 'tag'), /kræver/);

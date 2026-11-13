@@ -69,6 +69,72 @@ async function serviceDirectory(root, relative = '.') {
 async function readProjectText(root, file) {
   try { const filename = path.join(root, file), stat = await fs.lstat(filename); if (!stat.isFile() || stat.isSymbolicLink() || stat.size > 200_000) return null; return fs.readFile(filename, 'utf8'); } catch (error) { if (error.code === 'ENOENT') return null; throw error; }
 }
+// Startfilerne: de filer, en tjenestes kommando peger på (fx server.js i "node server.js"), også når kommandoen er et npm-script i
+// package.json. De indgår i samtykkets fingeraftryk, så en ændret startfil kræver nyt samtykke. Kun almindelige filer inde i projektet.
+// Kun kildefiler: data- og logfiler, som et program selv skriver til, må ikke få samtykket til at udløbe hver gang.
+const START_FILE_EXTENSIONS = /\.(?:[cm]?[jt]sx?|py|rb|php|go|sh)$/i;
+const MODULE_EXTENSIONS = ['.js', '.cjs', '.mjs', '.ts', '.tsx', '.jsx', '.py', '.rb', '.php', '.go', '.sh'];
+const JS_FILE = /\.[cm]?[jt]sx?$/i;
+const START_FILE_LIMIT = 2_000_000, START_FILE_COUNT = 200;
+// Ordene i kommandoen eller scriptet, der kan pege på en startfil: med endelse (server.js) eller uden (server, .), som da afprøves mod kendte endelser.
+function startFileCandidates(command, script) {
+  const words = [...command.slice(1)];
+  if (typeof script === 'string') words.push(...script.split(/\s+|&&|\|\||;|\|/));
+  return [...new Set(words.map(word => word.replace(/^["']|["']$/g, '')).filter(word => word && !word.startsWith('-') && !/[{}$`<>*?=:]/.test(word) && word.length < 300))].slice(0, 64);
+}
+async function isFile(file) { try { const stat = await fs.lstat(file); return stat.isFile() || stat.isSymbolicLink(); } catch { return false; } }
+async function packageMain(directory) {
+  try { const main = JSON.parse(await fs.readFile(path.join(directory, 'package.json'), 'utf8')).main; return typeof main === 'string' ? main : null; } catch { return null; }
+}
+// Finder den fil, et navn eller en modulsti peger på: selve filen, navnet med en kendt endelse, eller mappens main og index.
+async function resolveStartFile(target, depth = 0) {
+  let stat; try { stat = await fs.lstat(target); } catch { stat = null; }
+  if (stat && !stat.isDirectory() && START_FILE_EXTENSIONS.test(target)) return target;
+  if (!START_FILE_EXTENSIONS.test(target)) for (const extension of MODULE_EXTENSIONS) if (await isFile(target + extension)) return target + extension;
+  if (stat?.isDirectory()) {
+    const main = depth < 2 ? await packageMain(target) : null;
+    if (main) { const found = await resolveStartFile(path.resolve(target, main), depth + 1); if (found) return found; }
+    for (const extension of MODULE_EXTENSIONS) if (await isFile(path.join(target, 'index' + extension))) return path.join(target, 'index' + extension);
+  }
+  return null;
+}
+function relativeImports(text) {
+  const found = new Set();
+  for (const match of text.matchAll(/(?:\brequire\s*\(|\bimport\s*\(|\bfrom\s+|\bimport\s+)\s*["'](\.{1,2}(?:\/[^"'\n]*)?)["']/g)) found.add(match[1]);
+  return [...found].slice(0, 100);
+}
+async function startFileDigest(root, cwd, command, script) {
+  const base = await fs.realpath(root), found = {}, seen = new Set(), queue = [];
+  const inside = file => { const relative = path.relative(base, file); return !relative.startsWith('..') && !path.isAbsolute(relative); };
+  for (const word of startFileCandidates(command, script)) {
+    if (path.isAbsolute(word) || word.split(/[\\/]/).includes('..')) continue;
+    const file = await resolveStartFile(path.resolve(cwd, word)).catch(() => null);
+    if (file) queue.push(file);
+  }
+  // Mappens main i package.json gælder også (fx "node ." og "npm start" uden navngiven fil).
+  if (command.length > 1 || script) { const main = await packageMain(cwd); if (main && !path.isAbsolute(main) && !main.split(/[\\/]/).includes('..')) { const file = await resolveStartFile(path.resolve(cwd, main)).catch(() => null); if (file) queue.push(file); } }
+  while (queue.length && Object.keys(found).length < START_FILE_COUNT) {
+    const file = queue.shift();
+    if (seen.has(file)) continue;
+    seen.add(file);
+    try {
+      const stat = await fs.lstat(file), key = path.relative(base, file).split(path.sep).join('/');
+      if (!inside(file)) continue;
+      if (stat.isSymbolicLink()) { found[key] = 'link:' + await fs.readlink(file); continue; }
+      if (!stat.isFile()) continue;
+      if (!inside(await fs.realpath(file))) continue;
+      if (stat.size > START_FILE_LIMIT) { found[key] = `stor:${stat.size}:${stat.mtimeMs}`; continue; }
+      const content = await fs.readFile(file);
+      found[key] = createHash('sha256').update(content).digest('hex');
+      // Moduler, som en JavaScript-fil selv indlæser med en relativ sti, hører med til det samtykket dækker.
+      if (JS_FILE.test(file)) for (const specifier of relativeImports(content.toString('utf8'))) {
+        const module = await resolveStartFile(path.resolve(path.dirname(file), specifier)).catch(() => null);
+        if (module && inside(module)) queue.push(module);
+      }
+    } catch { /* Findes ikke: ikke en startfil. */ }
+  }
+  return found;
+}
 async function detectServices(root, config = {}) {
   const c = normalizeRuntimeConfig(config), files = {};
   for (const name of ['package.json', 'package-lock.json', 'npm-shrinkwrap.json', '.npmrc', 'requirements.txt', 'pyproject.toml', 'manage.py', 'app.py', 'main.py']) files[name] = await readProjectText(root, name);
@@ -81,28 +147,77 @@ async function detectServices(root, config = {}) {
     else if (/\bFastAPI\s*\(/.test(files['main.py'] || '')) services = [{ id: 'web', label: 'Python med FastAPI', command: ['python3', '-m', 'uvicorn', 'main:app', '--host', '{host}', '--port', '{port}'], cwd: '.' }];
     else if (/\bFlask\s*\(/.test(files['app.py'] || '')) services = [{ id: 'web', label: 'Python med Flask', command: ['python3', '-m', 'flask', '--app', 'app', 'run', '--host', '{host}', '--port', '{port}', '--no-reload'], cwd: '.' }];
   }
-  return { config: c, services: c.mode === 'static' ? [] : services, files, fingerprint: createHash('sha256').update(JSON.stringify({ config: c, files })).digest('hex') };
+  // Samtykket til start dækker pakker og opstart, ikke netlisten: den styrer kun, hvad siden må hente i forhåndsvisningen,
+  // og den ændres af brugeren selv, fx med Tillad. Uden netliste er fingeraftrykket det samme som før (fund 24, beta 3).
+  const { network, ...startup } = c;
+  return { config: c, services: c.mode === 'static' ? [] : services, files, fingerprint: createHash('sha256').update(JSON.stringify({ config: startup, files })).digest('hex') };
 }
 
 async function inspectPreviewDependencies(root, config = {}) {
   const network = normalizeRuntimeConfig(config).network || {}, diagnostics = [];
   const publicRoot = path.join(root, 'public');
   try { if ((await fs.lstat(publicRoot)).isSymbolicLink()) return diagnostics; } catch { return diagnostics; }
-  const html = (await readProjectText(publicRoot, 'index.html') || '').replace(/<!--[\s\S]*?-->/g, '');
+  // Bevar en adskillelse, når kommentarer springes over: ellers kan fx <scr<!-- ... -->ipt blive til et nyt tag i diagnosen.
+  const html = (await readProjectText(publicRoot, 'index.html') || '').replace(/<!--[\s\S]*?-->/g, ' ');
+  const report = (address, script, via) => {
+    if (typeof address !== 'string' || !/^(?:https?:)?\/\//i.test(address.trim())) return;
+    address = address.trim();
+    let origin; try { origin = new URL(address.startsWith('//') ? 'https:' + address : address).origin; } catch { return; }
+    const kind = script ? 'scripts' : 'styles';
+    if (network[kind]?.includes(origin) || diagnostics.some(item => item.kind === kind && item.origin === origin)) return;
+    diagnostics.push({ kind, origin, resourceType: script ? 'script' : 'stylesheet', reason: 'declared-remote-dependency', file: 'public/index.html', message: `Startsiden henviser til ${script ? (via || 'kode') : 'typografi'} fra ${origin}, som projektets netadgang ikke tillader.`, repair: 'Ret forhåndsvisningen: public/index.html henviser til eksterne browserbiblioteker, som bliver blokeret. Undersøg den konkrete fejl, og brug lokale filer eller projektets lokale pakker og bygning. Bevar den valgte teknologi, udseendet, funktionerne og eksisterende data. React er ikke et krav. Eksterne API’er og login er særskilte integrationer og skal bevares. Fremlæg nødvendige installationer til gennemgang. Fjern ikke funktioner eller erstat rigtige data med eksempeldata.' });
+  };
   for (const match of html.matchAll(/<(script|link)\b[^>]*>/gi)) {
     const tag = match[0], script = match[1].toLowerCase() === 'script';
     if (!script && !/\brel\s*=\s*["']?stylesheet\b/i.test(tag)) continue;
     const address = tag.match(script ? /\bsrc\s*=\s*(?:"([^"]+)"|'([^']+)'|([^\s>]+))/i : /\bhref\s*=\s*(?:"([^"]+)"|'([^']+)'|([^\s>]+))/i)?.slice(1).find(Boolean);
-    if (!address || !/^(?:https?:)?\/\//i.test(address)) continue;
-    let origin; try { origin = new URL(address.startsWith('//') ? 'https:' + address : address).origin; } catch { continue; }
-    const kind = script ? 'scripts' : 'styles';
-    if (network[kind]?.includes(origin) || diagnostics.some(item => item.kind === kind && item.origin === origin)) continue;
-    diagnostics.push({ kind, origin, resourceType: script ? 'script' : 'stylesheet', reason: 'declared-remote-dependency', file: 'public/index.html', message: `Startsiden henviser til ${script ? 'kode' : 'typografi'} fra ${origin}, som projektets netadgang ikke tillader.`, repair: 'Ret forhåndsvisningen: public/index.html henviser til eksterne browserbiblioteker, som bliver blokeret. Undersøg den konkrete fejl, og brug lokale filer eller projektets lokale pakker og bygning. Bevar den valgte teknologi, udseendet, funktionerne og eksisterende data. React er ikke et krav. Eksterne API’er og login er særskilte integrationer og skal bevares. Fremlæg nødvendige installationer til gennemgang. Fjern ikke funktioner eller erstat rigtige data med eksempeldata.' });
+    report(address, script);
+  }
+  // Importmap og ESM-imports i indlejrede scripts henter også fra nettet, selv om der ikke står src på tagget.
+  // Browseren afslutter også et script ved et sluttag med attributter eller en skråstreg. Kun HTMLs ASCII-mellemrum,
+  // / og > afslutter selve navnet; fx </script-template> i en JavaScript-streng er ikke et sluttag. Dette finder kun diagnoser.
+  for (const match of html.matchAll(/<script(?=[\t\n\f\r />])([^>]*)>([\s\S]*?)<\/script(?=[\t\n\f\r />])[^>]*>/gi)) {
+    const attributes = match[1], body = match[2];
+    if (!body.trim()) continue;
+    if (/\btype\s*=\s*["']?importmap\b/i.test(attributes)) {
+      let map; try { map = JSON.parse(body); } catch { map = null; }
+      const addresses = value => Object.values(value && typeof value === 'object' ? value : {}).filter(item => typeof item === 'string');
+      for (const address of [...addresses(map?.imports), ...Object.values(map?.scopes && typeof map.scopes === 'object' ? map.scopes : {}).flatMap(addresses)]) report(address, true, 'et importkort (importmap) med kode');
+      continue;
+    }
+    // Kun rigtig JavaScript læses, og kommentarer og almindelige strenge springes over, så tekst som ligner et import ikke giver falske diagnoser.
+    const type = (attributes.match(/\btype\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i) || []).slice(1).find(item => item !== undefined);
+    if (type !== undefined && type.trim() && !/^(?:module|(?:text|application)\/(?:javascript|ecmascript|babel|jsx))\s*(?:;.*)?$/i.test(type.trim())) continue;
+    for (const address of importAddresses(body)) report(address, true, 'kode (ESM-import)');
   }
   return diagnostics;
 }
 
-// Netlisten for nye projekter: Tailwind, webskrifter og billeder fra https (beslutning for beta 2). Eksisterende projekter ændres ikke.
-const CDN_HOSTS = ['https://cdn.tailwindcss.com', 'https://cdn.jsdelivr.net', 'https://unpkg.com', 'https://cdnjs.cloudflare.com'];
-const DESIGN_PREVIEW_NETWORK = { scripts: [...CDN_HOSTS], styles: [...CDN_HOSTS, 'https://fonts.googleapis.com', 'https://fonts.gstatic.com'], connect: [], images: ['https:'] };
-module.exports = { normalizeRuntimeConfig, describeRuntime, describe: describeRuntime, detectServices, inspectPreviewDependencies, serviceDirectory, networkOrigin, NETWORK_KINDS, LOOPBACK, DESIGN_PREVIEW_NETWORK };
+// Finder importadresser i JavaScript uden at læse kommentarer eller strenge, der ikke står lige efter import, import( eller from.
+function importAddresses(code) {
+  const found = [];
+  let index = 0, previous = '', dotted = false;
+  while (index < code.length) {
+    const char = code[index];
+    if (char === '/' && code[index + 1] === '/') { const end = code.indexOf('\n', index); index = end < 0 ? code.length : end + 1; continue; }
+    if (char === '/' && code[index + 1] === '*') { const end = code.indexOf('*/', index + 2); index = end < 0 ? code.length : end + 2; continue; }
+    if (char === '"' || char === "'" || char === '`') {
+      let end = index + 1;
+      while (end < code.length && code[end] !== char) { if (code[end] === '\\') end++; else if (char !== '`' && code[end] === '\n') break; end++; }
+      const text = code.slice(index + 1, end);
+      if ((previous === 'import' || previous === 'from' || previous === 'import(') && !dotted && code[end] === char && !text.includes('${')) found.push(text);
+      index = end + 1; previous = 'literal'; dotted = false; continue;
+    }
+    if (/\s/.test(char)) { index++; continue; }
+    if (/[\w$]/.test(char)) { let end = index; while (end < code.length && /[\w$]/.test(code[end])) end++; dotted = previous === '.'; previous = code.slice(index, end); index = end; continue; }
+    dotted = false;
+    previous = char === '(' && previous === 'import' ? 'import(' : char;
+    index++;
+  }
+  return found;
+}
+
+// Netlisten for nye projekter (valg 4, 5. november 2026): en kort fast liste. Tailwind som kode, Google Fonts som typografi og skrifter.
+// Alt andet, også eksterne billeder, kræver brugerens samtykke pr. adresse. Eksisterende projekter ændres ikke.
+const DESIGN_PREVIEW_NETWORK = { scripts: ['https://cdn.tailwindcss.com'], styles: ['https://fonts.googleapis.com', 'https://fonts.gstatic.com'], connect: [], images: [] };
+module.exports = { startFileDigest, normalizeRuntimeConfig, describeRuntime, describe: describeRuntime, detectServices, inspectPreviewDependencies, serviceDirectory, networkOrigin, NETWORK_KINDS, LOOPBACK, DESIGN_PREVIEW_NETWORK };

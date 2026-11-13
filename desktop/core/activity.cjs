@@ -10,6 +10,11 @@ const approvalTitles = { edit: 'Godkendelse: ændre en fil', bash: 'Godkendelse:
 const FILE_TOOLS = new Set(['edit', 'write', 'multiedit']);
 const PATCH_TOOLS = new Set(['patch', 'apply_patch']);
 
+// Sandkassen pakker agentens kommando ind i "exec /usr/bin/env -i ... 'nyttelast'". Aktivitet og godkendelser viser den
+// oprindelige kommando, som ligger i nyttelasten, men kun for en indpakning, sandkassen selv har lavet (præcis samme
+// forstavelse). En kommando, agenten selv har skrevet i samme form, vises uændret og kan ikke forklæde sig.
+function originalCommand(command) { return require('./command-sandbox.cjs').unwrap(command); }
+
 // En sti vises i forhold til projektet, når den ligger i projektet. Skills ligger i motorens egen mappe og vises med navn.
 function projectPath(root, file) {
   if (typeof file !== 'string' || !file) return '';
@@ -43,7 +48,7 @@ function toolFiles(part, root) {
 function toolEntry(part, root) {
   const state = part.state || {}, input = state.input || {}, metadata = state.metadata || {};
   const file = input.filePath || input.path || metadata.filepath;
-  let target = part.tool === 'bash' ? input.command || state.title || '' : file ? projectPath(root, file) : input.url || input.query || input.pattern || state.title || '';
+  let target = part.tool === 'bash' ? originalCommand(input.command) || state.title || '' : file ? projectPath(root, file) : input.url || input.query || input.pattern || state.title || '';
   if (PATCH_TOOLS.has(part.tool)) target = toolFiles(part, root).join(', ') || state.title || '';
   const entry = { id: `tool-${part.id}`, kind: 'tool', tool: part.tool, title: toolLabels[part.tool] || `Værktøj: ${part.tool}`, target: projectPath(root, String(target)).slice(0, 2000), status: state.status || 'pending' };
   if (Number.isFinite(state.time?.start)) entry.started = state.time.start;
@@ -57,7 +62,7 @@ function toolEntry(part, root) {
   return entry;
 }
 function approvalTarget(p, root) {
-  if (p.permission === 'bash') return String(p.metadata?.command || (p.patterns || []).join('\n'));
+  if (p.permission === 'bash') return originalCommand(String(p.metadata?.command || (p.patterns || []).join('\n')));
   if (typeof p.metadata?.filepath === 'string') return projectPath(root, p.metadata.filepath);
   return (p.patterns || []).join('\n');
 }
@@ -79,4 +84,4 @@ class Activity {
   list() { return this.entries.map(entry => ({ ...entry })); }
 }
 
-module.exports = { Activity, toolEntry, toolFiles, approvalTarget, approvalTitles, toolLabels, projectPath, projectFile, patchFiles };
+module.exports = { Activity, originalCommand, toolEntry, toolFiles, approvalTarget, approvalTitles, toolLabels, projectPath, projectFile, patchFiles };

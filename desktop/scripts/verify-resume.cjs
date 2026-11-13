@@ -61,7 +61,8 @@ const http = require('node:http');
     await page.locator('#resume-notice:not([hidden])').waitFor();
     assert.equal(await page.inputValue('#prompt'), 'Husk plads til fem aktiviteter.');
     assert.match(await page.locator('#messages').textContent(), /violet-cykel/);
-    assert.equal(await page.isChecked('#include-history'), false);
+    // Under Tidligere samtale står intet tilvalg om en ekstra kopi; det ændrede intet efter Q:B1-2 (skeptikerens fund efter G1 og G2).
+    assert.equal(await page.locator('#include-history').count(), 0);
     assert.equal(await page.isVisible('#plan-card'), true);
     assert.equal(await page.inputValue('#model-select'), 'test-model');
     assert.equal(requests.length, beforeRestart); assert.equal(catalogs, catalogsBefore);
@@ -81,14 +82,36 @@ const http = require('node:http');
     await require('./ui-test-helpers.cjs').approve(page, 'Tillad én gang');
     await page.frameLocator('#preview').locator('h1').filter({ hasText: 'Fælleshuset er klar' }).waitFor({ timeout: 30000 });
     await page.locator('#run-status').filter({ hasText: 'Klar' }).waitFor({ timeout: 30000 });
-    await page.click('#resume-notice > summary'); await page.check('#include-history'); await require('./ui-test-helpers.cjs').selectMode(page, 'plan'); await draft('Vurder næste skridt.');
-    // Tilvalget af historik ændrer ikke modtager, model, vilkår eller pris, så resuméet gentages ikke; se DESIGN.md.
+    // Byg og Planlæg deler motor og AI-session (8f8eb49, docs/releases/0.7.0-beta.2.md). I en fortsat session har AI'en
+    // allerede samtalen, så der sendes ingen ekstra kopi, og Før du sender må ikke sige andet (README: en
+    // igangværende modelsession beholder sin egen kontekst). Gennemgangen læses i hovedprocessen, fordi vilkårene er husket.
+    await app.evaluate(({ app }) => {
+      const require = process.getBuiltinModule('module').createRequire(app.getAppPath() + '/package.json');
+      const { ChatSession } = require('./core/chat-session.cjs'), prepare = ChatSession.prototype.prepare;
+      globalThis.resumeReviews = [];
+      ChatSession.prototype.prepare = async function(...args) { const review = await prepare.apply(this, args); globalThis.resumeReviews.push({ historyRequested: review.historyRequested, historyIncluded: review.historyIncluded, historyText: review.historyText, conversation: review.conversation }); return review; };
+    });
+    await require('./ui-test-helpers.cjs').selectMode(page, 'plan'); await draft('Vurder næste skridt.');
+    const sentBefore = requests.length;
+    // Skift til Planlæg ændrer ikke modtager, model, vilkår eller pris, så resuméet gentages ikke; se DESIGN.md.
     await page.click('#send');
-    assert.equal(await page.locator('#data-dialog').evaluate(el => el.open), false, 'et tilvalg af historik gentager ikke resuméet');
-    // "Klar" står der allerede, før der sendes, så prøven venter på selve modelkaldet med historikken.
-    for (let round = 0; round < 180; round++) { if (requests.some(r => JSON.stringify(r.messages).includes('Tidligere samtale, som brugeren har valgt'))) break; await new Promise(resolve => setTimeout(resolve, 500)); }
+    assert.equal(await page.locator('#data-dialog').evaluate(el => el.open), false, 'skift af arbejdsmåde gentager ikke resuméet');
+    const lastUser = r => JSON.stringify([...r.messages].reverse().find(m => m.role === 'user')?.content ?? '');
+    const isNext = r => lastUser(r).includes('Vurder næste skridt');
+    // "Klar" står der allerede, før der sendes, så prøven venter på selve modelkaldet.
+    for (let round = 0; round < 180 && !requests.slice(sentBefore).some(isNext); round++) await new Promise(resolve => setTimeout(resolve, 500));
     await page.locator('#run-status').filter({ hasText: 'Klar' }).waitFor({ timeout: 60000 });
-    assert.ok(requests.some(r => JSON.stringify(r.messages).includes('Tidligere samtale, som brugeren har valgt') && JSON.stringify(r.messages).includes('violet-cykel')));
+    const next = requests.slice(sentBefore).find(isNext);
+    assert.ok(next, 'beskeden nåede modellen');
+    // Mærket står også i planafklaringen i systemteksten, så kun brugerbeskederne beviser sessionens historik.
+    assert.ok(next.messages.some(m => m.role === 'user' && JSON.stringify(m.content).includes('violet-cykel')), 'modellen har den første besked fra den fortsatte AI-session');
+    assert.equal(JSON.stringify(next.messages).includes('Tidligere beskeder fra samme samtale'), false, 'ingen ekstra kopi i en fortsat session');
+    const review = await app.evaluate(() => globalThis.resumeReviews.at(-1));
+    assert.ok(review, 'gennemgangen blev læst');
+    assert.equal(review.historyIncluded, false, 'Før du sender lover ingen ekstra kopi, der ikke sendes');
+    assert.equal(review.conversation, '');
+    // Linjen siger, hvad den fortsatte AI-session har, og intet om en kopi, der ikke sendes (N:B1-4, DESIGN.md:57).
+    assert.equal(review.historyText, 'I denne samtale kan AI’en bruge tidligere beskeder og værktøjsresultater.');
     // Ny samtale starter en tom samtale ved siden af den gamle, som bevares i sidepanelet; projektfilerne er uændrede.
     await page.click('#project-list .project-entry.is-current .project-add'); await page.waitForFunction(() => document.querySelector('#messages').textContent === '');
     assert.equal(await page.inputValue('#prompt'), ''); assert.equal(await page.isVisible('#plan-card'), false);
@@ -118,7 +141,7 @@ const http = require('node:http');
     assert.equal(await page.isVisible('#plan-card'), false); assert.equal(requests.length,requestCount);
     assert.equal(await page.isVisible('#stop'), false);
 
-    console.log(JSON.stringify({ status: 'bestået', root, checks: ['rigtig genstart med plan, kladde og samtale', 'genåbning uden netværkskald', 'kladders adskillelse mellem projekter', 'accepterede vilkår huskes efter genstart; filgodkendelse efter genstart', 'nyt resumé, når tidligere samtale medsendes', 'rigtig filændring og preview', 'aktivt tilvalg af tidligere samtale', 'ny samtale ved siden af den gamle med bevarede filer', '980 × 720, tastaturfokus og dialoger', 'lukning under streaming bevarer delvist svar uden genstart'] }));
+    console.log(JSON.stringify({ status: 'bestået', root, checks: ['rigtig genstart med plan, kladde og samtale', 'genåbning uden netværkskald', 'kladders adskillelse mellem projekter', 'accepterede vilkår huskes efter genstart; filgodkendelse efter genstart', 'tilvalg af tidligere samtale gentager ikke resuméet', 'rigtig filændring og preview', 'samme AI-session fortsætter med tidligere beskeder efter genstart og på tværs af Byg og Planlæg; Før du sender lover ingen ekstra kopi, der ikke sendes','ny samtale ved siden af den gamle med bevarede filer', '980 × 720, tastaturfokus og dialoger', 'lukning under streaming bevarer delvist svar uden genstart'] }));
   } catch (error) { if (page) { await page.screenshot({ animations: 'disabled', path: path.join(root, 'fejl.png'), timeout: 3000 }).catch(() => {}); console.error('Testmateriale: ' + root); } throw error; }
   finally { await app?.close(); server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

@@ -20,7 +20,8 @@ test('kvitteringen skiller appens navn og adresse fra versionsmetadata', () => {
 test('READY fra upload er ingen indholdskontrol eller bekræftet adgang', () => {
  const r = { ...receipt, id: 'version-1', config: { provider: 'komplai', visibility: 'private' } };
  const summary = view.receiptSummary(r);
- assert.equal(summary.publication.title, 'Udgivet'); assert.match(summary.publication.detail, /uploadsvar/);
+ // Uden en adressekontrol står der ikke «Udgivet»: kun at filerne er uploadet (fund 15, 5. november).
+ assert.equal(summary.publication.title, 'Uploadet, adressen er ikke kontrolleret endnu'); assert.match(summary.publication.detail, /adressen er ikke kontrolleret/);
  assert.equal(summary.publication.tone, 'neutral');
  assert.equal(summary.access.title, 'Adgang ikke kontrolleret'); assert.match(summary.access.detail, /Valgt ved upload/);
  assert.equal(summary.verification.title, 'Startside ikke kontrolleret'); assert.notEqual(summary.verification.tone, 'positive');

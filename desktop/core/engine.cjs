@@ -10,7 +10,7 @@ const run = promisify(execFile);
 const { EngineEvents } = require('./engine-events.cjs');
 const { setTimeout: delay } = require('node:timers/promises');
 // Skal svare til opencode i runtime-lock.json. En unit-test holder de to ens, så motoren ikke afvises af sin egen version.
-const VERSION = '1.18.33';
+const VERSION = '1.19.5';
 
 // Første opstart kan være langsom, fordi macOS eller et antivirusprogram kontrollerer motoren, før den må køre.
 const VERSION_CHECK_MS = 120000;
@@ -27,16 +27,17 @@ async function guardedProgram(executable) {
   }
   throw new Error('AI-motoren blev ikke fundet: ' + executable);
 }
-async function findExecutable({ bundled = require('./runtime.cjs').get(), timeout = VERSION_CHECK_MS } = {}) {
+async function findExecutable({ bundled = require('./runtime.cjs').get(), timeout = VERSION_CHECK_MS, signal } = {}) {
   const binary = process.platform === 'win32' ? 'opencode.exe' : 'opencode';
   // Under udvikling bruges den version, `npm run runtime:prepare` har hentet og kontrolleret, før en eventuel egen installation.
   const prepared = path.join(__dirname, '..', '.runtime', `${process.platform}-${process.arch}`, 'opencode', 'bin', binary);
   const candidates = bundled ? [bundled.opencode] : [process.env.HARNESS_OPENCODE_PATH, prepared, path.join(os.homedir(), '.opencode', 'bin', binary), 'opencode'].filter(Boolean);
   let slow = false;
   for (const file of candidates) {
+    signal?.throwIfAborted();
     if (file === verified) return file;
-    try { const result = await run(file, ['--version'], { timeout, windowsHide: true }); if (result.stdout.trim() === VERSION) return (verified = file); }
-    catch (error) { if (error.killed) slow = true; /* Prøv næste eksplicitte installationsplacering. */ }
+    try { const result = await run(file, ['--version'], { timeout, windowsHide: true, signal }); signal?.throwIfAborted(); if (result.stdout.trim() === VERSION) return (verified = file); }
+    catch (error) { signal?.throwIfAborted(); if (error.killed) slow = true; /* Prøv næste eksplicitte installationsplacering. */ }
   }
   // Den pakkede app har sin egen motor. Brugeren skal have en forklaring, de kan handle på, ikke en udviklerkommando.
   if (bundled) throw new Error(slow
@@ -49,18 +50,38 @@ const SKILL_FILE = /^(SKILL\.md|references\/[a-z0-9-]+\.md)$/;
 // OpenCode sammenligner fil- og læsetilladelser med stien i forhold til projektets Git-rod, eller til computerens rod uden Git.
 // En mappe spærres derfor både som "mappe/…" og "…/mappe/…"; en fuld sti ville aldrig blive ramt. Sidste regel, der passer, gælder.
 // Aktive skills ligger i motorens egen konfigurationsmappe uden for projektet. Mappens navn er projektets nøgle, så mønsteret kun rammer den.
+// Kommandobeskyttelsens indstillinger spærres med hele deres egen sti. Et mappenavn alene ('policy') ramte ellers enhver
+// projektsti som public/policy/privatliv.html. OpenCode kan vise stien relativt, så den fulde sti står både med og uden foranstillet skråstreg.
+const trustedPolicyPatterns = sandbox => {
+  const dir = path.dirname(sandbox.policyPath).replace(/\\/g, '/').replace(/\/+$/, '');
+  return [`*${dir}/*`, ...(dir.startsWith('/') ? [`${dir.slice(1)}/*`] : [])];
+};
 const skillPattern = directory => `*/${path.basename(directory)}/config/skills/*`;
 function permissions(root, references, mode = 'free', skills = null) {
   // Rækkefølge: navne-alias først, så undtagelsen for stier uden for projektet ("../*"), og til sidst de egentlige nægtelser.
   // Ellers afviser mønstret "*./*" en godkendt læsning eller skrivning uden for et Git-projekt.
   const alias = new Set(toOpenCodeAliasGlobs()), all = toOpenCodeGlobs();
   const denyOnly = list => Object.fromEntries(list.map(pattern => [pattern, 'deny']));
-  const withOutside = base => ({ ...denyOnly(all.filter(pattern => alias.has(pattern))), '../*': base, ...denyOnly(all.filter(pattern => !alias.has(pattern))) });
+  const withOutside = (base, middle = {}) => ({ ...denyOnly(all.filter(pattern => alias.has(pattern))), '../*': base, ...middle, ...denyOnly(all.filter(pattern => !alias.has(pattern))) });
   const denials = withOutside('ask');
-  const read = { '*': 'allow', ...withOutside('allow') };
+  // Motorens egne data spærres for read og external_directory. Sidste passende regel gælder: reglerne står efter "../*" (ellers gør
+  // den en læsning uden for projektet tilladt igen) og før navnebeskyttelsen. Undtagelserne (valgte skills og tool-output, som OpenCode
+  // selv beder modellen læse) står efter nægtelsen. Mønstrene har en stjerne og en sti uden foranstillet skråstreg som i trustedPolicyPatterns.
+  const engineRules = {}, externalRules = {};
+  if (skills?.directory) {
+    const normal = value => value.replace(/\\/g, '/').replace(/\/+$/, '');
+    const engineDir = normal(skills.directory), parent = path.dirname(engineDir), closed = path.basename(parent) === 'runtime' ? path.dirname(parent) : engineDir;
+    const forms = base => [`*${base}/*`, ...(base.startsWith('/') ? [`${base.slice(1)}/*`] : [])];
+    for (const pattern of forms(closed)) engineRules[pattern] = externalRules[pattern] = 'deny';
+    // En samtalekopi ligger i appens mappe og er stadig projektet: læsning som før, og mappeadgang spørger som før.
+    const workspace = normal(root);
+    if (workspace.startsWith(closed + '/')) for (const pattern of forms(workspace)) { engineRules[pattern] = 'allow'; externalRules[pattern] = 'ask'; }
+    for (const pattern of [...forms(`${engineDir}/data/opencode/tool-output`), ...forms(`${engineDir}/config/skills`)]) engineRules[pattern] = externalRules[pattern] = 'allow';
+  }
+  const read = { '*': 'allow', ...withOutside('allow', engineRules) };
   // Udvalgte referencer kan åbnes, men kan aldrig frigive nøgler eller private metadata.
   for (const file of references) if (!isProtected(file, { references: false })) for (const pattern of [file, `*/${file}`]) read[pattern] = 'allow';
-  const external = { '*': 'ask' };
+  const external = { '*': 'ask', ...externalRules };
   let skill = 'deny';
   if (skills?.names.length) {
     const pattern = skillPattern(skills.directory);
@@ -68,7 +89,8 @@ function permissions(root, references, mode = 'free', skills = null) {
     // Kun de skills, brugerens funktioner har slået til, kan hentes. OpenCodes egne skills er skjult.
     skill = { '*': 'deny', ...Object.fromEntries(skills.names.map(name => [name, 'allow'])) };
   }
-  if (['chat', 'plan'].includes(mode)) return { '*': 'deny', read, glob: 'allow', list: 'allow', grep: 'ask', webfetch: 'ask', external_directory: external, skill, question: 'allow' };
+  // doom_loop står eksplicit til 'ask' her: ellers rammer '*': 'deny' gentagelsesvagten, og opgaven stopper uden et svar. Aura svarer selv (chat-session.cjs).
+  if (['chat', 'plan'].includes(mode)) return { '*': 'deny', read, glob: 'allow', list: 'allow', grep: 'ask', webfetch: 'ask', doom_loop: 'ask', external_directory: external, skill, question: 'allow' };
   const edit = { '*': 'ask', ...denials };
   if (skills?.names.length) edit[skillPattern(skills.directory)] = 'deny';
   return { '*': 'ask', read, glob: 'allow', grep: 'ask', list: 'allow', edit, bash: 'ask', external_directory: external, webfetch: 'ask', websearch: 'deny', task: 'deny', skill, lsp: 'deny', question: 'deny', todowrite: 'allow', todoread: 'allow' };
@@ -116,9 +138,18 @@ function isolatedEnv(directory, config, password, { commandIsolation = false, te
   env.OPENCODE_EXPERIMENTAL_OUTPUT_TOKEN_MAX = String(require('./connections.cjs').OUTPUT_CEILING);
   return require('./runtime.cjs').gitEnvironment(env);
 }
-const pluginModules = () => path.join(__dirname, '..', 'node_modules').replace(/app\.asar([/\\])/, 'app.asar.unpacked$1');
+// Plugin-SDK'et findes, som Node selv finder en pakke fra denne fil: i desktop/node_modules under udvikling og i appen (app.asar.unpacked),
+// og i en npm-installeret CLI-pakke i den node_modules, npm har lagt det i (typisk over pakken). require.resolve kan ikke bruges, fordi
+// SDK'ets exports kun har import-betingelser. Kun mapperne over denne fil gennemsøges, ikke NODE_PATH eller globale mapper.
+async function pluginModules() {
+  for (const folder of module.paths) {
+    const candidate = folder.replace(/app\.asar([/\\])/, 'app.asar.unpacked$1');
+    if (await fs.access(path.join(candidate, '@opencode-ai', 'plugin', 'package.json')).then(() => true, () => false)) return candidate;
+  }
+  throw new Error('Plugin-understøttelsen til Auras AI-motor mangler. Installer Aura igen.');
+}
 async function pluginRuntimeFiles() {
-  const seen = new Set(), modules = path.join(__dirname, '..', 'node_modules');
+  const seen = new Set(), modules = await pluginModules();
   async function visit(folder) {
     folder = await fs.realpath(folder); if (seen.has(folder)) return; seen.add(folder);
     const manifest = JSON.parse(await fs.readFile(path.join(folder, 'package.json'), 'utf8'));
@@ -148,7 +179,7 @@ async function pluginRuntimePatterns() {
   return [...patterns];
 }
 async function writePluginRuntime(directory) {
-  const modules = await fs.realpath(pluginModules());
+  const modules = await fs.realpath(await pluginModules());
   const sdk = JSON.parse(await fs.readFile(path.join(modules, '@opencode-ai', 'plugin', 'package.json'), 'utf8'));
   if (sdk.version !== VERSION) throw new Error('Plugin-understøttelsen matcher ikke Auras AI-motor. Installer appen igen.');
   // OpenCode venter på npm-installation før enhver lokal plugin. Den låste SDK følger med appen;
@@ -167,8 +198,14 @@ async function writePluginRuntime(directory) {
 }
 // Funktionen indlejres i en lokal plugin, så kontrollen sker før OpenCodes read.
 // Den bruger kun Nodes indbyggede moduler og virker også uden kommandosandbox.
-function createReadGuard({ fs, path, root, references = [], selectedFiles = [], classifyPath = classify }) {
+function createReadGuard({ fs, path, root, references = [], selectedFiles = [], classifyPath = classify, engineRoot = null, storeRoot = null }) {
   const selected = new Set([...references.map(file => path.resolve(root, file)), ...selectedFiles]);
+  // Motorens egne data (opencode.db med -wal og -shm, andre projekters runtime og appens store.json) er ikke projektets filer. De spærres, undtagen
+  // projektmappen selv (en samtalekopi ligger i appens mappe), de valgte skills og data/opencode/tool-output, som OpenCode selv beder modellen læse.
+  const inside = (base, target) => { const rel = path.relative(base, target); return rel === '' || (rel !== '..' && !rel.startsWith('..' + path.sep) && !path.isAbsolute(rel)); };
+  const closed = [engineRoot, storeRoot].filter(value => typeof value === 'string' && value);
+  const open = engineRoot ? [path.join(engineRoot, 'config', 'skills'), path.join(engineRoot, 'data', 'opencode', 'tool-output')] : [];
+  const engineData = file => !inside(root, file) && closed.some(base => inside(base, file)) && !open.some(base => inside(base, file));
   const protectedFile = file => {
     // Kun stien inde i projektet tæller: mapperne over projektet (fx "secrets-app") gør ikke projektets filer beskyttede.
     const rel = path.relative(root, file);
@@ -181,30 +218,41 @@ function createReadGuard({ fs, path, root, references = [], selectedFiles = [], 
     const file = output.args?.filePath;
     if (typeof file !== 'string' || !file || /[\0\r\n]/.test(file)) throw new Error('Aura beskytter denne fil: stien kan ikke læses sikkert.');
     const requested = path.resolve(root, file);
+    if (engineData(requested)) throw new Error('Aura beskytter denne fil.');
     // En valgt reference må kun åbne præcis den valgte fil, ikke et nyt linkmål.
     if (protectedFile(requested) && !selected.has(requested)) throw new Error('Aura beskytter denne fil.');
     const actual = await fs.realpath(requested);
+    if (engineData(actual)) throw new Error('Aura beskytter denne fil.');
     if ((protectedFile(requested) || protectedFile(actual)) && !selected.has(actual)) throw new Error('Aura beskytter denne fil.');
     // OpenCodes egen eksterne-mappekontrol og læsetilladelse ser det faktiske mål.
     output.args.filePath = actual;
   };
 }
-// Skrivevagten nægter kun ved positivt bevis for en sti uden for projektet. Som plugin giver afvisningen en almindelig
+// Skrivevagten nægter kun ved positivt bevis for en sti uden for projektet, eller når en kæde af links ikke kan følges. Som plugin giver afvisningen en almindelig
 // værktøjsfejl, ikke et godkendelseskort, og den lukker ikke andre ventende kort (beslutning for beta 2).
 function createWriteGuard({ fs, path, root }) {
   const inside = (base, target) => { const rel = path.relative(base, target); return rel === '' || (rel !== '..' && !rel.startsWith('..' + path.sep) && !path.isAbsolute(rel)); };
-  const real = async file => {
+  // En sti, der ikke findes endnu, afgøres af den nærmeste mappe over den, som findes. Et hængende link (fx projekt/ny.txt -> /uden/for/ny.txt)
+  // følges til sit mål, fordi skrivningen lander dér. En løkke af links eller en for lang kæde kan ikke afgøres og giver null.
+  const real = async (file, depth = 0) => {
+    if (depth > 40) return null;
     let current = file; const rest = [];
     for (;;) {
       try { return path.join(await fs.realpath(current), ...rest.reverse()); }
-      catch { const parent = path.dirname(current); if (parent === current) return file; rest.push(path.basename(current)); current = parent; }
+      catch {
+        const link = await fs.readlink(current).catch(() => null);
+        if (link !== null) return real(path.join(path.resolve(path.dirname(current), link), ...rest.reverse()), depth + 1);
+        const parent = path.dirname(current); if (parent === current) return file; rest.push(path.basename(current)); current = parent;
+      }
     }
   };
   const refuse = () => { throw new Error('Skriv ikke uden for projektmappen. Brug mappen .aura/tmp til midlertidige filer, og læg alt andet i projektet.'); };
+  // Den faktiske sti afgør: et link i projektet, der peger ud, nægtes, mens en sti gennem et link til projektet (fx /var/… for
+  // /private/var/… på macOS) går igennem, fordi skrivningen lander i projektet.
   const check = async file => {
     if (typeof file !== 'string' || !file || /[\0\r\n]/.test(file)) return;
-    const resolved = path.resolve(root, file);
-    if (!inside(root, resolved) || !inside(root, await real(resolved))) refuse();
+    const actual = await real(path.resolve(root, file));
+    if (actual === null || !inside(root, actual)) refuse();
   };
   return async (input, output) => {
     if (input.tool === 'write' || input.tool === 'edit') return check(output.args?.filePath);
@@ -216,21 +264,90 @@ function createWriteGuard({ fs, path, root }) {
     }
   };
 }
+// Søgning (grep) i projektet må kun ske uden kort, hvis resultatet beviseligt ikke indeholder beskyttede filer. OpenCode spørger, før
+// stien er kendt, og søger også i skjulte filer som .env. Vagten fjerner derfor hele blokke for beskyttede filer (også via links)
+// fra resultatet, før modellen ser det, og regner antallet om. Ukendte linjer i resultatet gør, at alt skjules (fail closed).
+// Den indlejres i pluginet som createReadGuard og bruger kun de indbyggede moduler.
+function createGrepGuard({ fs, path, root, classifyPath = classify, engineRoot = null, storeRoot = null }) {
+  const refusal = 'Aura skjuler søgeresultater, som ikke kan kontrolleres for beskyttede filer.';
+  const inside = (base, target) => { const rel = path.relative(base, target); return rel === '' || (rel !== '..' && !rel.startsWith('..' + path.sep) && !path.isAbsolute(rel)); };
+  const rooted = file => { const rel = path.relative(root, file); return rel && rel !== '..' && !rel.startsWith('..' + path.sep) && !path.isAbsolute(rel) ? rel : file; };
+  const hidden = file => { const result = classifyPath(rooted(file)); return result.invalid || result.credentials || result.metadata || result.references; };
+  const protectedTarget = async file => {
+    if (hidden(file)) return true;
+    try { return hidden(await fs.realpath(file)); } catch { return true; }
+  };
+  // Motorens egne data skjules som i createReadGuard, også i en godkendt søgning uden for projektet. Projektmappen (en samtalekopi ligger i
+  // appens mappe), de valgte skills og tool-output, som OpenCode selv beder modellen søge i, er undtaget.
+  const closed = [engineRoot, storeRoot].filter(value => typeof value === 'string' && value);
+  const open = engineRoot ? [path.join(engineRoot, 'config', 'skills'), path.join(engineRoot, 'data', 'opencode', 'tool-output')] : [];
+  const engineData = file => !inside(root, file) && closed.some(base => inside(base, file)) && !open.some(base => inside(base, file));
+  // Søgningens eget mål afgør, hvad der må vises. En søgning i projektet (også uden sti) kan ske uden kort, så alt uden for projektet
+  // skjules, fx gennem et link. Ligger målet uden for projektet, har brugeren godkendt netop det mål på et kort: OpenCode spørger altid,
+  // og «Godkend alt» dækker ikke søgning. Så vises resultaterne inde i målet. Kendes målet ikke, gælder projektets grænse (fail closed).
+  const scope = async requested => {
+    if (typeof requested !== 'string' || !requested || /[\0\r\n]/.test(requested)) return root;
+    try { const real = await fs.realpath(path.resolve(root, requested)); return inside(root, real) ? root : real; } catch { return root; }
+  };
+  // Målet afgøres i tool.execute.before, før OpenCode spørger og før søgningen kører, og gemmes pr. kald. tool.execute.after bruger det
+  // gemte mål og ikke stien, som den ser ud efter søgningen: skiftes en mappe i projektet til et link ud af projektet, efter at søgningen
+  // er godkendt uden kort, viser resultatet stadig kun projektet. Uden et gemt mål gælder projektets grænse.
+  const scopes = new Map(), call = input => `${input?.sessionID}\0${input?.callID}`;
+  const visible = async (file, base) => {
+    if (await protectedTarget(file)) return false;
+    try { const real = await fs.realpath(file); return inside(base, real) && !engineData(real); } catch { return false; }
+  };
+  const before = async (input, output) => {
+    if (input.tool !== 'grep') return;
+    const requested = output.args?.path;
+    if (requested !== undefined && requested !== null && requested !== '' && (typeof requested !== 'string' || /[\0\r\n]/.test(requested) || await protectedTarget(path.resolve(root, requested)))) throw new Error('Aura beskytter denne fil.');
+    if (typeof input.callID !== 'string' || !input.callID) return;
+    scopes.set(call(input), await scope(requested));
+    // Et kald, der aldrig når tool.execute.after (fx en fejl i søgningen), må ikke hobe sig op.
+    if (scopes.size > 100) scopes.delete(scopes.keys().next().value);
+  };
+  const after = async (input, output) => {
+    if (input.tool !== 'grep') return;
+    const base = scopes.get(call(input)) || root; scopes.delete(call(input));
+    const text = output?.output;
+    if (typeof text !== 'string') { output.output = refusal; return; }
+    if (text.trim() === 'No files found') return;
+    const lines = text.split('\n'), kept = [];
+    let header = false, hide = false, matches = 0, suffix = '';
+    for (const line of lines) {
+      if (!header) { const found = /^Found \d+ matches( \(more matches available\))?$/.exec(line); if (!found) { output.output = refusal; return; } suffix = found[1] || ''; header = true; continue; }
+      if (line === '') { if (!hide) kept.push(line); continue; }
+      if (line.startsWith('  Line ')) { if (!hide) { kept.push(line); matches++; } continue; }
+      if (line.endsWith(':') && path.isAbsolute(line.slice(0, -1))) { hide = !(await visible(line.slice(0, -1), base)); if (!hide) kept.push(line); continue; }
+      if (/^\(Results truncated\.[^\n]*\)$/.test(line)) { kept.push(line); continue; }
+      output.output = refusal; return;
+    }
+    output.output = matches ? [`Found ${matches} matches${suffix}`, ...kept].join('\n') : 'No files found';
+  };
+  return { before, after };
+}
 async function writeReadGuard(directory, root, references, skills = [], { tempRoot = null } = {}) {
   root = await fs.realpath(root);
+  // Motorens mappe ligger i <appens mappe>/runtime/<nøgle>. Er det tilfældet, spærres hele appens mappe (store.json og de andre projekters runtime).
+  const engineRoot = await fs.realpath(directory), parent = path.dirname(engineRoot), storeRoot = path.basename(parent) === 'runtime' ? path.dirname(parent) : null;
   const pluginPath = path.join(directory, 'read-guard.mjs'), readyPath = path.join(directory, 'read-guard-ready.json'), token = randomBytes(32).toString('hex');
   const selectedFiles = skills.flatMap(skill => skill.files.map(file => path.join(directory, 'config', 'skills', skill.name, file.path)));
   await fs.rm(readyPath, { force: true });
-  const source = `import fs from 'node:fs/promises';\nimport path from 'node:path';\nconst classify = (${createPathClassifier.toString()})(${JSON.stringify(RULES)});\nconst guard = (${createReadGuard.toString()})({ fs, path, root: ${JSON.stringify(root)}, references: ${JSON.stringify(references)}, selectedFiles: ${JSON.stringify(selectedFiles)}, classifyPath: classify });\nconst writeGuard = (${createWriteGuard.toString()})({ fs, path, root: ${JSON.stringify(root)} });\nconst tempRoot = ${JSON.stringify(tempRoot)};\nexport const AuraReadProtection = async () => {\n await fs.writeFile(${JSON.stringify(readyPath)}, ${JSON.stringify(JSON.stringify({ token }))}, { mode: 0o600 });\n return {\n 'shell.env': async (_input, output) => {\n  // AI'ens kommandoer bruger projektets .aura/tmp. Sandkassens plugin kommer efter og overskriver miljøet helt.\n  if (tempRoot && !output.env.TMPDIR) output.env = { ...output.env, TMPDIR: tempRoot, TMP: tempRoot, TEMP: tempRoot, NODE_DISABLE_COMPILE_CACHE: '1' };\n },\n 'tool.execute.before': async (input, output) => { await guard(input, output); await writeGuard(input, output); }\n };\n};\n`;
+  const source = `import fs from 'node:fs/promises';\nimport path from 'node:path';\nconst classify = (${createPathClassifier.toString()})(${JSON.stringify(RULES)});\nconst guard = (${createReadGuard.toString()})({ fs, path, root: ${JSON.stringify(root)}, references: ${JSON.stringify(references)}, selectedFiles: ${JSON.stringify(selectedFiles)}, classifyPath: classify, engineRoot: ${JSON.stringify(engineRoot)}, storeRoot: ${JSON.stringify(storeRoot)} });\nconst grepGuard = (${createGrepGuard.toString()})({ fs, path, root: ${JSON.stringify(root)}, classifyPath: classify, engineRoot: ${JSON.stringify(engineRoot)}, storeRoot: ${JSON.stringify(storeRoot)} });\nconst writeGuard = (${createWriteGuard.toString()})({ fs, path, root: ${JSON.stringify(root)} });\nconst tempRoot = ${JSON.stringify(tempRoot)};\nexport const AuraReadProtection = async () => {\n await fs.writeFile(${JSON.stringify(readyPath)}, ${JSON.stringify(JSON.stringify({ token }))}, { mode: 0o600 });\n return {\n 'shell.env': async (_input, output) => {\n  // AI'ens kommandoer arver ikke motorens opsætning (gatewayens midlertidige nøgle og adresse) eller motorens adgangskode, heller ikke\n  // en kommando, der kører uden sandkasse. Miljøet lægges oven på motorens eget, så værdierne tømmes. En kommando uden sandkasse kører\n  // dog med brugerens rettigheder og kan stadig læse dem i motorens egen proces (fx med ps på macOS); det forhindrer kun sandkassen.\n  output.env = { ...output.env, OPENCODE_CONFIG_CONTENT: '', OPENCODE_SERVER_PASSWORD: '', OPENCODE_SERVER_USERNAME: '' };\n  // AI'ens kommandoer bruger projektets .aura/tmp. Sandkassens plugin kommer efter og overskriver miljøet helt.\n  if (tempRoot && !output.env.TMPDIR) output.env = { ...output.env, TMPDIR: tempRoot, TMP: tempRoot, TEMP: tempRoot, NODE_DISABLE_COMPILE_CACHE: '1' };\n },\n 'tool.execute.before': async (input, output) => { await guard(input, output); await writeGuard(input, output); await grepGuard.before(input, output); },\n  'tool.execute.after': async (input, output) => { await grepGuard.after(input, output); }\n };\n};\n`;
   await fs.writeFile(pluginPath, source, { mode: 0o600 });
   return { pluginURL: pathToFileURL(pluginPath).href, readyPath, token };
 }
 const ownsMessage = (info, promptID) => Boolean(info?.id) && (info.id === promptID || info.parentID === promptID || info.id > promptID);
+// Motoren plejer at starte på få sekunder. Under belastning er der målt 21 til 30 sekunder. Grænsen er uændret, men en langsom
+// start forklares i almindeligt dansk i stedet for at sige, at installationen skal kontrolleres.
+const START_TIMEOUT_MS = 30000, SLOW_START_MS = 10000;
+const SLOW_START_TEXT = 'AI-motoren brugte længere tid end normalt på at starte. Computeren kan være travl, eller et antivirusprogram kan være ved at kontrollere programmet. Vent lidt, og prøv igen.';
 class OpenCodeEngine {
   // resume: en tidligere OpenCode-session for samme samtale. Findes den ikke længere, oprettes en ny.
-  constructor({ root, directory, provider, model, references = [], mode = 'free', skills = [], resume = null, sandbox = null, detached = false, recovery = {}, tempRoot = null, preview = null, onEvent = () => {} }) { Object.assign(this, { tempRoot, preview, root, directory, provider, model, references, mode, skills, resume, sandbox, detached, recovery, onEvent }); this.promptEpoch = 0; this.closedPermissions = new Set(); this.closedQuestions = new Set(); this.pendingQuestions = new Map(); this.pending = new Map(); this.active = false; this.resumed = false; }
+  constructor({ root, directory, provider, model, references = [], mode = 'free', skills = [], resume = null, sandbox = null, detached = false, recovery = {}, tempRoot = null, preview = null, startTimeout = START_TIMEOUT_MS, slowStartMs = SLOW_START_MS, onEvent = () => {} }) { Object.assign(this, { startTimeout, slowStartMs, tempRoot, preview, root, directory, provider, model, references, mode, skills, resume, sandbox, detached, recovery, onEvent }); this.promptEpoch = 0; this.closedPermissions = new Set(); this.closedQuestions = new Set(); this.pendingQuestions = new Map(); this.pending = new Map(); this.active = false; this.resumed = false; }
   async request(url, method = 'GET', body, signal) {
-    const response = await fetch(`${this.url}${url}`, { method, headers: { authorization: this.auth, 'content-type': 'application/json', 'x-opencode-directory': encodeURIComponent(this.root) }, body: body === undefined ? undefined : JSON.stringify(body), signal: signal || AbortSignal.timeout(15000), redirect: 'error' });
+    const requestSignal = signal || AbortSignal.timeout(15000);
+    const response = await fetch(`${this.url}${url}`, { method, headers: { authorization: this.auth, 'content-type': 'application/json', 'x-opencode-directory': encodeURIComponent(this.root) }, body: body === undefined ? undefined : JSON.stringify(body), signal: this.startup ? AbortSignal.any([this.startup.signal, requestSignal]) : requestSignal, redirect: 'error' });
     if (!response.ok) throw Object.assign(new Error(`Agentmotoren afviste handlingen (HTTP ${response.status}).`), { status: response.status });
     if (response.status === 204) return null;
     return response.json();
@@ -241,26 +358,38 @@ class OpenCodeEngine {
     if (typeof this.resume === 'string' && /^[A-Za-z0-9_-]{1,100}$/.test(this.resume)) {
       try { const session = await this.request(`/session/${this.resume}`); if (session?.id === this.resume) { this.session = session; this.resumed = true; } } catch { /* Sessionen findes ikke længere. */ }
     }
+    this.startup?.signal.throwIfAborted();
     if (!this.resumed) this.session = await this.request('/session', 'POST', { title: 'Aura' });
     return this.session;
   }
   async start() {
-    const executable = await findExecutable();
+    if (this.startup) throw new Error('Agentmotoren er allerede ved at starte.');
+    const startup = this.startup = new AbortController();
+    try { return await this.startProcess(startup.signal); }
+    finally { if (this.startup === startup) this.startup = null; }
+  }
+  async startProcess(signal) {
+    await this.closing;
+    signal.throwIfAborted();
+    const executable = await findExecutable({ signal });
+    signal.throwIfAborted();
     await fs.mkdir(this.directory, { recursive: true, mode: 0o700 });
     this.directory = await fs.realpath(this.directory);
     await fs.mkdir(path.join(this.directory, 'home'), { recursive: true, mode: 0o700 });
     // Motorens egen temp-mappe ryddes ved start, så udpakkede biblioteker fra tidligere starter ikke hober sig op.
     await fs.rm(path.join(this.directory, 'tmp'), { recursive: true, force: true }); await fs.mkdir(path.join(this.directory, 'tmp'), { recursive: true, mode: 0o700 });
     await writeSkills(this.directory, this.skills);
+    signal.throwIfAborted();
     await writePluginRuntime(this.directory);
+    signal.throwIfAborted();
     const readGuard = await writeReadGuard(this.directory, this.root, this.references, this.skills, { tempRoot: this.tempRoot });
+    signal.throwIfAborted();
     const password = randomBytes(32).toString('hex');
     this.auth = `Basic ${Buffer.from(`harness:${password}`).toString('base64')}`;
     const skillSet = { directory: this.directory, names: this.skills.map(skill => skill.name) };
     const permission = permissions(this.root, this.references, 'plan', skillSet), buildPermission = permissions(this.root, this.references, 'build', skillSet);
     if (this.sandbox) {
-      const trustedPattern = `*/${path.basename(path.dirname(this.sandbox.policyPath))}/*`;
-      for (const set of [permission, buildPermission]) {
+      for (const set of [permission, buildPermission]) for (const trustedPattern of trustedPolicyPatterns(this.sandbox)) {
         set.read[trustedPattern] = 'deny';
         if (typeof set.edit === 'object') set.edit[trustedPattern] = 'deny';
         set.external_directory[trustedPattern] = 'deny';
@@ -277,7 +406,8 @@ class OpenCodeEngine {
     if (/\{(?:env|file):/.test(JSON.stringify(this.config))) throw new Error('Konfigurationen indeholder en ikke tilladt variabelhenvisning.');
     // Terminalklienten styrer Stop via API'et; dens Ctrl+C må ikke også ramme motorens procesgruppe.
     const args = ['serve', '--hostname', '127.0.0.1', '--port', '0'], env = isolatedEnv(this.directory, this.config, password, { commandIsolation: Boolean(this.sandbox), tempRoot: this.tempRoot });
-    this.enginePID = null;
+    this.enginePID = null; const startedAt = Date.now(); this.startMs = null; this.slowStart = false;
+    signal.throwIfAborted();
     if (process.platform === 'win32') this.child = spawn(executable, args, { cwd: this.root, env, detached: this.detached, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
     else {
       // På macOS og Linux startes OpenCode gennem en vagtproces, så motoren også stopper, hvis Aura eller CLI'en
@@ -286,42 +416,61 @@ class OpenCodeEngine {
       const node = require('./runtime.cjs').get()?.node || process.execPath;
       // Vagtprocessen har sin egen procesgruppe, så et signal til hele Auras gruppe ikke rammer den og ejeren samtidig.
       // Den opdager ejerens død gennem IPC-forbindelsen.
-      this.child = spawn(node, [guardian, await guardedProgram(executable), ...args], { cwd: this.root, env: { ...env, ELECTRON_RUN_AS_NODE: '1' }, detached: true, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe', 'ipc'] });
-      this.child.on('message', message => { if (message?.type === 'engine' && Number.isInteger(message.pid)) this.enginePID = message.pid; });
+      const program = await guardedProgram(executable);
+      signal.throwIfAborted();
+      this.child = spawn(node, [guardian, program, ...args], { cwd: this.root, env: { ...env, ELECTRON_RUN_AS_NODE: '1' }, detached: true, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe', 'ipc'] });
     }
     // Ingen rå proceslogs sendes til UI; de kan indeholde projektindhold.
-    this.child.stderr.resume();
-    this.child.on('exit', () => {
-      if (!this.active) return;
+    const child = this.child;
+    this.ownedChild = child;
+    child.on('message', message => { if (this.ownedChild === child && message?.type === 'engine' && Number.isInteger(message.pid)) this.enginePID = message.pid; });
+    child.stderr.resume();
+    const stopped = () => {
+      if (this.child !== child || !this.active) return;
       // Forsvinder vagtprocessen uventet, stoppes motorens procesgruppe her, så den ikke lever videre uden ejer.
       if (this.enginePID) { try { process.kill(-this.enginePID, 'SIGKILL'); } catch { /* Gruppen er allerede væk. */ } }
       this.active = false; this.handleEvent({ type: 'engine.error', message: 'Agentmotoren stoppede. Start opgaven igen for at oprette en ny session.', failure: { kind: 'engine' } });
-    });
+    };
+    child.on('exit', stopped); child.on('error', stopped);
     try {
       this.url = await new Promise((resolve, reject) => {
-        const timer = setTimeout(() => reject(new Error('Agentmotoren kunne ikke starte. Kontrollér installationen.')), 30000);
-        let output = '';
-        const done = callback => value => { clearTimeout(timer); callback(value); };
-        this.child.once('error', done(() => reject(new Error('Agentmotoren kunne ikke startes.'))));
-        this.child.once('exit', done(() => reject(new Error('Agentmotoren afsluttede under opstart.'))));
-        this.child.stdout.on('data', chunk => { output = (output + chunk.toString()).slice(-8000); const found = output.match(/http:\/\/127\.0\.0\.1:\d+/); if (found) done(resolve)(found[0]); });
+        const child = this.child;
+        let output = '', settled = false;
+        const done = (callback, value) => {
+          if (settled) return; settled = true; clearTimeout(timer);
+          signal.removeEventListener('abort', aborted); child.off('error', failed); child.off('exit', exited); child.stdout.off('data', data);
+          callback(value);
+        };
+        const aborted = () => done(reject, signal.reason);
+        const failed = () => done(reject, new Error('Agentmotoren kunne ikke startes.'));
+        const exited = () => done(reject, new Error('Agentmotoren afsluttede under opstart.'));
+        const data = chunk => { output = (output + chunk.toString()).slice(-8000); const found = output.match(/http:\/\/127\.0\.0\.1:\d+/); if (found) done(resolve, found[0]); };
+        const timer = setTimeout(() => done(reject, new Error(SLOW_START_TEXT)), this.startTimeout);
+        signal.addEventListener('abort', aborted, { once: true }); child.once('error', failed); child.once('exit', exited); child.stdout.on('data', data);
+        if (signal.aborted) aborted();
       });
+      signal.throwIfAborted();
+      // Starttiden gemmes som et tal, uden stier eller nøgler, så skærmen kan sige det, når motoren var langsom.
+      this.startMs = Date.now() - startedAt; this.slowStart = this.startMs >= this.slowStartMs;
       const health = await this.request('/global/health');
       if (health.version !== VERSION) throw new Error('Agentmotorens version matcher ikke den afprøvede version.');
       const effective = await this.request('/config');
       if (effective.small_model !== this.config.small_model || !isDeepStrictEqual(effective.enabled_providers, ['harness']) || effective.provider?.harness?.npm !== this.provider.npm || effective.provider?.harness?.options?.baseURL !== this.provider.options.baseURL || effective.provider?.harness?.options?.apiKey !== this.provider.options.apiKey || effective.model !== this.config.model || effective.share !== 'disabled' || effective.snapshot !== false || !isDeepStrictEqual(effective.permission, permission) || !isDeepStrictEqual(effective.agent?.plan?.permission, permission) || Object.keys(effective.mcp || {}).length || !isDeepStrictEqual(effective.plugin || [], this.config.plugin)) throw new Error('Agentens effektive indstillinger afviger. En lokal eller administreret konfiguration kan være årsagen.');
       const readReady = await fs.readFile(readGuard.readyPath, 'utf8').then(JSON.parse).catch(() => null);
       if (readReady?.token !== readGuard.token) throw new Error('Filbeskyttelsen blev ikke indlæst. Opgaven blev ikke startet.');
+      this.grepGuard = true; // Pluginet med createGrepGuard er indlæst; Auras godkendelser må først nu lade søgning i projektet passere uden kort.
       if (this.sandbox) {
         const ready = await fs.readFile(this.sandbox.readyPath, 'utf8').then(JSON.parse).catch(() => null);
         if (ready?.token !== this.sandbox.readyToken || ready?.identity !== this.sandbox.identity) throw new Error('Kommandobeskyttelsen blev ikke indlæst. Opgaven blev ikke startet.');
       }
       await this.openSession();
+      signal.throwIfAborted();
       this.active = true;
       this.listen();
       await this.eventStream.ready;
+      signal.throwIfAborted();
       return this.session.id;
-    } catch (error) { await this.close(); throw error; }
+    } catch (error) { const failure = signal.aborted ? signal.reason : error; await this.close(); throw failure; }
   }
   async listen() {
     this.eventStream?.close();
@@ -386,7 +535,7 @@ class OpenCodeEngine {
     this.currentReplySeen = false; this.currentMessageIDs = new Set([messageID]);
     const epoch = this.promptEpoch, signal = this.eventsAbort?.signal;
     try {
-      return await this.request(`/session/${this.session.id}/prompt_async`, 'POST', { messageID, model: { providerID: 'harness', modelID: this.model.id }, agent: ['chat', 'plan'].includes(mode) ? 'laes' : 'build', system, parts: [{ type: 'text', text }] });
+      return await this.request(`/session/${this.session.id}/prompt_async`, 'POST', { messageID, model: { providerID: 'harness', modelID: this.model.id }, agent: ['chat', 'plan'].includes(mode) ? 'laes' : 'build', system, parts: [{ type: 'text', text }] }, signal ? AbortSignal.any([signal, AbortSignal.timeout(15000)]) : undefined);
     } catch (error) {
       if (error.status && error.status < 500 || signal?.aborted) throw error;
       for (const wait of this.recovery.delays || [500, 1500, 3000]) {
@@ -406,7 +555,18 @@ class OpenCodeEngine {
       throw new Error('Det kunne ikke bekræftes, om agenten modtog beskeden. Aura sender den ikke igen automatisk, så handlinger ikke gentages.');
     }
   }
-  async abort() { ++this.promptEpoch; this.eventStream?.close(); this.cancelCompletionCheck(); this.cancelCompaction(); if (this.session && this.url) await this.request(`/session/${this.session.id}/abort`, 'POST'); this.pending.clear(); this.pendingQuestions.clear(); }
+  async abort({ starting = false } = {}) {
+    ++this.promptEpoch; this.eventStream?.close(); this.cancelCompletionCheck(); this.cancelCompaction();
+    if (this.startup) { await this.close(); return; }
+    if (starting) {
+      // Et prompt kan være modtaget, selv om dets HTTP-kvittering mangler. Lad først motoren stoppe eventuelle
+      // værktøjer (også kommandoer i egne procesgrupper), men lad ikke en manglende abort-kvittering fastholde Stop.
+      if (this.active && this.session && this.url) await this.request(`/session/${this.session.id}/abort`, 'POST', undefined, AbortSignal.timeout(1000)).catch(() => {});
+      await this.close(); return;
+    }
+    if (this.session && this.url) await this.request(`/session/${this.session.id}/abort`, 'POST');
+    this.pending.clear(); this.pendingQuestions.clear();
+  }
   cancelCompletionCheck() { clearTimeout(this.completionTimer); this.completionTimer = null; this.completionCheck = null; }
   watchCompletion(message) {
     this.cancelCompletionCheck();
@@ -458,9 +618,28 @@ class OpenCodeEngine {
   cancelCompaction(error = new Error('Sammenfatningen blev stoppet.')) { if (this.compaction) { this.compaction.controller.abort(error); this.compaction.reject(error); } }
   async diff() { return this.request(`/session/${this.session.id}/diff`); }
   async close() {
+    this.startup?.abort(new DOMException('Opstarten af AI-motoren blev stoppet.', 'AbortError'));
+    if (this.closing) return this.closing;
+    const closing = this.closeProcess(); this.closing = closing;
+    try { return await closing; } finally { if (this.closing === closing) this.closing = null; }
+  }
+  async closeProcess() {
     ++this.promptEpoch; this.eventStream?.close(); this.pendingQuestions.clear();
+    const child = this.child;
     // Er vagtprocessen allerede væk, stoppes motorens gruppe direkte.
-    if (this.child && this.child.exitCode !== null && this.enginePID) { try { process.kill(-this.enginePID, 'SIGKILL'); } catch { /* Gruppen er allerede væk. */ } }
-    this.cancelCompletionCheck(); this.cancelCompaction(); this.active = false; this.eventsAbort?.abort(); this.pending.clear(); if (this.child && this.child.exitCode === null) { this.child.kill(); await new Promise(resolve => { const timer = setTimeout(() => { this.child.kill('SIGKILL'); resolve(); }, 3000); this.child.once('exit', () => { clearTimeout(timer); resolve(); }); }); } }
+    if (child && (child.exitCode !== null || child.signalCode) && this.enginePID) { try { process.kill(-this.enginePID, 'SIGKILL'); } catch { /* Gruppen er allerede væk. */ } }
+    this.cancelCompletionCheck(); this.cancelCompaction(); this.active = false; this.eventsAbort?.abort(); this.pending.clear();
+    if (child && child.exitCode === null && !child.signalCode) {
+      await new Promise(resolve => {
+        const timer = setTimeout(() => {
+          child.kill('SIGKILL');
+          if (this.enginePID) { try { process.kill(-this.enginePID, 'SIGKILL'); } catch { /* Gruppen er allerede væk. */ } }
+          resolve();
+        }, 3000);
+        child.once('exit', () => { clearTimeout(timer); resolve(); }); child.kill();
+      });
+    }
+    if (this.ownedChild === child) { this.ownedChild = null; this.enginePID = null; }
+  }
 }
-module.exports = { createWriteGuard, OpenCodeEngine, findExecutable, isolatedEnv, permissions, engineConfig, writeSkills, writePluginRuntime, pluginRuntimeFiles, pluginRuntimePatterns, createReadGuard, writeReadGuard, VERSION, SUMMARIZE_TIMEOUT_MS };
+module.exports = { SLOW_START_MS, SLOW_START_TEXT, createGrepGuard, trustedPolicyPatterns, createWriteGuard, OpenCodeEngine, findExecutable, isolatedEnv, permissions, engineConfig, writeSkills, writePluginRuntime, pluginRuntimeFiles, pluginRuntimePatterns, createReadGuard, writeReadGuard, VERSION, SUMMARIZE_TIMEOUT_MS };

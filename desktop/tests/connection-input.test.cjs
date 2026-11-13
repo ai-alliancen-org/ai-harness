@@ -11,14 +11,15 @@ test('header- og variabelnavne foran en nøgle fjernes', () => {
 });
 
 test('et tomt nøglefelt er fint for en lokal model, mens selve nøglerensningen afviser et tomt felt', () => {
-  assert.equal(normalize({ kind: 'ollama', name: 'x', baseURL: 'http://localhost:11434/v1', apiKey: '   ' }).baseURL, 'http://localhost:11434/v1');
+  // Ollama gemmes som serverens rod; /v1 lægges til af gatewayen (ollama-adresse.test.cjs).
+  assert.equal(normalize({ kind: 'ollama', name: 'x', baseURL: 'http://localhost:11434/v1', apiKey: '   ' }).baseURL, 'http://localhost:11434');
   assert.throws(() => cleanKey('   ', 'ollama'), /tomt/);
   assert.throws(() => cleanKey('   ', 'openai'), /tomt/);
 });
 
 test('en lokal adresse uden http accepteres, og en fuld Azure-adresse bliver til ressourcens adresse', () => {
-  assert.equal(normalize({ kind: 'ollama', name: 'x', baseURL: 'localhost:11434', apiKey: '' }).baseURL, 'http://localhost:11434/v1');
-  assert.equal(normalize({ kind: 'ollama', name: 'x', baseURL: '127.0.0.1:11434/v1', apiKey: '' }).baseURL, 'http://127.0.0.1:11434/v1');
+  assert.equal(normalize({ kind: 'ollama', name: 'x', baseURL: 'localhost:11434', apiKey: '' }).baseURL, 'http://localhost:11434');
+  assert.equal(normalize({ kind: 'ollama', name: 'x', baseURL: '127.0.0.1:11434/v1', apiKey: '' }).baseURL, 'http://127.0.0.1:11434');
   const azure = normalize({ kind: 'azure', name: 'x', deployment: 'gpt4', baseURL: 'https://mit.openai.azure.com/openai/deployments/gpt4/chat/completions?api-version=2024-02-01' });
   assert.equal(azure.baseURL, 'https://mit.openai.azure.com/openai/v1');
   assert.throws(() => normalize({ kind: 'azure', name: 'x', deployment: 'gpt4', baseURL: 'https://mit.openai.azure.com?key=skjult' }), /parametre/, 'en hemmelighed i adressen tages ikke tavst af');

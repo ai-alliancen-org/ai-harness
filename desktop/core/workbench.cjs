@@ -98,7 +98,7 @@ class Workbench {
   async state(chatID) {
     const chat = chatID ? this.chatFor(chatID) : this.chat, project = this.project;
     const state = await this.store.read();
-    return { connections: state.connections.filter(c => Object.hasOwn(connections.definitions, c.kind)).map(c => this.store.publicConnection(c)), retiredConnections: state.connections.filter(c => c.kind === 'komplai').map(c => ({ id: c.id, kind: c.kind, name: c.name, hasKey: Boolean(c.secret), account: { authMethod: c.account?.authMethod === 'token' ? 'token' : 'oauth' } })), definitions: connections.definitions, engineVersion: VERSION, projectSettings: project ? await this.store.project(project.root) : {}, running: this.running, workspace: chat?.data || null, historyWarning: this.historyWarning || chat?.historyWarning || '', usage: chat ? chat.currentUsage() : null, features: await this.features.get(project?.root), brief: project ? this.brief : null, plan: chat?.plan || null, lastPlan: chat?.lastPlan || null, chat: chat?.id || null, chatRunning: Boolean(chat?.running), workspaceRoot: chat?.root || project?.root, isolated: Boolean(chat?.copy), copy: chat?.copy ? { id: chat.copy.id, omissions: chat.copy.omissions } : null, chats: project ? await this.chatList(project.root) : [] };
+    return { connections: state.connections.filter(c => Object.hasOwn(connections.definitions, c.kind)).map(c => this.store.publicConnection(connections.fromStore(c))), retiredConnections: state.connections.filter(c => c.kind === 'komplai').map(c => ({ id: c.id, kind: c.kind, name: c.name, hasKey: Boolean(c.secret), account: { authMethod: c.account?.authMethod === 'token' ? 'token' : 'oauth' } })), definitions: connections.definitions, engineVersion: VERSION, projectSettings: project ? await this.store.project(project.root) : {}, running: this.running, workspace: chat?.data || null, historyWarning: this.historyWarning || chat?.historyWarning || '', usage: chat ? chat.currentUsage() : null, features: await this.features.get(project?.root), brief: project ? this.brief : null, plan: chat?.plan || null, lastPlan: chat?.lastPlan || null, chat: chat?.id || null, chatRunning: Boolean(chat?.running), workspaceRoot: chat?.root || project?.root, isolated: Boolean(chat?.copy), copy: chat?.copy ? { id: chat.copy.id, omissions: chat.copy.omissions } : null, chats: project ? await this.chatList(project.root) : [] };
   }
   async activate(project) {
     await this.close();
@@ -230,7 +230,8 @@ class Workbench {
       if (input.id && !previous) throw new Error('Forbindelsen findes ikke.');
       // En Corti-nøgle hører til sit eget miljø. Uden ny nøgle beholder forbindelsen adressen fra den gemte nøgle.
       if (connection.kind === 'corti' && !input.apiKey && !input.clearKey && previous?.kind === 'corti') connection.baseURL = previous.baseURL;
-      connection.secret = input.apiKey ? this.store.encrypt(connections.cleanKey(input.apiKey, connection.kind).key) : (input.clearKey || previous?.kind !== connection.kind || previous?.baseURL !== connection.baseURL ? undefined : previous?.secret);
+      // Adressen sammenlignes, som den bruges: en Ollama-adresse gemt med /v1 i beta.2 er den samme server som roden.
+      connection.secret = input.apiKey ? this.store.encrypt(connections.cleanKey(input.apiKey, connection.kind).key) : (input.clearKey || previous?.kind !== connection.kind || connections.fromStore(previous)?.baseURL !== connection.baseURL ? undefined : previous?.secret);
       state.connections = [...state.connections.filter(c => c.id !== connection.id), connection];
     });
     await this.invalidateConnection(connection.id);
@@ -243,12 +244,24 @@ class Workbench {
     this.connectionRemovals.add(id);
     try {
       const connection = await this.connection(id);
+      let removalNotice = '';
       if (connection.kind === 'komplai') {
         // Et indsat token kan også bruges i andre programmer. Fjernelse her tilbagekalder kun Auras egne loginadgange.
-        if (connection.account?.authMethod !== 'token') await require('./komplai.cjs').disconnect(connection, this.store.decrypt(connection));
+        // Den udgåede forbindelse skal kunne fjernes uden net: kan adgangen ikke læses, kan komplai ikke nås, eller afviser komplai
+        // tilbagekaldelsen, fjernes den alligevel fra denne computer, og svaret siger ærligt, at den ikke er tilbagekaldt (Q:D2-3).
+        if (connection.account?.authMethod !== 'token') {
+          let secret = null;
+          try { secret = this.store.decrypt(connection); } catch { removalNotice = notRevoked('den ikke kunne læses på denne computer'); }
+          if (!removalNotice) {
+            try { await require('./komplai.cjs').disconnect(connection, secret); }
+            catch (error) { removalNotice = notRevoked(error?.unreachable ? 'komplai ikke kunne nås' : Number.isInteger(error?.status) ? 'komplai afviste tilbagekaldelsen' : error?.unreadable ? 'svaret fra komplai ikke kunne læses' : 'tilbagekaldelsen ikke kunne gennemføres'); }
+          }
+        }
       }
       await this.store.update(state => { this.assertConnectionIdle(id); state.connections = state.connections.filter(c => c.id !== id); });
-      await this.invalidateConnection(id); return this.state();
+      await this.invalidateConnection(id);
+      const state = await this.state();
+      return removalNotice ? { ...state, removalNotice } : state;
     } finally { this.connectionRemovals.delete(id); }
   }
   assertConnectionIdle(id) {
@@ -275,28 +288,36 @@ class Workbench {
     return Promise.all(closing);
   }
   async closeEngines() { for (const chat of this.chats.values()) if (!chat.running) await chat.close(false); }
-  async connection(id) { const connection = (await this.store.read()).connections.find(c => c.id === id); if (!connection) throw new Error('Vælg en gemt forbindelse.'); return connection; }
-  async models(id) {
+  // En gemt forbindelse, som den bruges nu (fx Ollamas rodadresse, også for en forbindelse gemt med /v1 i beta.2).
+  async connection(id) { const connection = (await this.store.read()).connections.find(c => c.id === id); if (!connection) throw new Error('Vælg en gemt forbindelse.'); return connections.fromStore(connection); }
+  // signal er valgfrit og stopper selve netkaldet, fx når brugeren trykker Ctrl+C under /model i terminalen.
+  async models(id, { signal } = {}) {
     const request = Symbol(); this.catalogRequests.set(id, request); this.catalogs.delete(id);
     const connection = await this.connection(id);
     connections.assertSupported(connection);
-    const models = await connections.listModels(connection, this.store.decrypt(connection));
-    // Et sent katalogsvar må ikke genindføre adgang efter redigering, fjernelse eller en nyere kontrol.
-    if (this.catalogRequests.get(id) !== request) throw new Error('Forbindelsen blev ændret eller kontrolleret igen. Hent modellerne på ny.');
+    const models = (await connections.listModels(connection, this.store.decrypt(connection), { signal })).map(model => ({ ...model, effortLevels: connections.effortLevels(connection, model) }));
+    // Et sent katalogsvar må ikke genindføre adgang efter redigering, fjernelse eller en nyere kontrol. Forbindelsen fejler ikke.
+    if (this.catalogRequests.get(id) !== request) throw changedConnection('Forbindelsen blev ændret eller kontrolleret igen. Hent modellerne på ny.');
     this.catalogs.set(id, models); this.catalogTimes.set(id, new Date().toISOString()); return models;
   }
-  async routes(id, modelID) { const connection = await this.connection(id); connections.assertSupported(connection); return connections.routes(connection, this.store.decrypt(connection), modelID); }
+  async routes(id, modelID, { signal } = {}) { const connection = await this.connection(id); connections.assertSupported(connection); return connections.routes(connection, this.store.decrypt(connection), modelID, { signal }); }
   async selection(input) {
     if (!this.project) throw new Error('Åbn et projekt først.');
-    if (typeof input.modelID !== 'string' || !/^[a-zA-Z0-9_./:@+-]{1,200}$/.test(input.modelID)) throw new Error('Vælg en gyldig model.');
-    const connection = await this.connection(input.connectionID);
-    // Kataloget hentes igen før afsendelse, så ændret pris/model giver nye oplysninger.
-    const model = (await this.models(connection.id)).find(m => m.id === input.modelID);
-    if (!model) throw new Error('Modellen findes ikke længere hos denne forbindelse.');
-    const routes = await this.routes(connection.id, model.id);
-    const route = routes.find(r => r.id === input.routeID);
-    if (connection.kind === 'openrouter' && !route) throw new Error('Vælg en konkret OpenRouter-udbyder.');
-    if ((await this.connection(connection.id)).revision !== connection.revision) throw new Error('Forbindelsen blev ændret. Gennemgå oplysningerne igen.');
+    let connection, model, route;
+    // Fejl i forbindelsen, kataloget, modellen og ruten hører til AI-forbindelsen. De mærkes, så brugerfladen kun beder om
+    // at gennemgå forbindelsen for dem og ikke fx for en forældet filhenvisning senere i prepare (fund 13). En forbindelse, der
+    // blev gemt igen undervejs, fejler ikke: den mærkes ikke, ligesom samme tekst fra ChatSession.prepare (N:B2-5).
+    try {
+      if (typeof input.modelID !== 'string' || !/^[a-zA-Z0-9_./:@+-]{1,200}$/.test(input.modelID)) throw new Error('Vælg en gyldig model.');
+      connection = await this.connection(input.connectionID);
+      // Kataloget hentes igen før afsendelse, så ændret pris/model giver nye oplysninger.
+      model = (await this.models(connection.id)).find(m => m.id === input.modelID);
+      if (!model) throw new Error('Modellen findes ikke længere hos denne forbindelse.');
+      const routes = await this.routes(connection.id, model.id);
+      route = routes.find(r => r.id === input.routeID);
+      if (connection.kind === 'openrouter' && !route) throw new Error('Vælg en konkret OpenRouter-udbyder.');
+      if ((await this.connection(connection.id)).revision !== connection.revision) throw changedConnection('Forbindelsen blev ændret. Gennemgå oplysningerne igen.');
+    } catch (error) { if (error && typeof error === 'object' && error.changed !== true) error.scope = 'connection'; throw error; }
     await this.store.saveProject(this.project.root, { selection: { connectionID: connection.id, modelID: model.id, routeID: route?.id || '' } });
     return { connection, model, route };
   }
@@ -307,6 +328,7 @@ class Workbench {
   send(input) { return this.chatFor(input?.chat).send(input); }
   stop(input) { return this.chatFor(input?.chat).stop(); }
   // Godkendelser og spørgsmål hører til den samtale, hvis motor stillede dem.
+  approveAllOff(input) { return this.chatFor(input?.chat).approveAllOff(); }
   reply(input) { const chat = input?.chat ? this.chatFor(input.chat) : [...this.chats.values()].find(item => item.engine?.pending.has(input?.id)) || this.chatFor(); return chat.reply(input); }
   question(input) { const chat = input?.chat ? this.chatFor(input.chat) : [...this.chats.values()].find(item => item.questions?.has(input?.id)) || this.chatFor(); return chat.question(input); }
   editPlan(input) { return this.chatFor(input?.chat).editPlan(input); }
@@ -375,4 +397,9 @@ class Workbench {
     await this.history.queue;
   }
 }
+// Forbindelsen blev gemt igen eller kontrolleret, mens en afsendelse blev gjort klar. Det er ikke en fejl i forbindelsen, og et
+// nyt Send virker; mærket holder fejlen uden for forbindelsens omfang (N:B2-5).
+function changedConnection(message) { return Object.assign(new Error(message), { changed: true }); }
+// Beskeden, når den udgåede komplai-AI-forbindelse er fjernet fra Aura uden at være tilbagekaldt hos komplai (Q:D2-3).
+function notRevoked(reason) { return `Forbindelsen er fjernet fra denne computer. Adgangen er ikke tilbagekaldt hos komplai, fordi ${reason}, og den kan stadig være gyldig der, til den udløber.`; }
 module.exports = { Workbench, planningReply };

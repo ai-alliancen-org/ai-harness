@@ -1,0 +1,104 @@
+{
+ "opencode": "1.19.5",
+ "aura": "1cfa7a6+ændringer",
+ "scenario": "byg-git-soeg",
+ "outcome": "idle",
+ "case": "grep-sti-ude-relativ",
+ "askIndex": 1,
+ "asksInStep": 2,
+ "layout": {
+  "mode": "build",
+  "git": true,
+  "copy": false,
+  "model": "kontraktmodel",
+  "worktree": "${ROOT}",
+  "directory": "${ROOT}"
+ },
+ "sequence": [
+  "del:pending",
+  "del:running",
+  "spørg:grep",
+  "svar:once",
+  "spørg:external_directory",
+  "svar:once",
+  "del:completed"
+ ],
+ "request": {
+  "id": "per_1c4c67ecc002v7IXVPHexTQOx5",
+  "sessionID": "ses_e3b398532ffeoRuSmwWI1ujThB",
+  "permission": "grep",
+  "patterns": [
+   "Ekstern"
+  ],
+  "metadata": {
+   "pattern": "Ekstern",
+   "path": "../ekstern"
+  },
+  "always": [
+   "*"
+  ],
+  "tool": {
+   "messageID": "msg_1c4c67ec2001nq68SMQcrXBPGy",
+   "callID": "kald-6-0"
+  }
+ },
+ "toolPartAtAsk": {
+  "status": "running",
+  "tool": "grep",
+  "input": {
+   "pattern": "Ekstern",
+   "path": "../ekstern"
+  }
+ },
+ "policyInput": {
+  "id": "per_1c4c67ecc002v7IXVPHexTQOx5",
+  "sessionID": "ses_e3b398532ffeoRuSmwWI1ujThB",
+  "permission": "grep",
+  "patterns": [
+   "Ekstern"
+  ],
+  "metadata": {
+   "pattern": "Ekstern",
+   "path": "../ekstern"
+  },
+  "always": [
+   "*"
+  ],
+  "tool": {
+   "messageID": "msg_1c4c67ec2001nq68SMQcrXBPGy",
+   "callID": "kald-6-0"
+  },
+  "toolInput": {
+   "pattern": "Ekstern",
+   "path": "../ekstern",
+   "tool": "grep",
+   "input": {
+    "pattern": "Ekstern",
+    "path": "../ekstern"
+   }
+  }
+ },
+ "recordedAura": {
+  "allowed": false,
+  "source": null,
+  "label": "Læsning: ${OUTSIDE}",
+  "target": "${OUTSIDE}",
+  "match": {
+   "kind": "grep",
+   "targets": [
+    {
+     "path": "${OUTSIDE}",
+     "subtree": false
+    }
+   ]
+  },
+  "persistable": true,
+  "projectFile": false,
+  "scratch": false,
+  "folder": "${DOCUMENTS}",
+  "blockedMode": false
+ },
+ "toolResult": [
+  "Found 2 matches\n${OUTSIDE}/fil.txt:\n  Line 1: Ekstern fil\n\n\n${OUTSIDE}/fil2.txt:\n  Line 1: Ekstern fil 2\n"
+ ]
+}

@@ -16,7 +16,7 @@ class Application {
   constructor({ directory, vault, ui, profiles = path.join(__dirname, '..', 'profiles'), engineFactory, loginFactory, openBrowser }) {
     Object.assign(this, { directory, vault, ui, profiles, loginFactory, openBrowser });
     this.queue = Promise.resolve(); this.parts = new Map(); this.tools = new Map(); this.references = [];
-    this.mode = 'plan'; this.selection = null; this.closing = false; this.answering = false; this.operation = 0; this.includeHistory = false;
+    this.mode = 'plan'; this.selection = null; this.closing = false; this.answering = false; this.operation = 0;
     this.bench = new Workbench({ surface: 'cli', directory, safeStorage: vault, profiles, engineFactory: engineFactory || (options => new OpenCodeEngine({ ...options, detached: true })), emit: event => this.event(event) });
     this.bench.restoration = new Restoration(this.bench.git, this.bench.store);
     this.deployments = new Deployments(this.bench.store);
@@ -60,7 +60,8 @@ class Application {
       this.ui.line(`\n${tool.tool} · ${status}`);
     }
     if (['engine.error', 'history.error', 'session.error'].includes(event.type)) this.ui.line(`\n${event.message || event.properties?.error?.data?.message || 'Opgaven kunne ikke fortsætte.'}`);
-    if (event.type === 'session.new') this.ui.line('Ny modelsession. Planlægning medtager afklaringen; /context kan medtage tidligere samtaletekst ved direkte arbejde.');
+    // Siger kun, at tidligere beskeder følger med, når de faktisk gør. En fortsat session får ingen ekstra kopi (N:B1-7).
+    if (event.type === 'session.new') this.ui.line(this.bench.chat?.engineConversation ? 'Ny AI-session. De seneste beskeder fra samtalen følger med som kontekst.' : 'Ny AI-session. Planlægning medtager afklaringen.');
   }
   render(final = false) {
     if (this.answering) return;
@@ -78,6 +79,19 @@ class Application {
     this.ui.line(`\nAI'en beder om tilladelse: ${request.permission}`);
     this.ui.line(`Arbejdsmappe: ${request.workspaceRoot || this.bench.project.root}`);
     this.ui.line(JSON.stringify({ handling: request.toolInput, mål: request.patterns, detaljer: request.metadata }, null, 2));
+    // Kortsamlingen (beslutning 10. november 2026): efter fem kort i én opgave spørger Aura én gang, om resten af opgaven må fortsætte i
+    // projektmappen. Kernen sætter policy.collect på det kort, spørgsmålet hører til. Et nej spørger om handlingen alene som før.
+    if (request.policy?.collect) {
+      const scope = require('../desktop/ui/approval-view.js').collectScope(request.policy.collect);
+      this.ui.line(`Hvis du siger ja, må AI'en ${scope.covered} uden at spørge resten af opgaven. Handlingen ovenfor godkendes også.`);
+      this.ui.line(`Spørger stadig: ${scope.asks}`);
+      const answer = await this.ui.choose('Må resten af opgaven fortsætte i projektmappen?', [{ value: 'collect', label: 'Ja, resten af opgaven' }, { value: 'each', label: 'Nej, spørg hver gang' }]);
+      if (answer === 'collect') {
+        await this.bench.reply({ id: request.id, allow: true, scope: 'collect' });
+        this.ui.line(`Handlingen er godkendt. Resten af opgaven må AI'en ${scope.covered} uden at spørge.`);
+        return;
+      }
+    }
     const allow = await this.ui.confirm('Tillad denne handling én gang?');
     await this.bench.reply({ id: request.id, allow });
     this.ui.line(allow ? 'Handlingen er godkendt.' : 'Handlingen er afvist.');
@@ -120,7 +134,7 @@ class Application {
       this.ui.line(this.bench.chat.plan.text);
       if (!await this.ui.confirm('Byg efter denne plan?')) return;
     }
-    const data = await this.bench.prepare({ ...this.selection, text, mode: this.mode, planID: this.bench.chat.plan?.id, references: this.references, includeHistory: this.includeHistory });
+    const data = await this.bench.prepare({ ...this.selection, text, mode: this.mode, planID: this.bench.chat.plan?.id, references: this.references });
     check();
     if (!await disclose(this.ui, data)) return;
     check();
@@ -153,9 +167,10 @@ class Application {
       case '/model': this.selection = await selectModel(this) || this.selection; break;
       case '/login': { const id = await login(this, argument || undefined); if (id) this.selection = await selectModel(this, id) || this.selection; break; }
       case '/history': for (const m of this.bench.workspace.messages) this.ui.line(`\n${m.role === 'user' ? 'Dig' : m.role === 'assistant' ? 'AI' : 'Aura'}:\n${m.text}`); break;
-      case '/new': await this.bench.newChat(); this.mode = 'plan'; this.references = []; this.includeHistory = false; this.ui.line('Ny samtale. Projektfilerne er uændrede.'); break;
-      case '/chats': { const id = await this.ui.choose('Vælg samtale', (await this.bench.chatList()).map(c => ({ value: c.id, label: c.title || 'Ny samtale' }))); if (id) { await this.bench.openChat(id); this.mode = (Object.hasOwn(modes, this.bench.workspace.mode) ? this.bench.workspace.mode : 'plan'); this.references = []; this.includeHistory = false; } break; }
-      case '/context': this.ui.line('De seneste beskeder sendes som ekstra kontekst, også efter modelskift. De kan indeholde tidligere valgte referencer. /history viser teksten.'); this.includeHistory = await this.ui.confirm('Medtag denne samtales tekst i kommende opgaver, indtil du skifter samtale eller lukker?'); break;
+      case '/new': await this.bench.newChat(); this.mode = 'plan'; this.references = []; this.ui.line('Ny samtale. Projektfilerne er uændrede.'); break;
+      case '/chats': { const id = await this.ui.choose('Vælg samtale', (await this.bench.chatList()).map(c => ({ value: c.id, label: c.title || 'Ny samtale' }))); if (id) { await this.bench.openChat(id); this.mode = (Object.hasOwn(modes, this.bench.workspace.mode) ? this.bench.workspace.mode : 'plan'); this.references = []; } break; }
+      // Kopien sendes kun, når en ny AI-session starter. Fortsætter samme session, har AI'en samtalen i forvejen (N:B1-7).
+      case '/context': this.ui.line('Når en ny AI-session starter, fx efter modelskift, følger de seneste beskeder med som kontekst. Fortsætter samme AI-session, har AI’en allerede samtalen, og der sendes ingen ekstra kopi. Beskederne kan indeholde tidligere valgte referencer. /history viser teksten.'); break;
       case '/draft': { const text = this.bench.workspace.draft; this.ui.line(text || 'Ingen kladde.'); if (text && await this.ui.confirm('Send kladden?')) await this.submit(text); break; }
       case '/references': await actions.references(this); break;
       case '/rules': await actions.rules(this); break;

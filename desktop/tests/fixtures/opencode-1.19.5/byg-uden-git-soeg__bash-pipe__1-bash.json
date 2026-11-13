@@ -1,0 +1,101 @@
+{
+ "opencode": "1.19.5",
+ "aura": "1cfa7a6+ændringer",
+ "scenario": "byg-uden-git-soeg",
+ "outcome": "idle",
+ "case": "bash-pipe",
+ "askIndex": 1,
+ "asksInStep": 1,
+ "layout": {
+  "mode": "build",
+  "git": false,
+  "copy": false,
+  "model": "kontraktmodel",
+  "worktree": "/",
+  "directory": "${ROOT}"
+ },
+ "sequence": [
+  "del:pending",
+  "del:running",
+  "spørg:bash",
+  "svar:once",
+  "del:running",
+  "del:completed"
+ ],
+ "request": {
+  "id": "per_1c4c68c27001v7nVE7Hb9jDpVi",
+  "sessionID": "ses_e3b3979f3ffe5KHrNXt25TaWnK",
+  "permission": "bash",
+  "patterns": [
+   "git status --short",
+   "head -5"
+  ],
+  "metadata": {
+   "command": "git status --short | head -5"
+  },
+  "always": [
+   "git status *",
+   "head *"
+  ],
+  "tool": {
+   "messageID": "msg_1c4c68c1d001hhK9zKgstiDT6s",
+   "callID": "kald-19-0"
+  }
+ },
+ "toolPartAtAsk": {
+  "status": "running",
+  "tool": "bash",
+  "input": {
+   "command": "git status --short | head -5",
+   "description": "Viser ændringer"
+  }
+ },
+ "policyInput": {
+  "id": "per_1c4c68c27001v7nVE7Hb9jDpVi",
+  "sessionID": "ses_e3b3979f3ffe5KHrNXt25TaWnK",
+  "permission": "bash",
+  "patterns": [
+   "git status --short",
+   "head -5"
+  ],
+  "metadata": {
+   "command": "git status --short | head -5"
+  },
+  "always": [
+   "git status *",
+   "head *"
+  ],
+  "tool": {
+   "messageID": "msg_1c4c68c1d001hhK9zKgstiDT6s",
+   "callID": "kald-19-0"
+  },
+  "toolInput": {
+   "command": "git status --short | head -5",
+   "description": "Viser ændringer",
+   "tool": "bash",
+   "input": {
+    "command": "git status --short | head -5",
+    "description": "Viser ændringer"
+   }
+  }
+ },
+ "recordedAura": {
+  "allowed": false,
+  "source": null,
+  "label": "Kommando: git status --short | head -5",
+  "target": "git status --short | head -5",
+  "match": {
+   "kind": "bash",
+   "command": "git status --short | head -5",
+   "cwd": "${ROOT}"
+  },
+  "persistable": false,
+  "projectFile": false,
+  "scratch": false,
+  "folder": null,
+  "blockedMode": false
+ },
+ "toolResult": [
+  "fatal: not a git repository (or any of the parent directories): .git\n"
+ ]
+}

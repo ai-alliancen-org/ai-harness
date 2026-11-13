@@ -1,0 +1,97 @@
+{
+ "opencode": "1.19.5",
+ "aura": "1cfa7a6+ændringer",
+ "scenario": "byg-git-soeg",
+ "outcome": "idle",
+ "case": "bash-npm-build",
+ "askIndex": 1,
+ "asksInStep": 1,
+ "layout": {
+  "mode": "build",
+  "git": true,
+  "copy": false,
+  "model": "kontraktmodel",
+  "worktree": "${ROOT}",
+  "directory": "${ROOT}"
+ },
+ "sequence": [
+  "del:pending",
+  "del:running",
+  "spørg:bash",
+  "svar:once",
+  "del:running",
+  "del:completed"
+ ],
+ "request": {
+  "id": "per_1c4c6815b001wDAw2Vx3XFfONJ",
+  "sessionID": "ses_e3b398532ffeoRuSmwWI1ujThB",
+  "permission": "bash",
+  "patterns": [
+   "npm run build --if-present"
+  ],
+  "metadata": {
+   "command": "npm run build --if-present"
+  },
+  "always": [
+   "npm run build *"
+  ],
+  "tool": {
+   "messageID": "msg_1c4c681520016DpAa4vsRRAMZT",
+   "callID": "kald-18-0"
+  }
+ },
+ "toolPartAtAsk": {
+  "status": "running",
+  "tool": "bash",
+  "input": {
+   "command": "npm run build --if-present",
+   "description": "Bygger projektet"
+  }
+ },
+ "policyInput": {
+  "id": "per_1c4c6815b001wDAw2Vx3XFfONJ",
+  "sessionID": "ses_e3b398532ffeoRuSmwWI1ujThB",
+  "permission": "bash",
+  "patterns": [
+   "npm run build --if-present"
+  ],
+  "metadata": {
+   "command": "npm run build --if-present"
+  },
+  "always": [
+   "npm run build *"
+  ],
+  "tool": {
+   "messageID": "msg_1c4c681520016DpAa4vsRRAMZT",
+   "callID": "kald-18-0"
+  },
+  "toolInput": {
+   "command": "npm run build --if-present",
+   "description": "Bygger projektet",
+   "tool": "bash",
+   "input": {
+    "command": "npm run build --if-present",
+    "description": "Bygger projektet"
+   }
+  }
+ },
+ "recordedAura": {
+  "allowed": false,
+  "source": null,
+  "label": "Kommando: npm run build --if-present",
+  "target": "npm run build --if-present",
+  "match": {
+   "kind": "bash",
+   "command": "npm run build --if-present",
+   "cwd": "${ROOT}"
+  },
+  "persistable": false,
+  "projectFile": false,
+  "scratch": false,
+  "folder": null,
+  "blockedMode": false
+ },
+ "toolResult": [
+  "npm error code ENOENT\nnpm error syscall open\nnpm error path ${ROOT}/package.json\nnpm error errno -2\nnpm error enoent Could not read package.json: Error: ENOENT: no such file or directory, open '${ROOT}/package.json'\nnpm error enoent This is related to npm not being able to find a file.\nnpm error eno"
+ ]
+}

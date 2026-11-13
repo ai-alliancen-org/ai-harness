@@ -32,12 +32,17 @@ function parseStatus(raw) {
   return files;
 }
 const { isProtected } = require('./protected-paths.cjs');
+const secrets = require('./secrets.cjs');
 function protectedPath(file) {
   return isProtected(file) || file.split(/[\\/]/).some(part => part.toLowerCase() === 'node_modules');
 }
+// Kun præcise fund spærrer en fil, så kode og offentlige klientnøgler ikke spærres uden grund. Samme regler som
+// Pages-workflowet (secrets.blockingSecret); maskeringen i secrets.scan må gerne skjule mere.
 function secretContent(text) {
-  return /-----BEGIN (?:[A-Z ]+ )?PRIVATE KEY-----|\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|sk-(?:ant-|or-v1-)?[A-Za-z0-9_-]{20,}|AKIA[A-Z0-9]{16}|kp_live_[A-Za-z0-9_-]{43}|komp_publish_(?:grant_)?[a-f0-9]{64})\b/i.test(text) || /(?:api[_-]?key|secret|password|access[_-]?token)\s*["']?\s*[:=]\s*["'][^"'\r\n]{12,}["']/i.test(text);
+  return Boolean(secrets.blockingSecret(text));
 }
+// Fundets type i almindeligt dansk, så brugeren ved, hvad der skal flyttes ud af filen.
+const FINDINGS = { private_key: 'en privat nøgle', github_token: 'et GitHub-token', aws_key: 'en AWS-nøgle', komplai_key: 'en komplai-nøgle', provider_token: 'et adgangstoken', supabase_secret: 'en hemmelig Supabase-nøgle', openai_key: 'en API-nøgle', jwt: 'et adgangstoken', url_credentials: 'en adgangskode i en adresse', authorization: 'et adgangstoken skrevet direkte i koden', named_secret: 'en nøgle eller adgangskode skrevet direkte i koden' };
 async function content(root, file) {
   if (!file || path.isAbsolute(file) || file.split('/').some(p => p === '..' || p === '.git') || file.includes('\0')) throw new Error('Ugyldig Git-filsti.');
   let current = root;
@@ -52,8 +57,9 @@ async function content(root, file) {
   const hash = digest(data);
   if (protectedPath(file)) return { hash, blocked: 'Privat reference eller mulig hemmelighedsfil.' };
   if (data.includes(0)) return /\.(png|jpe?g|webp|gif|ico|woff2?)$/i.test(file) ? { hash, binary: true, text: null, mode: stat.mode & 0o111 ? '100755' : '100644' } : { hash, blocked: 'Denne binære filtype kræver manuel Git-gennemgang uden for appen.' };
-  const text = data.toString('utf8');
-  if (secretContent(text)) return { hash, blocked: 'Mulig nøgle eller hemmelighed i indholdet. Gennemgå filen uden for appen.' };
+  const text = data.toString('utf8'), found = secrets.blockingSecret(text);
+  // Teksten vises både ved Gem version, i terminalen og som fejl ved gendannelse, så den nævner selv filen.
+  if (found) return { hash, blocked: `Mulig hemmelighed i ${file}: ${FINDINGS[found] || 'en nøgle eller adgangskode'}. Bed AI’en flytte den ud af filen.` };
   return { hash, text, mode: stat.mode & 0o111 ? '100755' : '100644' };
 }
 
@@ -138,7 +144,10 @@ class GitVersions {
       if (!value.blocked && repo.head && file.status !== '??') {
         const data = await run(repo.root, ['show', `${repo.head}:${file.file}`]).catch(() => null);
         if (data) {
-          if (data.length > LIMIT || (data.includes(0) && !value.binary) || secretContent(data.toString())) value.blocked = 'Tidligere indhold kræver manuel gennemgang uden for appen.';
+          if (data.length > LIMIT || (data.includes(0) && !value.binary)) value.blocked = 'Tidligere indhold kræver manuel gennemgang uden for appen.';
+          // Den gemte version kan rumme en hemmelighed, som siden er fjernet. Den nye version er kontrolleret og kan gemmes, men teksten
+          // fra før sendes aldrig til visningen.
+          else if (secretContent(data.toString())) value.beforeHidden = 'Teksten fra før vises ikke, fordi den gemte version kan indeholde en nøgle eller adgangskode. Den nye version er kontrolleret og kan gemmes.';
           else before = value.binary ? null : data.toString();
         }
       }

@@ -66,7 +66,9 @@ class Checkpoints {
       const summary = text.length <= 80 ? text || 'AI-opgave' : text.slice(0, 80).replace(/[\s,.;:]+\S*$/, '') + ' …';
       const message = `${task.stopped ? 'Afbrudt AI-opgave' : 'AI-opgave'}: ${summary}`;
       const result = await this.git.commit(task.root, { token: review.token, files, message });
-      this.emit({ type: 'git.checkpoint', status: 'saved', head: result.head, previous: task.head, message: task.stopped ? 'Opgaven blev afbrudt. Det, den nåede at ændre, er gemt som en version, så du kan fortryde.' : 'Gemt som en version. Du kan fortryde opgaven.', kept, files });
+      // Filer, der ikke kom med, nævnes ved navn: de fortrydes heller ikke sammen med opgaven. Årsagen pr. fil står under Gem version.
+      const skipped = kept.length ? ` Disse filer blev ikke gemt og fortrydes ikke med opgaven, fordi Aura ikke gemmer dem automatisk, fx ved en mulig hemmelighed eller en stor fil: ${kept.join(', ')}.` : '';
+      this.emit({ type: 'git.checkpoint', status: 'saved', head: result.head, previous: task.head, message: (task.stopped ? 'Opgaven blev afbrudt. Det, den nåede at ændre, er gemt som en version, så du kan fortryde.' : 'Gemt som en version. Du kan fortryde opgaven.') + skipped, kept, files });
     } catch (error) { this.emit({ type: 'git.checkpoint', status: 'skipped', message: `Versionen blev ikke gemt automatisk: ${error.message}` }); }
   }
 }

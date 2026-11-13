@@ -109,7 +109,7 @@ const server = http.createServer(async (req, res) => {
     await click('#create'); await win.waitForSelector('#workspace:not([hidden])');
     state.project = path.join(documents, 'Aura', (await fs.readdir(path.join(documents, 'Aura')))[0]);
     await measure('arbejdsomraade', '#workspace', 'Arbejdsområde: tomt projekt');
-    task = null; await win.click('#model-chip'); await measure('din-ai', '#task-dialog', 'Din AI'); await win.click('[data-close="task-dialog"]'); task = 'Fra idé til første udkast';
+    task = null; await helpers.taskOptions(win); await measure('din-ai', '#task-dialog', 'Din AI'); await win.click('[data-close="task-dialog"]'); task = 'Fra idé til første udkast';
     await helpers.selectMode(win, 'plan');
     await click('#send'); await win.waitForSelector('#data-dialog[open]'); await measure('foer-du-sender', '#data-dialog', 'Før du sender');
     task = null; await win.locator('#data-dialog details > summary').first().click(); await measure('foer-du-sender-alt', '#data-dialog', 'Før du sender · Se alle oplysninger'); await win.locator('#data-dialog details > summary').first().click(); task = 'Fra idé til første udkast';
@@ -120,9 +120,13 @@ const server = http.createServer(async (req, res) => {
     await measure('forslag', '#plan-card', 'Forslag: klar til at bygge?');
     task = null; await win.click('#plan-open'); await measure('plan', '#panel-plan', 'Plan: brief og plan'); await win.click('#tab-preview'); task = 'Fra idé til første udkast';
     await click('#build-plan');
-    const allow = win.locator('#approvals button').filter({ hasText: 'Tillad én gang' }).first(); await allow.waitFor({ timeout: 120000 });
-    await measure('godkendelse', '#approvals', 'Godkendelse af filændringer');
-    tasks[task]++; await allow.click();
+    // Et nyt projekt med versioner godkender filændringer i projektet uden kort, og samtalen kvitterer i stedet. Uden versioner
+    // spørger projektet som før (beslutning (c), 10. november 2026), så kortet måles kun i den kørsel.
+    if (withoutVersions) {
+      const allow = win.locator('#approvals button').filter({ hasText: 'Tillad én gang' }).first(); await allow.waitFor({ timeout: 120000 });
+      await measure('godkendelse', '#approvals', 'Godkendelse af filændringer');
+      tasks[task]++; await allow.click();
+    } else await win.locator('#messages .answer-record').filter({ hasText: '1 handling godkendt automatisk: projektets filer.' }).waitFor({ timeout: 120000 });
     await win.locator('#run-review .result-receipt').waitFor({ timeout: 120000 }); await win.locator('#run-status').filter({ hasText: 'Klar' }).waitFor();
     // Kontrolresultaterne ligger i Aktivitet; samtalen måles med den korte kvittering.
     await measure('resultat', '#run-review', 'Resultatkort'); task = null;
@@ -178,9 +182,9 @@ const server = http.createServer(async (req, res) => {
     const table = ['| Skærm | Ord | Valg | ⓘ | Felter | Skærmbillede |', '|---|---:|---:|---:|---:|---|', ...rows.map(row => `| ${row.title} | ${row.words} | ${row.choices} | ${row.infos} | ${row.fields} | ${row.file} |`)].join('\n');
     const clicks = ['| Opgave | Klik |', '|---|---:|', ...Object.entries(tasks).map(([name, count]) => `| ${name} | ${count} |`)].join('\n');
     if (withoutVersions) await helpers.assertNoGitWrites(app);
-    const omission = withoutVersions ? 'Prøven blokerer Git-skrivninger. De tre skærme til versionsoprettelse og versionshistorik er derfor udeladt.\n\n' : '';
+    const omission = withoutVersions ? 'Prøven blokerer Git-skrivninger. De tre skærme til versionsoprettelse og versionshistorik er derfor udeladt.\n\n' : 'Projektet har versioner, så filændringen godkendes uden kort. Godkendelseskortet måles med AURA_MEASURE_NO_GIT=1.\n\n';
     await fs.writeFile(path.join(out, 'maalinger.md'), `# Måling af skærme\n\nMålt ${new Date().toISOString().slice(0, 10)} i Electron med en kontrolleret model. Ord og valg tæller kun det, der er synligt i skærmens eget område; lukkede afsnit tæller ikke med. Ord i en liste tæller alle dens muligheder med. Valg er knapper, links, kontakter, lister og foldbare afsnit. ⓘ er forklaringer, der åbnes med et klik. Felter er tekstfelter.\n\n${omission}${table}\n\n## Klik pr. opgave\n\n${clicks}\n\nSidefejl: ${errors.length}\n`);
-    await fs.writeFile(path.join(out, 'maalinger.json'), JSON.stringify({ results, tasks, errors, withoutVersions, omitted: withoutVersions ? ['Versioner', 'Versioner · Avanceret', 'Version: før, efter og filer'] : [] }, null, 2));
+    await fs.writeFile(path.join(out, 'maalinger.json'), JSON.stringify({ results, tasks, errors, withoutVersions, omitted: withoutVersions ? ['Versioner', 'Versioner · Avanceret', 'Version: før, efter og filer'] : ['Godkendelse af filændringer'] }, null, 2));
     console.log(JSON.stringify({ status: errors.length ? 'sidefejl' : 'målt', out, skaerme: results.length, ord: results.reduce((sum, row) => sum + row.words, 0), tasks, errors }, null, 2));
     if (errors.length) process.exitCode = 1;
   } catch (error) {

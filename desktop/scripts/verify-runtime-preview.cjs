@@ -41,7 +41,18 @@ const helpers = require('./ui-test-helpers.cjs');
     await window.locator('#prompt').fill('');
     const origin = (await frame()).url();
     // Kun prøvens kopi får den tilsvarende lokale React-bygning. Brugerens filer røres ikke.
-    const repaired = original.replace(/<script\b[^>]*\bsrc=["']https?:[^>]*>\s*<\/script>/gi, '').replace(/<script\s+type=["']text\/babel["'][^>]*>[\s\S]*?<\/script>/i, '<script src="app.js"></script>');
+    // Parse prøvens HTML i den allerede isolerede preview-ramme. DOM-operationer fjerner hele elementer,
+    // også når attributter indeholder > eller sluttag har attributter; dette er en testkonvertering, ikke en HTML-sanitizer.
+    const repaired = await (await frame()).evaluate(html => {
+      const parsed = new DOMParser().parseFromString(html, 'text/html');
+      for (const script of parsed.querySelectorAll('script[src]')) {
+        if (/^(?:https?:)?\/\//i.test(script.getAttribute('src').trim())) script.remove();
+      }
+      const babel = parsed.querySelectorAll('script[type="text/babel"]');
+      if (babel.length !== 1) throw Error('Prøven kræver præcis ét React/Babel-script.');
+      const local = parsed.createElement('script'); local.setAttribute('src', 'app.js'); babel[0].replaceWith(local);
+      return '<!doctype html>\n' + parsed.documentElement.outerHTML;
+    }, original);
     await fs.writeFile(path.join(project, 'public/app.js'), bundled.outputFiles[0].contents); await fs.writeFile(path.join(project, 'public/index.html'), repaired);
     await window.evaluate(() => { const frame = document.querySelector('#preview'); frame.src = frame.src; });
     await window.frameLocator('#preview').getByRole('heading', { name: 'Mødelokaler i dag' }).waitFor();

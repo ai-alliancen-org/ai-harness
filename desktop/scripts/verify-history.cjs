@@ -206,7 +206,7 @@ const helpers = require('./ui-test-helpers.cjs');
 
     // 9. Fortryd uden Git: en mappe uden versioner bruger Auras øjebliksbillede og bevarer brugerens rettelse.
     const plain = path.join(root, 'Uden Git'); await fs.mkdir(path.join(plain, 'public'), { recursive: true });
-    await fs.writeFile(path.join(plain, 'public/index.html'), page1.replace('<p>Tre lokaler.</p>', '<p>Tre lokaler.</p>'));
+    await fs.writeFile(path.join(plain, 'public/index.html'), page1);
     await app.evaluate(({ dialog }, folder) => { dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [folder] }); }, plain);
     await page.click('#open'); await page.waitForFunction(folder => document.querySelector('#project-path').textContent === folder, plain);
     await helpers.taskOptions(page); await page.selectOption('#connection-select', connection); await page.locator('#model-shortlist button').first().click();

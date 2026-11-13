@@ -1,5 +1,9 @@
 const { randomUUID } = require('node:crypto');
 const { repository } = require('./github.cjs');
+const { blockingSecret } = require('./secrets.cjs');
+// Workflowets version. Hæv den, når workflowets indhold ændres, også i verifyMaterial, verifyCloudflare og
+// secrets.blockingSecret, så en opsætning fra en ældre Aura får en forklaring frem for den almindelige besked.
+const WORKFLOW_VERSION = 6;
 
 const PROVIDERS = new Set(['github-pages', 'cloudflare']);
 const SHA = /^[a-f0-9]{40,64}$/;
@@ -106,7 +110,9 @@ async function verifyMaterial(env = process.env) {
       const stat = await fs.stat(full); bytes += stat.size;
       if (entries.length >= 2000 || stat.size > 2 * 1024 * 1024 || bytes > 20 * 1024 * 1024) throw Error('Udgivelsen overstiger filgrænsen.');
       const data = await fs.readFile(full), text = data.toString();
-      if (/-----BEGIN (?:[A-Z ]+ )?PRIVATE KEY-----|\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|sk-(?:ant-|or-v1-)?[A-Za-z0-9_-]{20,}|AKIA[A-Z0-9]{16}|kp_live_[A-Za-z0-9_-]{43})\b/i.test(text) || /(?:api[_-]?key|secret|password|access[_-]?token)\s*["']?\s*[:=]\s*["'][^"'\r\n]{12,}["']/i.test(text) || /^version https:\/\/git-lfs.github.com\/spec\/v1/.test(text)) throw Error('Mulig hemmelighed eller Git LFS-pointer i udgivelsen.');
+      // Samme regler som Auras gennemgang: blockingSecret fra secrets.cjs indlejres i workflowet sammen med denne funktion.
+      if (blockingSecret(text)) throw Error(`Mulig hemmelighed i ${env.AURA_DIRECTORY}/${file}. Fjern den, gem en ny version, og udgiv igen.`);
+      if (/^version https:\/\/git-lfs.github.com\/spec\/v1/.test(text)) throw Error(`Git LFS-pointer i ${env.AURA_DIRECTORY}/${file}. Gem selve filen i projektet, og udgiv igen.`);
       entries.push({ file, data, hash: createHash('sha256').update(data).digest('hex') });
     }
   }
@@ -130,10 +136,12 @@ async function verifyCloudflare(env = process.env, fetcher = fetch) {
   if (project.source && (project.source.config?.production_deployments_enabled !== false || project.source.config?.preview_deployment_setting !== 'none')) throw Error('Slå automatiske Cloudflare-udgivelser fra før manuel udgivelse fra Aura.');
   return true;
 }
-function scriptBlock(fn, invocation) { return `${fn.toString()}\n${invocation}`.split('\n').map(line => `          ${line}`).join('\n'); }
+function scriptBlock(fns, invocation) { return `${[].concat(fns).map(fn => fn.toString()).join('\n')}\n${invocation}`.split('\n').map(line => `          ${line}`).join('\n'); }
+const VERSION_MARK = /^# Aura Pages-workflow (\d+)\./m;
 function pagesWorkflow(input) {
   const c = pagesConfiguration(input), cloudflare = c.provider === 'cloudflare';
-  const header = `name: Udgiv med ${cloudflare ? 'Cloudflare Pages' : 'GitHub Pages'}
+  const header = `# Aura Pages-workflow ${WORKFLOW_VERSION}. Aura sammenligner filen tegn for tegn før hver udgivelse; ret den ikke i hånden.
+name: Udgiv med ${cloudflare ? 'Cloudflare Pages' : 'GitHub Pages'}
 run-name: Aura Pages \${{ inputs.request_id }}
 on:
   workflow_dispatch:
@@ -176,7 +184,7 @@ ${cloudflare ? '' : '      pages: write\n      id-token: write\n'}    environmen
           AURA_DIRECTORY: ${JSON.stringify(c.directory)}
         run: |
           node <<'AURA_NODE'
-${scriptBlock(verifyMaterial, "verifyMaterial().catch(error => { console.error(error.message); process.exit(1); });")}
+${scriptBlock([blockingSecret, verifyMaterial], "verifyMaterial().catch(error => { console.error(error.message); process.exit(1); });")}
           AURA_NODE
 `;
   const deploy = cloudflare ? `      - name: Kontrollér Cloudflare-destinationen
@@ -226,7 +234,10 @@ class PagesDeployment {
     const branch = await this.github.api(`/repos/${c.repository}/branches/${encodeURIComponent(c.branch)}`, { missing: true });
     if (!SHA.test(branch?.commit?.sha || '')) return { ready: false, connection, links, message: 'Opret og push den valgte branch i dit Git-værktøj.' };
     const workflow = pagesWorkflow(c), file = await this.github.api(`/repos/${c.repository}/contents/${workflow.path}?ref=${branch.commit.sha}`, { missing: true });
-    const sameWorkflow = file?.type === 'file' && file.encoding === 'base64' && Buffer.from(file.content || '', 'base64').toString() === workflow.content;
+    const remote = file?.type === 'file' && file.encoding === 'base64' ? Buffer.from(file.content || '', 'base64').toString() : null;
+    const sameWorkflow = remote === workflow.content;
+    // Et workflow, som en ældre Aura har skrevet (uden versionsmærke eller med et lavere nummer), skal fornyes efter opdateringen.
+    const outdated = !sameWorkflow && remote !== null && /^run-name: Aura Pages \$\{\{ inputs\.request_id \}\}$/m.test(remote) && Number(VERSION_MARK.exec(remote)?.[1] || 1) < WORKFLOW_VERSION;
     const active = sameWorkflow ? await this.github.api(`/repos/${c.repository}/actions/workflows/${workflow.path.split('/').pop()}`, { missing: true }) : null;
     let pages = null, secret = null;
     if (this.id === 'github-pages') {
@@ -238,8 +249,8 @@ class PagesDeployment {
     }
     const destinationReady = this.id === 'github-pages' ? pages?.build_type === 'workflow' : secret?.name === 'CLOUDFLARE_API_TOKEN';
     const ready = sameWorkflow && active?.state === 'active' && destinationReady;
-    const message = !sameWorkflow ? 'Gem opsætningen i projektet, og push den gennemgåede version med dit Git-værktøj.' : active?.state !== 'active' ? 'Aktivér det manuelle workflow på GitHub. Det skal også findes på repositoryets standardbranch.' : !destinationReady ? this.id === 'github-pages' ? 'Vælg GitHub Actions som kilde under Settings → Pages.' : 'Gem CLOUDFLARE_API_TOKEN under repositoryets Actions secrets.' : this.id === 'cloudflare' ? 'Workflow og tokennavn er klar. Cloudflare-konto og projekt kontrolleres før upload i udgivelsen.' : 'GitHub Pages og det manuelle workflow er klar.';
-    return { ready, connection, links, message, repository: { id: repo.id, fullName: repo.full_name, private: repo.private === true }, head: branch.commit.sha, workflow: { path: workflow.path, matches: sameWorkflow, active: active?.state === 'active', id: active?.id || null }, pages: pages ? { url: pages.html_url || null, public: typeof pages.public === 'boolean' ? pages.public : null, buildType: pages.build_type } : null, secretPresent: secret?.name === 'CLOUDFLARE_API_TOKEN' };
+    const message = !sameWorkflow ? `${outdated ? 'Aura er opdateret, så udgivelsesopsætningen på GitHub skal fornyes. ' : ''}Gem opsætningen i projektet, og push den gennemgåede version med dit Git-værktøj.` : active?.state !== 'active' ? 'Aktivér det manuelle workflow på GitHub. Det skal også findes på repositoryets standardbranch.' : !destinationReady ? this.id === 'github-pages' ? 'Vælg GitHub Actions som kilde under Settings → Pages.' : 'Gem CLOUDFLARE_API_TOKEN under repositoryets Actions secrets.' : this.id === 'cloudflare' ? 'Workflow og tokennavn er klar. Cloudflare-konto og projekt kontrolleres før upload i udgivelsen.' : 'GitHub Pages og det manuelle workflow er klar.';
+    return { ready, connection, links, message, repository: { id: repo.id, fullName: repo.full_name, private: repo.private === true }, head: branch.commit.sha, workflow: { path: workflow.path, matches: sameWorkflow, outdated, active: active?.state === 'active', id: active?.id || null }, pages: pages ? { url: pages.html_url || null, public: typeof pages.public === 'boolean' ? pages.public : null, buildType: pages.build_type } : null, secretPresent: secret?.name === 'CLOUDFLARE_API_TOKEN' };
   }
   async inspect(input, artifact) {
     const c = pagesConfiguration(input), setup = await this.setup(c);
@@ -307,4 +318,4 @@ class PagesDeployment {
 }
 class GitHubPagesDeployment extends PagesDeployment { constructor(github) { super(github, 'github-pages'); } }
 class CloudflarePagesDeployment extends PagesDeployment { constructor(github) { super(github, 'cloudflare'); } }
-module.exports = { pagesConfiguration, pagesWorkflow, workflowPath, validatePagesArtifact, siteURL, publicAddress, fetchSite, GitHubPagesDeployment, CloudflarePagesDeployment, verifyMaterial, verifyCloudflare };
+module.exports = { pagesConfiguration, pagesWorkflow, workflowPath, validatePagesArtifact, siteURL, publicAddress, fetchSite, GitHubPagesDeployment, CloudflarePagesDeployment, verifyMaterial, verifyCloudflare, WORKFLOW_VERSION };

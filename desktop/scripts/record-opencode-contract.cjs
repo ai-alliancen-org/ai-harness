@@ -290,8 +290,8 @@ async function recordForloeb(name, base) {
         // Den rigtige vej til en samtalekopi: en anden samtale holder projektmappen, så allocate() laver en kopi.
         if (spec.copy) bench.claims.set(root, { id: 'anden-samtale', running: true });
         if (spec.mode === 'build') chat.plan = chat.plan || { id: 'plan-kontrakt', text: 'Byg prøven.', context: '', source: 'ai', at: Date.now() };
-        const disclosure = await bench.prepare({ chat: chat.id, connectionID: connection.id, modelID: ctx.model, mode: spec.mode, planID: chat.plan?.id });
-        await bench.send({ chat: chat.id, text: 'Kør kontraktprøven.', fingerprint: disclosure.fingerprint });
+        const disclosure = await bench.prepare({ chat: chat.id, connectionID: connection.id, modelID: ctx.model, mode: spec.mode, planID: chat.plan?.id, text: 'Kør kontraktprøven.' });
+        await bench.send({ chat: chat.id, text: 'Kør kontraktprøven.', fingerprint: disclosure.fingerprint, contextBinding: disclosure.contextBinding });
         log.push(`motorstart lykkedes i forsøg ${attempt}`);
         break;
       } catch (error) { log.push(`forsøg ${attempt}: ${error.message}`); if (attempt >= 3) throw error; await pause(2000); events.length = 0; policyCalls.length = 0; model.requests.length = 0; arm(); }
@@ -370,6 +370,18 @@ const DIREKTE = {
     ['glob-gennem-link', 'glob', { pattern: '*', path: L.W('link') }],
     ['bash-cat-gennem-link', 'bash', { command: 'cat link/fil.txt', description: 'Læser' }]
   ] },
+  // Skrivning uden for projektet UDEN Auras skrivevagt (direkte-sættet indlæser intet plugin). Auras vagt svarer i forløbssættet før
+  // OpenCode, så kontrakten ser kun OpenCodes egen mappekontrol for skrivning her: hvis vagten fejler, er det denne kontrol, der fanger det.
+  'skriv-ude-uden-vagt': { git: true, config: L => { const p = permissions(L.root, [], 'build'); return { permission: p, agent: { plan: { permission: p } } }; }, steps: L => [
+    ['write-ude-absolut', 'write', { filePath: L.O('ny.txt'), content: 'ny ekstern\n' }],
+    ['write-ude-relativ', 'write', { filePath: '../ekstern/ny2.txt', content: 'ny ekstern 2\n' }],
+    ['edit-ude-absolut', 'edit', { filePath: L.O('fil.txt'), oldString: 'Ekstern', newString: 'Ekstern rettet' }]
+  ] },
+  // Samme uden vagt, men med en model, der får apply_patch i stedet for write og edit (som apply-patch-sættene).
+  'skriv-ude-uden-vagt-patch': { git: true, model: 'gpt-5-kontrakt', config: L => { const p = permissions(L.root, [], 'build'); return { permission: p, agent: { plan: { permission: p } } }; }, steps: L => [
+    ['patch-tilfoej-ude-absolut', 'apply_patch', { patchText: `*** Begin Patch\n*** Add File: ${L.O('patch2.txt')}\n+ekstern\n*** End Patch` }],
+    ['patch-to-filer', 'apply_patch', { patchText: `*** Begin Patch\n*** Add File: public/a.html\n+a\n*** Add File: ${L.O('b.txt')}\n+b\n*** End Patch` }]
+  ] },
   // Former, som Auras konfiguration aldrig sender til godkendelse: skill, todowrite og question sat til 'ask'.
   'spoerg-alt': { git: true, skills: true, config: L => { const p = permissions(L.root, [], 'build'); p.skill = { '*': 'ask' }; p.todowrite = 'ask'; p.question = 'ask'; return { permission: p, agent: { plan: { permission: p } }, skills: { paths: ['.aura/skills'] } }; }, steps: () => [
     ['skill', 'skill', { name: 'aura-proeve' }],
@@ -400,10 +412,10 @@ async function recordDirekte(name, base) {
   }
   if (spec.link) await fs.symlink(outside, path.join(root, 'link'));
   if (spec.git) git(root, 'init', '-q', '-b', 'main');
-  const L = { root, rootNoSlash: root.slice(1), outside, shared, W: (...p) => path.join(root, ...p), O: (...p) => path.join(outside, ...p), X: (...p) => path.join(elsewhere, ...p) };
+  const L = { model: spec.model, root, rootNoSlash: root.slice(1), outside, shared, W: (...p) => path.join(root, ...p), O: (...p) => path.join(outside, ...p), X: (...p) => path.join(elsewhere, ...p) };
   const model = await fakeModel(spec.steps(L), L);
   const directory = path.join(real, 'appdata', 'runtime');
-  const extra = spec.config(L), config = { ...engineConfig(model.provider, { id: MODEL }, extra.permission), ...extra };
+  const extra = spec.config(L), config = { ...engineConfig(model.provider, { id: spec.model || MODEL }, extra.permission), ...extra };
   const env = spec.env ? spec.env(L) : {};
   if (env.TMPDIR) await fs.mkdir(env.TMPDIR, { recursive: true });
   if (env.OPENCODE_DB) await fs.mkdir(path.dirname(env.OPENCODE_DB), { recursive: true });
@@ -424,7 +436,7 @@ async function recordDirekte(name, base) {
       if (event.type === 'session.error') d.resolve('error ' + JSON.stringify(p.error).slice(0, 300));
     });
     await pause(300);
-    await engine.api(`/session/${session.id}/prompt_async`, 'POST', { model: { providerID: 'harness', modelID: MODEL }, agent: 'build', parts: [{ type: 'text', text: 'Kør prøven.' }] });
+    await engine.api(`/session/${session.id}/prompt_async`, 'POST', { model: { providerID: 'harness', modelID: spec.model || MODEL }, agent: 'build', parts: [{ type: 'text', text: 'Kør prøven.' }] });
     out.outcome = await d.promise;
     out.toolsOffered = model.requests.find(body => body.tools?.length)?.tools.map(tool => tool.function?.name);
     out.asked = asked; out.results = results;
@@ -777,7 +789,7 @@ function convertForloeb(raw, out, names) {
   }
   return { index, scenarios };
 }
-const FORLOEB_TOKENS = { ROOT: 'projektmappen (BASE/Dokumenter/projekt, i git-foraelder BASE/Dokumenter/repo/projekt)', WORKSPACE: 'samtalens arbejdsmappe (ROOT eller kopien STORE/copies/COPYID/project)', OUTSIDE: 'BASE/Dokumenter/ekstern', REPO: 'Git-roden over projektet (kun git-foraelder)', STORE: 'BASE/appdata/harness', SCRATCH: 'STORE/scratch/PROJECTKEY/TASK', RUNTIME: 'STORE/runtime/WORKSPACEKEY (motorens mappe; HOME er RUNTIME/home)', SYSTMP: 'os.tmpdir() under optagelsen', TOOLOUTPUT: 'RUNTIME/data/opencode/tool-output/<fil>', ':rel/': 'samme sti uden foranstillet skråstreg (OpenCodes path.relative("/", sti) uden Git)' };
+const FORLOEB_TOKENS = { ROOT: 'projektmappen (BASE/Dokumenter/projekt, i git-foraelder BASE/Dokumenter/repo/projekt)', WORKSPACE: 'samtalens arbejdsmappe (ROOT eller kopien STORE/copies/COPYID/project)', OUTSIDE: 'BASE/Dokumenter/ekstern', REPO: 'Git-roden over projektet (kun git-foraelder)', STORE: 'BASE/appdata/harness', SCRATCH: 'WORKSPACE/.aura/tmp/TASK (opgavens arbejdsmappe ligger i projektet; før beta 3 lå den i STORE/scratch/PROJECTKEY/TASK)', RUNTIME: 'STORE/runtime/WORKSPACEKEY (motorens mappe; HOME er RUNTIME/home)', SYSTMP: 'os.tmpdir() under optagelsen', TOOLOUTPUT: 'RUNTIME/data/opencode/tool-output/<fil>', ':rel/': 'samme sti uden foranstillet skråstreg (OpenCodes path.relative("/", sti) uden Git)' };
 async function writeForloeb(raw, out, names) {
   await fs.mkdir(out, { recursive: true });
   // Kun de valgte forløb erstattes; de øvrige bliver stående med deres linjer i INDEX.json.

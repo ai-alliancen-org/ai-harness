@@ -3,6 +3,7 @@ const path = require('node:path');
 const { createHash, randomUUID } = require('node:crypto');
 const { run, content, protectedPath, secretContent } = require('./git.cjs');
 const { merge3, resolve } = require('./merge.cjs');
+const { OPAQUE_UNDO } = require('./changes.cjs');
 const hash = data => createHash('sha256').update(data).digest('hex');
 const MAX = 2 * 1024 * 1024;
 const EMPTY = { data: null, hash: 'deleted' };
@@ -83,7 +84,7 @@ class Restoration {
   async review(root, input) {
     this.reviews.clear();
     const optional = Boolean(input?.undo || input?.task || input?.merge);
-    const repo = await this.repository(root, optional), files = [];
+    const repo = await this.repository(root, optional), files = [], kept = [];
     root = repo?.root || await fs.realpath(root);
     const previous = await this.previous(root);
     if (!input?.undo && previous && ['prepared', 'applying', 'failed'].includes(previous.state)) throw new Error('Sidste gendannelse blev afbrudt. Gennemgå først kopien fra før gendannelsen.');
@@ -112,7 +113,12 @@ class Restoration {
     } else if (input?.task) {
       // En opgave i denne samtale: filerne før og efter kommer fra Auras øjebliksbilleder.
       if (!Array.isArray(input.task.files) || input.task.files.length > 200) throw new Error('Opgaven kan ikke fortrydes her.');
-      files.push(...await revertFiles(root, input.task.files.map(entry => ({ file: entry.file, base: entry.after, theirs: entry.before }))));
+      // En binær fil eller en fil i et ældre tekstformat har ingen tekst før og efter i øjebliksbillederne. Den lades være og
+      // nævnes i gennemgangen (kept); ellers ville gennemgangen tilbyde at slette den.
+      kept.push(...input.task.files.filter(entry => entry.opaque).map(entry => entry.file));
+      const entries = input.task.files.filter(entry => !entry.opaque);
+      if (!entries.length && kept.length) throw new Error(OPAQUE_UNDO);
+      files.push(...await revertFiles(root, entries.map(entry => ({ file: entry.file, base: entry.after, theirs: entry.before }))));
     } else if (input?.revert) {
       // En gemt version: kun dens egne ændringer fjernes, også når senere versioner har ændret andet.
       if (!/^[a-f0-9]{40,64}$/.test(input.revert)) throw new Error('Vælg en version fra projektets historik.');
@@ -147,7 +153,7 @@ class Restoration {
     const token = randomUUID(); this.reviews.set(token, { root, repo, files, kind: input?.merge ? 'merge' : 'restore', undo: Boolean(input?.undo), previous: previous?.id });
     const text = value => value?.data?.includes(0) ? null : value?.data?.toString() ?? null;
     const action = (before, target) => target.data === null ? 'Slettes' : before.data === null ? 'Genskabes' : 'Ændres';
-    return { token, undo: Boolean(input?.undo), undoMerge: Boolean(input?.undo && previous?.kind === 'merge'), kind: input?.merge ? 'merge' : input?.undo ? 'undo' : input?.task ? 'task' : input?.revert ? 'revert' : 'restore', untracked: repo ? repo.files.filter(f => f.status === '??' && !files.some(item => item.file === f.file)).length : 0, git: Boolean(repo),
+    return { token, ...(kept.length ? { kept } : {}), undo: Boolean(input?.undo), undoMerge: Boolean(input?.undo && previous?.kind === 'merge'), kind: input?.merge ? 'merge' : input?.undo ? 'undo' : input?.task ? 'task' : input?.revert ? 'revert' : 'restore', untracked: repo ? repo.files.filter(f => f.status === '??' && !files.some(item => item.file === f.file)).length : 0, git: Boolean(repo),
       conflicts: files.filter(f => f.outcome === 'conflict').length,
       files: files.map(f => f.outcome === 'conflict' ? { file: f.file, outcome: 'conflict', action: 'Du vælger', conflict: conflictView(f) }
         : { file: f.file, outcome: f.outcome || 'restore', action: action(f.before, f.target), before: text(f.before), after: text(f.target), binary: Boolean(f.before.data?.includes(0) || f.target.data?.includes(0)) }) };

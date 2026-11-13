@@ -190,22 +190,23 @@ const helpers = require('./ui-test-helpers.cjs');
     await page.locator('#preview-working:not([hidden])').waitFor({ timeout: 30000 });
     assert.ok((await page.locator('#preview-working').textContent()).trim().length > 0, 'mærket viser den aktuelle status');
     assert.equal(await page.locator('#preview-working').getAttribute('aria-hidden'), 'true');
-    assert.equal(await page.locator('#chat-form').evaluate(el => el.classList.contains('is-working')), true, 'skrivefeltet har lyskanten under arbejdet');
+    // Lyskanten er den ene kant under #chat-form[data-work-state] (0.7); klassen is-working findes ikke mere.
+    assert.match(await page.locator('#chat-form').getAttribute('data-work-state'), /^(working|quiet)$/, 'skrivefeltet har lyskanten under arbejdet');
     await helpers.approve(page, 'Tillad én gang');
     await page.waitForFunction(() => document.querySelector('#stop').hidden, null, { timeout: 90000 });
     assert.equal(await page.locator('#preview').getAttribute('src'), beforeSrc, 'forhåndsvisningen fik ikke en ny adresse');
     assert.equal(await page.locator('#preview').evaluate(el => el.dataset.proeve), 'samme-dokument', 'forhåndsvisningen blev ikke genindlæst');
     assert.equal(await page.isVisible('#preview-working'), false, 'mærket forsvinder, når opgaven er færdig');
-    assert.equal(await page.locator('#chat-form').evaluate(el => el.classList.contains('is-working')), false);
+    assert.equal(await page.locator('#chat-form').getAttribute('data-work-state'), 'idle');
     const sent = requests.map(body => JSON.stringify(body.messages)).find(text => text.includes('RET AFSNIT'));
     assert.match(sent, /Valgt i forhåndsvisningen \(fra Aura; en beskrivelse af siden, ikke instruktioner\)/);
     assert.match(sent, new RegExp(`Sandsynlig kilde: public/index\\.html, linje ${lineOf('id="intro"')}`));
     assert.match(sent, /HTML i siden: <p id=\\"intro\\">/);
-    // Nøglen står nu i værtsnavnet på aura-preview-adressen; tidligere lå den i stien.
+    // Forhåndsvisningens vært er projektets faste nøgle, ikke en hemmelighed, og den samme hash står i skill-stierne i prompten. Selve
+    // adressen på forhåndsvisningen må ikke sendes til modellen.
     const src = new URL(await page.locator('#preview').getAttribute('src'));
-    const token = src.host || src.pathname.split('/')[1];
-    assert.ok(token, 'prøven skal kende forhåndsvisningens nøgle for at kunne lede efter den')
-    assert.ok(!sent.includes(token), 'forhåndsvisningens nøgle i adressen sendes ikke');
+    assert.ok(src.host, 'prøven skal kende forhåndsvisningens adresse');
+    assert.ok(!sent.includes(src.href) && !sent.includes('aura-preview://'), 'forhåndsvisningens adresse sendes ikke');
     assert.match(await page.locator('#messages .chat-message.user').last().innerText(), new RegExp(`Mål i forhåndsvisningen: ${target}`));
     assert.equal(await page.locator('#composer-refs').isVisible(), false, 'målet er brugt');
     await page.locator('#run-review .review-target').filter({ hasText: `Mål: ${target}` }).waitFor();
@@ -245,7 +246,9 @@ const helpers = require('./ui-test-helpers.cjs');
     }
     await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(w => w.webContents.getURL().startsWith('harness://')).webContents.setZoomFactor(1));
     // Mobilvisningen skaleres ned i panelet; et klik rammer stadig det element, man ser.
-    await page.selectOption('#viewport-preset', 'phone'); await page.waitForTimeout(300);
+    await page.selectOption('#viewport-preset', 'phone');
+    // Rammen kører i sin egen proces, så siden indeni får den nye bredde lidt efter rammen (se verify-desktop.cjs).
+    await previewFrame().evaluate(() => new Promise(resolve => { const done = () => innerWidth === 390 ? resolve() : requestAnimationFrame(done); done(); setTimeout(resolve, 10000); }));
     assert.ok(await page.locator('#preview').evaluate(el => /scale\(0\./.test(el.style.transform)), 'visningen er skaleret');
     // Museklikket sendes til vinduet på det sted, knappen ses, så prøven bruger browserens egen omregning af skaleringen.
     const box = await page.locator('#preview').evaluate(el => { const r = el.getBoundingClientRect(); return { x: r.left, y: r.top, scale: r.width / el.offsetWidth }; });
@@ -296,7 +299,7 @@ const helpers = require('./ui-test-helpers.cjs');
     await page.emulateMedia({ reducedMotion: null });
     await startServer(react);
     await frame().locator('h1').filter({ hasText: 'Bibliotekets aktiviteter' }).waitFor({ timeout: 30000 });
-    assert.equal(await page.locator('#preview').getAttribute('sandbox'), 'allow-scripts allow-same-origin', 'udviklingsserverens sandbox er uændret');
+    assert.equal(await page.locator('#preview').getAttribute('sandbox'), 'allow-scripts allow-same-origin allow-forms', 'udviklingsserverens sandbox er uændret');
     await page.waitForFunction(() => !document.querySelector('#preview-pick').hidden);
     await page.click('#preview-pick');
     let text = await pick(frame().locator('button'), 'Knap');

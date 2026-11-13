@@ -22,14 +22,14 @@ På Windows erstattes projektstien med fx `C:\Projekter\Min app`. Både CMD og P
 
 Installationen henter den relevante, versionslåste OpenCode-motor som en valgfri npm-afhængighed. Aura ændrer ikke din øvrige OpenCode-opsætning. `doctor` kontrollerer, at motorversionen er præcis den forventede, og forklarer, hvis npm har udeladt den. Du kan også angive en eksisterende motor med `HARNESS_OPENCODE_PATH`. Node, Git, Docker og projektets pakker installeres ikke ved opstart.
 
-Hvis du vil have kommandoen `aura` til rådighed fra andre mapper, kan du efter den lokale installation køre:
+Fra andre mapper kan du efter den lokale installation starte den samme kontrollerede installation med dens fulde sti:
 
 ```sh
-npm install --global . --ignore-scripts --no-audit --no-fund
-aura doctor
+node "/sti/til/aura/cli/aura.cjs" doctor
+node "/sti/til/aura/cli/aura.cjs" chat "/sti/til/mit projekt"
 ```
 
-En administrator kan i stedet distribuere en gennemgået lokal npm-pakke. Pakken er ikke publiceret i npm-registret; brug ikke en tilfældig pakke med et lignende navn. Brug heller ikke administratorrettigheder blot for at omgå organisationens installationspolitik.
+Det bevarer de afhængigheder, `npm ci` har installeret fra `npm-shrinkwrap.json`. En global installation fra repositoryet er ikke kvalificeret til at bevare sikkerhedsrettelserne. Næste CLI-pakkes låste installationsvej står i [udkastet til næste udgivelse](../docs/releases/cli-naeste-udkast.md). Pakken er ikke publiceret i npm-registret; brug ikke en tilfældig pakke med et lignende navn. Brug heller ikke administratorrettigheder blot for at omgå organisationens installationspolitik.
 
 ## Første projekt
 
@@ -37,9 +37,9 @@ En administrator kan i stedet distribuere en gennemgået lokal npm-pakke. Pakken
 
 Beskriv opgaven. Første besked bruger planlægning, som ikke tilbyder skrive- eller shellværktøjer. Vælg AI, hvis du ikke allerede har gjort det. Gennemgå datavilkårene, og send. Når planen er klar, starter `/build` en gennemgang af planen, før agenten får lov til at arbejde. Senere beskeder kan forbedre resultatet; `/plan` starter ny planlægning.
 
-Modellen beder om godkendelse af filændringer, kommandoer og anden adgang efter de fælles tilladelser. Terminalen har ingen universel `--yes`. Ctrl+C stopper opgaven. Filer, der allerede er ændret, bevares. `/diff` viser ændringer, og `/undo` gennemgår, hvordan den seneste opgave kan fortrydes. Projektkommandoer kører med din brugers rettigheder; dette er ikke en operativsystem-sandbox.
+Modellen beder om godkendelse af filændringer, kommandoer og anden adgang efter de fælles tilladelser. Efter fem godkendelser i én opgave spørger terminalen én gang, om resten af opgaven må fortsætte i projektmappen (**Ja, resten af opgaven** eller **Nej, spørg hver gang**). Beskyttede filer, mapper uden for projektet, kommandoer uden sandkasse, nettet og udgivelse spørger stadig. Terminalen har ingen universel `--yes`. Ctrl+C stopper opgaven. Filer, der allerede er ændret, bevares. `/diff` viser ændringer, og `/undo` gennemgår, hvordan den seneste opgave kan fortrydes. Projektkommandoer kører med din brugers rettigheder; dette er ikke en operativsystem-sandbox.
 
-Samtaler, kladder, planer og modelvalg gemmes uden for projektet. `/history` viser beskeder, `/chats` skifter samtale, og `/new` begynder en ny. Uændrede modelindstillinger kan genåbne samme modelsession. Ved modelskift eller ændrede indstillinger vises besked om en ny session; `/context` kan aktivt medtage tidligere samtaletekst. Planlægning og bygning medtager allerede den relevante plan og afklaring. Kun én Aura-terminal ad gangen må bruge samme datamappe. Undgå samtidig redigering fra desktopappen eller en anden agent i samme projekt.
+Samtaler, kladder, planer og modelvalg gemmes uden for projektet. `/history` viser beskeder, `/chats` skifter samtale, og `/new` begynder en ny. Uændrede modelindstillinger kan genåbne samme modelsession. Ved modelskift eller ændrede indstillinger vises besked om en ny session, og de seneste beskeder følger med som tekst; `/context` forklarer det. Planlægning og bygning medtager allerede den relevante plan og afklaring. Kun én Aura-terminal ad gangen må bruge samme datamappe. Undgå samtidig redigering fra desktopappen eller en anden agent i samme projekt.
 
 ## AI og nøgler
 
