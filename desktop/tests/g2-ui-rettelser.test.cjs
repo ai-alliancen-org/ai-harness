@@ -104,8 +104,28 @@ test('fjernes den udgåede komplai-forbindelse uden tilbagekaldelse, siger felte
     const { $ } = dom();
     const context = { $, state: null, current: null, verifiedConnection: 'x', acceptedFingerprint: 'y', setupGeneration: 0, connectionChecks: { clear() {} }, renderConnections() {}, connectionView() {}, connectionFailed() {}, call: async () => svar };
     vm.createContext(context);
-    vm.runInContext(udsnit('async function removeSavedConnection(id) {', "$('#connection-remove').onclick"), context);
+    vm.runInContext(udsnit('async function removeSavedConnection(id, { force = false } = {}) {', "$('#connection-remove').onclick"), context);
     await context.removeSavedConnection('tidligere-ai');
     assert.match($('#connections-feedback').textContent, forventet);
   }
+});
+
+test('kan komplai-adgangen ikke tilbagekaldes, bliver forbindelsen stående, og Fjern kun fra denne computer vises (brugerens valg 16. november 2026)', async () => {
+  const { $ } = dom();
+  const kald = [], fejlet = 'Adgangen kunne ikke tilbagekaldes hos komplai, fordi komplai ikke kunne nås, så forbindelsen er ikke fjernet.';
+  const svar = [{ connections: [{ id: 'tidligere-ai' }], revocationFailed: fejlet }, { connections: [], removalNotice: 'Forbindelsen er fjernet fra denne computer. Adgangen er ikke tilbagekaldt hos komplai, fordi komplai ikke kunne nås, og den kan stadig være gyldig der, til den udløber.' }];
+  $('#connection-forget').hidden = true;
+  const context = { $, state: 'uændret', current: null, verifiedConnection: 'x', acceptedFingerprint: 'y', setupGeneration: 0, connectionChecks: { clear() { kald.push('clear'); } }, renderConnections() { kald.push('render'); }, connectionView(view) { kald.push('view:' + view); }, connectionFailed() {}, call: async (method, value) => { kald.push([method, value]); return svar.shift(); } };
+  vm.createContext(context);
+  vm.runInContext(udsnit('async function removeSavedConnection(id, { force = false } = {}) {', "$('#connection-remove').onclick"), context);
+  await context.removeSavedConnection('tidligere-ai');
+  assert.equal($('#connection-feedback').textContent, fejlet, 'feltet i forbindelsen siger hvorfor');
+  assert.equal($('#connection-forget').hidden, false, 'Fjern kun fra denne computer vises');
+  assert.equal(context.state, 'uændret', 'intet er fjernet, så tilstanden er ikke skiftet');
+  assert.deepEqual(kald, [['removeConnection', 'tidligere-ai']], 'listen vises ikke, og intet ryddes');
+  await context.removeSavedConnection('tidligere-ai', { force: true });
+  // Objektet er lavet i vm-konteksten; en kopi sammenlignes uden dens prototype.
+  assert.deepEqual(JSON.parse(JSON.stringify(kald[1])), ['removeConnection', { id: 'tidligere-ai', force: true }], 'knappen beder om lokal fjernelse');
+  assert.ok(kald.includes('view:list'));
+  assert.match($('#connections-feedback').textContent, /ikke tilbagekaldt hos komplai/);
 });

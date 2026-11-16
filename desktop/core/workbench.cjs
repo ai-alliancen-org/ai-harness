@@ -238,7 +238,9 @@ class Workbench {
     if (Array.isArray(catalog)) this.catalogs.set(connection.id, catalog);
     return connection.id;
   }
-  async removeConnection(id) {
+  // input er id'et, eller { id, force } for «Fjern kun fra denne computer».
+  async removeConnection(input) {
+    const id = typeof input === 'string' ? input : input?.id, force = typeof input === 'object' && input?.force === true;
     this.assertConnectionIdle(id);
     if (this.connectionRemovals.has(id)) throw new Error('Forbindelsen er allerede ved at blive fjernet.');
     this.connectionRemovals.add(id);
@@ -247,15 +249,19 @@ class Workbench {
       let removalNotice = '';
       if (connection.kind === 'komplai') {
         // Et indsat token kan også bruges i andre programmer. Fjernelse her tilbagekalder kun Auras egne loginadgange.
-        // Den udgåede forbindelse skal kunne fjernes uden net: kan adgangen ikke læses, kan komplai ikke nås, eller afviser komplai
-        // tilbagekaldelsen, fjernes den alligevel fra denne computer, og svaret siger ærligt, at den ikke er tilbagekaldt (Q:D2-3).
+        // Kan adgangen ikke læses, kan komplai ikke nås, eller afviser komplai tilbagekaldelsen, bevares forbindelsen, og svaret
+        // siger hvorfor i revocationFailed. Brugeren vælger så selv: prøv igen eller «Fjern kun fra denne computer» (force), som
+        // for udgivelsesadgangen. Med force fjernes den lokalt, og svaret siger ærligt, at den ikke er tilbagekaldt
+        // (Q:D2-3, brugerens valg 16. november 2026).
         if (connection.account?.authMethod !== 'token') {
-          let secret = null;
-          try { secret = this.store.decrypt(connection); } catch { removalNotice = notRevoked('den ikke kunne læses på denne computer'); }
-          if (!removalNotice) {
+          let secret = null, reason = '';
+          try { secret = this.store.decrypt(connection); } catch { reason = 'den ikke kunne læses på denne computer'; }
+          if (!reason) {
             try { await require('./komplai.cjs').disconnect(connection, secret); }
-            catch (error) { removalNotice = notRevoked(error?.unreachable ? 'komplai ikke kunne nås' : Number.isInteger(error?.status) ? 'komplai afviste tilbagekaldelsen' : error?.unreadable ? 'svaret fra komplai ikke kunne læses' : 'tilbagekaldelsen ikke kunne gennemføres'); }
+            catch (error) { reason = error?.unreachable ? 'komplai ikke kunne nås' : Number.isInteger(error?.status) ? 'komplai afviste tilbagekaldelsen' : error?.unreadable ? 'svaret fra komplai ikke kunne læses' : 'tilbagekaldelsen ikke kunne gennemføres'; }
           }
+          if (reason && !force) return { ...(await this.state()), revocationFailed: revocationFailed(reason) };
+          if (reason) removalNotice = notRevoked(reason);
         }
       }
       await this.store.update(state => { this.assertConnectionIdle(id); state.connections = state.connections.filter(c => c.id !== id); });
@@ -402,4 +408,6 @@ class Workbench {
 function changedConnection(message) { return Object.assign(new Error(message), { changed: true }); }
 // Beskeden, når den udgåede komplai-AI-forbindelse er fjernet fra Aura uden at være tilbagekaldt hos komplai (Q:D2-3).
 function notRevoked(reason) { return `Forbindelsen er fjernet fra denne computer. Adgangen er ikke tilbagekaldt hos komplai, fordi ${reason}, og den kan stadig være gyldig der, til den udløber.`; }
+// Beskeden, når tilbagekaldelsen mislykkes, og forbindelsen derfor ikke er fjernet endnu.
+function revocationFailed(reason) { return `Adgangen kunne ikke tilbagekaldes hos komplai, fordi ${reason}, så forbindelsen er ikke fjernet. Prøv igen, eller fjern den kun fra denne computer. Så kan adgangen stadig være gyldig hos komplai, til den udløber.`; }
 module.exports = { Workbench, planningReply };

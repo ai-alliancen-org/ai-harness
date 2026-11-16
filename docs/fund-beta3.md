@@ -97,6 +97,9 @@ Niveau: *enhedsprøvet* for alle rettelser og *kørt mod rigtigt materiale* (den
 6. **Et dobbelt skift af et link under en søgning** (link ved `before`, mappe ved kortet, link ved søgningen) er ikke lukket. Det kræver, at søgningens sti skrives om til den faktiske sti. Tilsvarende viser en skrivning gennem et link til projektet OpenCodes eget mappekort. Begge er åbne spørgsmål til dig.
 
 ### Dine fire åbne valg
+
+*Afgjort 16. november 2026, alle fire efter anbefalingen (se `decisions.md`, «Beta 3 · de fire åbne valg afgjort»). Valg 1 og 2 er bygget og enhedsprøvet; valg 3 og 4 er dokumenteret. Valg 1 lukker også fund 20.*
+
 1. Skal en komplai-AI-forbindelse, hvis tilbagekaldelse mislykkes, fortsat fjernes uden spørgsmål, eller kræve «Fjern kun fra denne computer»?
 2. Skal en ødelagt gendannelsesjournal flyttes til side?
 3. Skal appvalget i komplai Run med fem synlige kontroller (Ny app, Eksisterende app, Konto og adgang, Tilbage, Luk) være en udtrykkelig undtagelse fra grænsen på fire?

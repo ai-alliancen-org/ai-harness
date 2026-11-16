@@ -121,7 +121,7 @@ async function activate(next) {
   const owner = await registry.select(next), request = requests.getStore();
   if (request) { request.bench = owner; request.workspaceRoot = owner.chat?.root || owner.project.root; request.chat = owner.chatID; }
   try { const restored = await owner.restoration.previous(owner.project.root); if (restored) await owner.invalidatePlan(restored.id); }
-  catch { await owner.invalidatePlan(crypto.randomUUID()); owner.historyWarning = 'Gendannelseskopien kan ikke læses. Projektfilerne er åbne, men den gamle plan er nulstillet.'; }
+  catch (error) { await owner.invalidatePlan(crypto.randomUUID()); owner.historyWarning = `${error?.setAside ? error.message : 'Gendannelseskopien kan ikke læses.'} Projektfilerne er åbne, men den gamle plan er nulstillet.`; }
   assets = [];
   const context = await selectSpace(owner.chat?.root || owner.project.root, owner);
   return { ...owner.project, ...context, workbench: { ...await owner.state(), preview: context } };

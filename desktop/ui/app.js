@@ -645,7 +645,7 @@ function fillConnection(connection) {
 function editConnection(connection) {
   moveConnectionForm(false); editingConnection = connection.id;
   $('#connection-form').reset(); $('#connection-id').value = connection.id; $('#provider-kind').value = connection.kind; updateProvider(); fillConnection(connection);
-  $('#clear-key').checked = false; connectionFilled();
+  $('#clear-key').checked = false; connectionFilled(); $('#connection-forget').hidden = true;
   $('#connection-feedback').textContent = connectionChecks.get(connection.id)?.detail || ''; connectionView('edit');
   $('#connection-use').disabled = projectLoading;
   $('#connection-use').focus();
@@ -675,14 +675,19 @@ $('#connection-test').onclick = () => action(async () => {
   try { const result = await checkConnection(id); if (result && $('#connections-dialog').open && id === $('#connection-id').value) $('#connection-feedback').textContent = result.detail; }
   finally { $('#connection-test').disabled = false; }
 });
-async function removeSavedConnection(id) {
+async function removeSavedConnection(id, { force = false } = {}) {
   const selected = $('#connection-select').value;
-  state = await call('removeConnection', id); connectionChecks.clear(id); ++setupGeneration; verifiedConnection = ''; acceptedFingerprint = null; renderConnections();
-  // Kunne adgangen hos komplai ikke tilbagekaldes, siger kernen det i removalNotice; forbindelsen er fjernet alligevel (Q:D2-3).
+  const result = await call('removeConnection', force ? { id, force: true } : id);
+  // Kunne adgangen hos komplai ikke tilbagekaldes, er forbindelsen ikke fjernet. Brugeren vælger selv: Fjern forbindelse igen eller
+  // «Fjern kun fra denne computer», som for udgivelsesadgangen (Q:D2-3, brugerens valg 16. november 2026).
+  if (result.revocationFailed) { $('#connection-feedback').textContent = result.revocationFailed; $('#connection-forget').hidden = false; return; }
+  state = result; connectionChecks.clear(id); ++setupGeneration; verifiedConnection = ''; acceptedFingerprint = null; renderConnections();
+  // Fjernes den kun fra denne computer, siger kernen i removalNotice, at adgangen ikke er tilbagekaldt hos komplai.
   connectionView('list'); $('#connections-feedback').textContent = state.removalNotice || 'Forbindelsen er fjernet.';
   if (current && selected === id) connectionFailed('Den valgte forbindelse er fjernet.');
 }
 $('#connection-remove').onclick = () => action(() => removeSavedConnection(editingConnection));
+$('#connection-forget').onclick = () => action(() => removeSavedConnection(editingConnection, { force: true }));
 // Trin for trin til en nøgle hos de tre udbydere i opsætningen. Knapperne åbner faste sider via hovedprocessen. Kontrolleret 29. september 2026.
 const keyGuides = {
   openai: { steps: [['Åbn din OpenAI API-konto.', 'start', 'Åbn'], ['Opret en API-nøgle.', 'keys', 'Åbn'], ['Indsæt nøglen herunder.']], cost: 'OpenAI API afregnes separat fra et ChatGPT-abonnement. Prisen afhænger af model og tokenforbrug.' },

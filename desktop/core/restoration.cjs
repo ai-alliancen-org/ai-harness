@@ -66,9 +66,21 @@ const conflictView = f => f.whole ? { whole: true, ours: f.before.data === null 
 class Restoration {
   constructor(git, store) { this.git = git; this.store = store; this.reviews = new Map(); }
   journal(root) { return path.join(this.store.root, 'restoration', this.store.projectKey(root), 'latest.json'); }
+  // En ødelagt journal lægges til side under et nyt navn i samme mappe og bevares. Den, der møder den først, får besked; derefter er
+  // der ingen journal, og nye gendannelser virker igen (brugerens valg 16. november 2026). Kan filen slet ikke læses eller flyttes,
+  // afvises gendannelser som før, og intet slettes.
   async previous(root) {
-    try { const value = JSON.parse(await fs.readFile(this.journal(root), 'utf8')); if (value.version !== 1 || value.root !== root || !/^[a-f0-9-]{36}$/.test(value.id) || !Array.isArray(value.files)) throw new Error(); return value; }
-    catch (error) { if (error.code === 'ENOENT') return null; throw new Error('Kopien før sidste gendannelse kan ikke læses. Den er bevaret i appens lokale data.'); }
+    const file = this.journal(root), kept = 'Kopien før sidste gendannelse kan ikke læses. Den er bevaret i appens lokale data.';
+    let raw;
+    try { raw = await fs.readFile(file, 'utf8'); }
+    catch (error) { if (error.code === 'ENOENT') return null; throw new Error(kept); }
+    try { const value = JSON.parse(raw); if (value.version !== 1 || value.root !== root || !/^[a-f0-9-]{36}$/.test(value.id) || !Array.isArray(value.files)) throw new Error(); return value; }
+    catch {
+      const aside = path.join(path.dirname(file), `damaged-${new Date().toISOString().replace(/[:.]/g, '-')}-${randomUUID().slice(0, 8)}.json`);
+      // En anden handling kan have lagt den til side i mellemtiden; så er der ingen journal at melde om.
+      try { await fs.rename(file, aside); } catch (error) { if (error.code === 'ENOENT') return null; throw new Error(kept); }
+      throw Object.assign(new Error('Kopien før sidste gendannelse kan ikke læses. Den er lagt til side i appens lokale data, og nye gendannelser virker igen.'), { setAside: aside });
+    }
   }
   async status(root) { const value = await this.previous(root); return value ? { at: value.at, state: value.state, files: value.files.length } : null; }
   // Fortryd af en opgave og af en gendannelse kan bruges uden Git. Så kontrolleres kun filerne.

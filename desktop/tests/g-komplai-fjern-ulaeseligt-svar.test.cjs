@@ -29,8 +29,12 @@ const ikkeTilbagekaldt = /fjernet fra denne computer.*ikke tilbagekaldt hos komp
 test('svarer komplai med noget, der ikke kan læses, siger beskeden det og ikke, at komplai ikke kunne nås', async t => {
   for (const svar of [() => new Response('<html>Bad gateway</html>', { status: 502, headers: { 'content-type': 'text/html' } }), () => new Response('ok', { status: 200 })]) {
     const { bench, store } = await fixture(t);
-    const result = await medFetch(async () => svar(), () => bench.removeConnection(old.id));
-    assert.deepEqual((await store.read()).connections.map(c => c.id), ['anden-ai'], 'forbindelsen er fjernet');
+    const first = await medFetch(async () => svar(), () => bench.removeConnection(old.id));
+    assert.deepEqual((await store.read()).connections.map(c => c.id), ['tidligere-ai', 'anden-ai'], 'forbindelsen bevares, til brugeren vælger');
+    assert.doesNotMatch(first.revocationFailed || '', /ikke kunne nås/);
+    assert.match(first.revocationFailed || '', /fordi svaret fra komplai ikke kunne læses/);
+    const result = await medFetch(async () => svar(), () => bench.removeConnection({ id: old.id, force: true }));
+    assert.deepEqual((await store.read()).connections.map(c => c.id), ['anden-ai'], 'Fjern kun fra denne computer fjerner den');
     assert.match(result.removalNotice || '', ikkeTilbagekaldt);
     assert.doesNotMatch(result.removalNotice, /ikke kunne nås/);
     assert.match(result.removalNotice, /fordi svaret fra komplai ikke kunne læses/);
@@ -39,6 +43,8 @@ test('svarer komplai med noget, der ikke kan læses, siger beskeden det og ikke,
 
 test('kommer netkaldet slet ikke igennem, siger beskeden stadig, at komplai ikke kunne nås', async t => {
   const { bench } = await fixture(t);
-  const result = await medFetch(async () => { throw new TypeError('fetch failed'); }, () => bench.removeConnection(old.id));
+  const first = await medFetch(async () => { throw new TypeError('fetch failed'); }, () => bench.removeConnection(old.id));
+  assert.match(first.revocationFailed, /fordi komplai ikke kunne nås/);
+  const result = await medFetch(async () => { throw new TypeError('fetch failed'); }, () => bench.removeConnection({ id: old.id, force: true }));
   assert.match(result.removalNotice, /fordi komplai ikke kunne nås/);
 });

@@ -77,6 +77,31 @@ test('fund 43: aura logout tilbagekalder og fjerner en gammel Komplai-browserfor
   assert.equal(backend.items.size, 0, 'den flyttede nøgle er også slettet fra nøgleringen');
   assert.match(ui.output, /Forbindelsen er fjernet/);
 });
+// Brugerens valg 16. november 2026 (Q:D2-3): fejler tilbagekaldelsen, fjernes forbindelsen kun efter et ja til «kun fra denne computer».
+test('aura logout spørger, før en gammel Komplai-forbindelse fjernes uden tilbagekaldelse, og et nej bevarer den og nøglen', async t => {
+  for (const svar of ['ja', 'nej']) {
+    const state = await directory(t);
+    await legacyStore(state, [{ id: 'k', kind: 'komplai', name: 'Komplai', plain: 'kp_live_proeve_0123456789', account: { organisationId: 'org' } }]);
+    const ui = new UI(q => /skal fjernes/.test(q) ? 'k' : /tilbagekald denne/.test(q) ? 'ja' : /Adgangssætning/.test(q) ? PASSPHRASE : /kun fra denne computer/.test(q) ? svar : '');
+    const { app, backend } = keychainApp(t, state, ui);
+    let attempts = 0;
+    t.mock.method(komplai, 'disconnect', async () => { attempts++; throw Object.assign(new Error('fetch failed'), { unreachable: true }); });
+    await logout(app);
+    assert.match(ui.output, /forbindelsen er ikke fjernet/);
+    assert.ok(ui.asked.some(q => /kun fra denne computer/.test(q)), 'brugeren bliver spurgt');
+    const connections = (await app.bench.store.read()).connections;
+    if (svar === 'ja') {
+      assert.equal(attempts, 2, 'lokal fjernelse prøver stadig at tilbagekalde først');
+      assert.deepEqual(connections, []);
+      assert.equal(backend.items.size, 0, 'nøglen er slettet med forbindelsen');
+      assert.match(ui.output, /ikke tilbagekaldt hos komplai, fordi komplai ikke kunne nås/);
+    } else {
+      assert.equal(attempts, 1);
+      assert.deepEqual(connections.map(c => c.id), ['k'], 'et nej bevarer forbindelsen');
+      assert.equal(backend.items.size, 1, 'og nøglen');
+    }
+  }
+});
 test('fund 43: uden adgangssætningen kan den gamle Komplai-forbindelse fjernes fra Aura efter et ja, uden tilbagekaldelse', async t => {
   const state = await directory(t);
   await legacyStore(state, [{ id: 'k', kind: 'komplai', name: 'Komplai', plain: 'kp_live_proeve_0123456789', account: {} }]);

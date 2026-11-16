@@ -83,15 +83,19 @@ test('Tidligere Komplai AI: fjernelse af eget token er lokal, browseradgang tilb
   } finally { globalThis.fetch = original; }
 });
 
-// Q:D2-3: den udgåede forbindelse skal kunne fjernes uden net. Den fjernes fra Aura, svaret siger ærligt, at adgangen ikke er
-// tilbagekaldt hos komplai, og Run bevares (flere tilfælde i tests/komplai-ai-fjern-uden-net.test.cjs).
-test('Tidligere Komplai AI: fejlet tilbagekaldelse fjerner forbindelsen fra Aura, siger det og bevarer Run', async t => {
+// Q:D2-3: den udgåede forbindelse skal kunne fjernes uden net. Fejler tilbagekaldelsen, bevares den, til brugeren vælger «Fjern kun
+// fra denne computer»; så fjernes den fra Aura, svaret siger ærligt, at adgangen ikke er tilbagekaldt hos komplai, og Run bevares
+// (flere tilfælde i tests/komplai-ai-fjern-uden-net.test.cjs).
+test('Tidligere Komplai AI: fejlet tilbagekaldelse bevarer forbindelsen, og Fjern kun fra denne computer fjerner den og bevarer Run', async t => {
   const { bench, store } = await fixture(t), original = globalThis.fetch;
   await store.update(state => { state.connections[0].account.authMethod = 'browser'; });
   const runBefore = (await store.read()).hosting.komplai;
   globalThis.fetch = async () => { throw Error('offline'); };
   try {
-    const result = await bench.removeConnection(old.id);
+    const first = await bench.removeConnection(old.id);
+    assert.match(first.revocationFailed, /forbindelsen er ikke fjernet/);
+    assert.ok((await store.read()).connections.some(c => c.id === old.id), 'forbindelsen er bevaret');
+    const result = await bench.removeConnection({ id: old.id, force: true });
     const after = await store.read();
     assert.deepEqual(after.connections.map(c => c.id), ['anden-ai']); assert.deepEqual(after.hosting.komplai, runBefore);
     assert.match(result.removalNotice, /ikke tilbagekaldt hos komplai/);

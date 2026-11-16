@@ -89,8 +89,17 @@ async function logout(app) {
       removed = true;
     }
   }
-  // Kunne adgangen hos komplai ikke tilbagekaldes (fx uden net), er forbindelsen fjernet alligevel, og kernen siger det i removalNotice (Q:D2-3).
-  if (!removed) { const result = await app.bench.removeConnection(id); ui.line(result?.removalNotice || 'Forbindelsen er fjernet.'); }
+  // Kan adgangen hos komplai ikke tilbagekaldes (fx uden net), er forbindelsen ikke fjernet, og kernen siger hvorfor. Brugeren vælger
+  // så, om den kun skal fjernes fra denne computer; kernen siger det i removalNotice (Q:D2-3, brugerens valg 16. november 2026).
+  if (!removed) {
+    let result = await app.bench.removeConnection(id);
+    if (result?.revocationFailed) {
+      ui.line(result.revocationFailed);
+      if (!await ui.confirm('Fjern forbindelsen kun fra denne computer? Adgangen kan stadig være gyldig hos Komplai, til den udløber.')) return;
+      result = await app.bench.removeConnection({ id, force: true });
+    }
+    ui.line(result?.removalNotice || 'Forbindelsen er fjernet.');
+  }
   // Nøglen må ikke blive liggende i nøgleringen uden en forbindelse, der bruger den, heller ikke efter udvejen ovenfor (N:F-1).
   try { if (vault.forget(secret)) ui.line('Nøglen er også slettet fra computerens nøglering.'); }
   catch (error) { ui.line(`Nøglen ligger stadig i computerens nøglering og kunne ikke slettes automatisk. ${error.message}`); }
