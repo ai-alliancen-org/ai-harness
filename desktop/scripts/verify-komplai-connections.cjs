@@ -63,9 +63,9 @@ async function installFixture(app, mode, project) {
     if (await page.locator('#deployment-dialog').evaluate(el => el.open)) {
       const choices = await page.locator('#deployment-dialog :is(button,select,summary,input[type=checkbox],input[type=radio]):visible').count();
       const providers = await page.locator('[data-deploy-step="providers"]').isVisible();
-      // Alle seks udbydere står på samme skærm med Tilbage og Luk (DESIGN.md:171, udtrykkelig undtagelse fra fire valg).
+      // Alle syv udbydere står på samme skærm med Tilbage og Luk (DESIGN.md:171, udtrykkelig undtagelse fra fire valg).
       if (providers) assert.deepEqual(await page.locator('#deployment-dialog button:visible').evaluateAll(items => items.map(item => item.dataset.provider || item.id || 'luk').sort()), ['azure', 'azure-containers', 'cloudflare', 'deployment-back', 'github-pages', 'komplai', 'luk', 'promte', 'vercel']);
-      assert(providers ? choices === 8 : choices <= 4, `${mode}: ${choices} synlige kontroller`); screens.push({ mode, choices, providers });
+      assert(providers ? choices === 9 : choices <= 4, `${mode}: ${choices} synlige kontroller`); screens.push({ mode, choices, providers });
     } else screens.push({ mode });
     await page.screenshot({ path: path.join(root, mode + '.png') });
   };
@@ -239,5 +239,5 @@ async function installFixture(app, mode, project) {
       console.error('Prøvemappe:', root); throw error;
     } finally { await app?.close(); }
   }
-  console.log(JSON.stringify({ status: 'bestået', root, screens, checks: ['AI-udbydere og IPC uden komplai-inferens', 'seks udbydere på én skærm', 'Run via PKCE og IPC, også når organisationen tilbyder AI', 'Tilbage til login viser Log ind med komplai igen', 'AI-only organisation giver ingen Run-adgang', 'ingen AI-vilkår eller samtidig AI-tilslutning', 'tidligere modelvalg skifter ikke automatisk udbyder', 'projekt og kladde bevares', 'oprydning af tidligere AI-token bevarer Run', 'Run bevares efter rigtig Electron-genstart', 'logout tilbagekalder Run-adgang', 'uden net kan adgangen fjernes fra denne computer alene', 'ingen modelkald eller udgivelse'], limitations: ['syntetisk identitetsudsteder og API', 'nøglering simuleret', 'ingen Windows-prøve'] }));
+  console.log(JSON.stringify({ status: 'bestået', root, screens, checks: ['AI-udbydere og IPC uden komplai-inferens', 'syv udbydere på én skærm', 'Run via PKCE og IPC, også når organisationen tilbyder AI', 'Tilbage til login viser Log ind med komplai igen', 'AI-only organisation giver ingen Run-adgang', 'ingen AI-vilkår eller samtidig AI-tilslutning', 'tidligere modelvalg skifter ikke automatisk udbyder', 'projekt og kladde bevares', 'oprydning af tidligere AI-token bevarer Run', 'Run bevares efter rigtig Electron-genstart', 'logout tilbagekalder Run-adgang', 'uden net kan adgangen fjernes fra denne computer alene', 'ingen modelkald eller udgivelse'], limitations: ['syntetisk identitetsudsteder og API', 'nøglering simuleret', 'ingen Windows-prøve'] }));
 })().catch(error => { console.error(error); process.exitCode = 1; });

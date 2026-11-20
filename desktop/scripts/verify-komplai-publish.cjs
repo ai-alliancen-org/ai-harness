@@ -155,7 +155,7 @@ const digest = data => createHash('sha256').update(data).digest('hex');
     await page.emulateMedia({ reducedMotion: 'reduce' }); await helpers.skipIntroduction(page); await helpers.enableSharing(page);
     await page.click('#open'); await page.waitForSelector('#workspace:not([hidden])');
     const idle = () => page.waitForFunction(() => !document.querySelector('#deployment-fields').disabled);
-    // Alle seks udbydere står på samme skærm (DESIGN.md:171), så komplai Run vælges direkte.
+    // Alle syv udbydere står på samme skærm (DESIGN.md:171), så komplai Run vælges direkte.
     const selectProvider = async id => { await page.click(`[data-provider="${id}"]`); await idle(); };
     const state = async () => (await page.evaluate(() => window.harness.deploymentState())).value;
     const capture = async name => {
@@ -298,9 +298,9 @@ const digest = data => createHash('sha256').update(data).digest('hex');
     await capture('eksisterende-app-980-150'); await page.click('#deployment-back'); await capture('appvalg-980-150'); await page.locator('#deploy-komplai-create').focus(); await page.keyboard.press('Enter'); await capture('ny-app-980-150'); await page.click('#deployment-next'); await capture('adgang-980-150'); await page.locator('[name=\"komplai-visibility\"][value=\"private\"]').focus(); await page.keyboard.press('Space'); assert.equal(await page.locator('#deployment-heading').evaluate(el => el.matches(':focus-visible') && getComputedStyle(el, '::before').width === '3px'), true, 'Tastaturfokus på overskriften markeres diskret.'); await capture('filer-980-150'); await review(); await capture('gennemgang-980-150'); await page.locator('#deployment-technical > summary').click(); await page.locator('#deployment-details').scrollIntoViewIfNeeded(); await capture('gennemgang-detaljer-980-150'); await page.keyboard.press('Escape'); assert.equal(await page.evaluate(() => document.activeElement.id), 'deploy-button');
     assert.equal(JSON.stringify(await state()).includes(grant), false); assert.doesNotMatch(await fs.readFile(path.join(appdata, 'harness/settings.json'), 'utf8'), /komp_publish_grant_|syntetisk-login/);
     // Forløbets trin og kvitteringen har højst fire synlige kontroller med Tilbage og Luk; kvitteringen viser højst to hovedknapper og
-    // Se detaljer (AGENTS.md). Udbydertrinnet viser seks udbydere samt Tilbage og Luk (DESIGN.md:171). Appvalget har to hovedvalg og
+    // Se detaljer (AGENTS.md). Udbydertrinnet viser syv udbydere samt Tilbage og Luk (DESIGN.md:171). Appvalget har to hovedvalg og
     // linket Konto og adgang (N:D2-3) ud over Tilbage og Luk; det er den eneste undtagelse og tælles kun, når linket står der.
-    assert.deepEqual(errors, []); assert.deepEqual(serverErrors, []); assert(screens.every(screen => !screen.overflow)); assert(screens.every(screen => screen.details || (screen.providers ? screen.choices === 8 : screen.app ? screen.choices <= 4 + Number(screen.appAccount) : screen.choices <= 4)), 'For mange synlige kontroller: ' + JSON.stringify(screens));
+    assert.deepEqual(errors, []); assert.deepEqual(serverErrors, []); assert(screens.every(screen => !screen.overflow)); assert(screens.every(screen => screen.details || (screen.providers ? screen.choices === 9 : screen.app ? screen.choices <= 4 + Number(screen.appAccount) : screen.choices <= 4)), 'For mange synlige kontroller: ' + JSON.stringify(screens));
     assert.equal(calls.some(call => /chat\/completions|\/aura\/connect$|\/models/.test(call.route)), false);
     // Den eneste ændring af adgang er den bekræftede offentliggørelse af den nye app før dens første version.
     assert.equal(changes.length, 1); assert.equal(calls.filter(call => call.method === 'PATCH').length, changes.length);
