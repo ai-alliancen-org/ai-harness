@@ -106,6 +106,10 @@ blob-report/
 /tmp/
 /temp/
 
+# Lokale Azure-demooptagelser og udgivelseskvitteringer
+/output/aura-video-*/
+/output/aura-*-demo-*/
+
 # Lokal tilknytning til hosting og cloudværktøjer
 .vercel/
 .netlify/
