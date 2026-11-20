@@ -4,7 +4,11 @@ Senest kontrolleret 20. november 2026. Afsnittene er daterede, så tidligere beg
 
 [Gennemgangen før offentlig beta](offentliggoerelse.md) samler historik- og logkontrol samt de lokale prøver af README, hjemmeside og udgivelseskontrol. Den offentliggør ikke appen og ændrer ikke installationsstatus nedenfor.
 
-## Kandidat 0.7.0-beta.4 · 20. november 2026
+## Offentlig desktopbeta 0.7.0-beta.4 · 20. november 2026
+
+**Offentliggørelse.** GitHub udgav betaen kl. 21.27 dansk tid som prerelease (`453140636`). Udgivelses- og Pages-workflowet bestod. Den efterfølgende historikoprydning ændrede commit-id’erne. De signerede pakker bevarer deres oprindelige kildebevis. Den offentlige downloadside viser de tre installationsfiler. Betafeeds til Apple Silicon, Intel-Mac og Windows x64 peger på 0.7.0-beta.4 med de forventede adresser, størrelser og SHA-512-kontrolsummer. [Udgivelse](https://github.com/ai-alliancen-org/ai-harness/releases/tag/v0.7.0-beta.4) · [Downloadside](https://ai-alliancen-org.github.io/ai-harness/desktop.html)
+
+Alle fem programfiler er hentet fra deres offentlige adresser uden GitHub-login. Filstørrelser, SHA-256 og SHA-512 stemmer med den lokale udgivelseskandidat. De to offentlige oversigter, `release.json` og `SHA256SUMS.txt`, matcher de kontrollerede originaler byte for byte.
 
 **Kildekode:** 1.608 af 1.608 desktoptests består. Prøverne omfatter Azure Container Apps, klargøringsforslaget ved manglende Dockerfile, tidligt forbindelsesbrud og modtagerens lukning af et færdigt AI-svar. Den rigtige OpenCode 1.19.5 genforsøger det tidlige brud gennem gatewayen og afslutter samme opgave. CLI-prøverne af den delte kode består med 120 tests og fire platformsbestemte overspringninger. En ældre CLI-prøve manglede svaret til den ekstra bekræftelse af lokal fjernelse ved fejlet tilbagekaldelse; prøven er opdateret uden ændring af CLI-adfærden.
 
