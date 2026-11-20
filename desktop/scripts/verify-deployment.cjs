@@ -9,6 +9,8 @@ const { run } = require('../core/git.cjs');
 const helpers = require('./ui-test-helpers.cjs');
 (async () => {
   const live = process.argv.includes('--live-vercel');
+  const bundle = process.env.HARNESS_TEST_PACKAGE && path.resolve(process.env.HARNESS_TEST_PACKAGE);
+  const executablePath = bundle ? (bundle.endsWith('.app') ? path.join(bundle, 'Contents/MacOS', path.basename(bundle, '.app')) : bundle) : require('electron');
   const repo = path.resolve(__dirname, '../..'), root = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), 'aura-del-cloud-'))), project = path.join(root, 'projekt'); let app;
   let head = (await run(repo, ['rev-parse', 'HEAD'])).toString().trim();
   let [name, at] = (await run(repo, ['log', '-1', '--format=%s%x00%cI'])).toString().trim().split('\0');
@@ -18,10 +20,11 @@ const helpers = require('./ui-test-helpers.cjs');
   // Den tidligere livegren bevares. Den opretter et isoleret testcommit og må kun køres med særskilt tilladelse.
   if (live) { await run(project, ['init']); await run(project, ['add', '.']); await run(project, ['-c', 'core.hooksPath=/dev/null', '-c', 'commit.gpgsign=false', '-c', 'user.name=Testbruger', '-c', 'user.email=test@example.invalid', 'commit', '-m', 'Gem isoleret udgivelsestest']); head = (await run(project, ['rev-parse', 'HEAD'])).toString().trim(); [name, at] = (await run(project, ['log', '-1', '--format=%s%x00%cI'])).toString().trim().split('\0'); }
   try {
-    app = await electron.launch({ executablePath: require('electron'), args: [path.join(__dirname, '..'), '--user-data-dir=' + path.join(root, 'appdata')], env: { ...process.env, ELECTRON_RUN_AS_NODE: undefined } });
+    app = await electron.launch({ executablePath, args: [...(bundle ? [] : [path.join(__dirname, '..')]), '--user-data-dir=' + path.join(root, 'appdata')], env: { ...process.env, ELECTRON_RUN_AS_NODE: undefined } });
     const page = await app.firstWindow(), errors = [], screens = [];
     await page.emulateMedia({ reducedMotion: 'reduce' }); page.on('pageerror', error => errors.push(error.message));
-    await app.evaluate(({ dialog, shell, session }, { project, modulePath, head, name, at, live }) => {
+    await app.evaluate(({ app: electronApp, dialog, shell, session }, { project, modulePath, head, name, at, live }) => {
+      if (electronApp.isPackaged) modulePath = process.getBuiltinModule('node:path').join(electronApp.getAppPath(), 'core/deployments.cjs');
       const require = process.getBuiltinModule('module').createRequire(modulePath), { Deployments } = require(modulePath), { VercelDeployment, AzureDeployment } = require('./deployment-providers.cjs');
       const fs = require('node:fs/promises'), path = require('node:path'), { createHash } = require('node:crypto'), hash = value => createHash('sha256').update(value).digest('hex');
       dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [project] }); if (live) return; globalThis.hostingLinks = []; shell.openExternal = async url => { globalThis.hostingLinks.push(url); };

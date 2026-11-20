@@ -62,7 +62,10 @@ async function pluginClosure(archive) {
       }
       if (!found && known.has('node_modules/' + name + '/package.json')) found = 'node_modules/' + name;
       assert.ok(found, 'Plugin-afhængighed mangler: ' + name);
-      assert.ok(semver.satisfies(manifest(found).version, range), 'Forkert version af plugin-afhængighed: ' + name);
+      // npm bruger rodpakkens eksplicitte overrides, bl.a. den sikkerhedsrettede Effect-version.
+      // Kontrollér den præcise override frem for at kræve den ældre version fra pluginets manifest.
+      const override = require('../package.json').overrides?.[name];
+      assert.ok(semver.satisfies(manifest(found).version, typeof override === 'string' ? override : range), 'Forkert version af plugin-afhængighed: ' + name);
       await visit(found);
     }
   }
