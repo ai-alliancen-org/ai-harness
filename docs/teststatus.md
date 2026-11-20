@@ -14,6 +14,10 @@ Senest kontrolleret 20. november 2026. Afsnittene er daterede, så tidligere beg
 
 **Pakker og offentliggørelse:** Version og opdateringsmeddelelse er hævet til 0.7.0-beta.4. Brugeren har godkendt Git- og udgivelsesforløbet. Den tilgængelige Developer ID-identitet er Komplai ApS med samme team-ID som tidligere pakker, 2UX98897JW. Den dokumenterede notariseringsprofil `ai-harness-notary` mangler aktuelt i denne Macs nøglering; ingen Apple-indsendelse er foretaget for kandidaten. Pakke- og installationsstatus opdateres efter de faktiske kontroller. Intel-hardware og Windows er endnu ikke installationsafprøvet for denne kandidat.
 
+De første pakker til Apple Silicon, Intel-Mac og Windows x64 er bygget lokalt efter `npm ci` (nul rapporterede sårbarheder) og forberedelse af de tre fastlåste runtimes. Kildebeviserne i de tre pakker dækker 212 produktfiler. Begge Mac-apps består den dybe, strenge kodesignaturkontrol og runtimekontrollen mod kvitteringen fra deres konkrete signering. Windows-installationsfilens faktiske NSIS-payload er pakket ud og kontrolleret mod samme kildekode, runtime, PE-arkitektur, versionsmetadata, ASAR-integritet og plugin-afhængigheder. Den er fortsat usigneret og ikke startet på Windows.
+
+Fire målrettede Windows-pakkeprøver består efter rettelsen af kontrollen af eksplicitte npm-overrides: den kræver nu den låste, sikkerhedsrettede Effect-version frem for pluginmanifestets ældre version. Både den gamle og en ukendt nyere version afvises. Ændringen vedrører verifikationsværktøjet og ændrer ingen af de 212 produktfiler i pakkerne.
+
 ## Offentlig desktopbeta 0.7.0-beta.1 · 31. oktober 2026
 
 **Udgivet og observeret.** [Aura 0.7.0-beta.1](https://github.com/ai-alliancen-org/ai-harness/releases/tag/v0.7.0-beta.1) og [downloadsiden](https://ai-alliancen-org.github.io/ai-harness/desktop.html) er offentligt tilgængelige uden GitHub-login. Letvægtstagget `v0.7.0-beta.1` peger på commit `fb6b0f0`, som kun ændrer udgivelsesnoter oven på `9091f2a`, pakkerne er bygget fra. Udgivelsen indeholder de fem programfiler, `release.json` og `SHA256SUMS.txt`.
