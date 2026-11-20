@@ -5,7 +5,7 @@ const { appRules } = require('../core/project-guidance.cjs');
 
 test('hostingvejledninger åbner kun kendte kilder og skelner fra upload', () => {
   const entries = catalog();
-  assert.deepEqual(entries.filter(item => item.integrated).map(item => item.id), ['azure', 'cloudflare', 'github-pages', 'komplai', 'promte', 'vercel']);
+  assert.deepEqual(entries.filter(item => item.integrated).map(item => item.id), ['azure-containers', 'azure', 'cloudflare', 'github-pages', 'komplai', 'promte', 'vercel']);
   assert.deepEqual(entries.filter(item => !item.integrated).map(item => item.id), ['netlify']);
   for (const entry of entries) {
     assert.ok(entry.summary && entry.scope && entry.data && entry.checkedAt);
@@ -19,7 +19,7 @@ test('hostingvejledninger åbner kun kendte kilder og skelner fra upload', () =>
 test('agentens faktiske appregler beskriver Udgiv og de tilgængelige udgivelsesveje', () => {
   const enabled = appRules({ deling: true });
   assert.match(enabled, /knap Udgiv står øverst/);
-  assert.match(enabled, /Azure Static Web Apps, Cloudflare Pages, GitHub Pages, komplai Run, Promte Apps og Vercel/);
+  assert.match(enabled, /Azure Container Apps, Azure Static Web Apps, Cloudflare Pages, GitHub Pages, komplai Run, Promte Apps og Vercel/);
   assert.match(enabled, /komplai Run kræver komplai-konto\. Promte Apps kræver konto og betalt aftale/);
   assert.match(enabled, /Netlify Drop har vejledning, men ingen uploadintegration/);
   assert.match(enabled, /Brugeren committer og pusher selv/);
@@ -29,6 +29,15 @@ test('agentens faktiske appregler beskriver Udgiv og de tilgængelige udgivelses
   const disabled = appRules({ deling: false });
   assert.match(disabled, /Indstillinger → Funktioner/);
   assert.doesNotMatch(disabled, /knap Udgiv står øverst/);
+  for (const rules of [enabled, appRules({ deling: false }, { containerPreparation: true })]) {
+    assert.match(rules, /KLARGØRING TIL AZURE CONTAINER APPS/);
+    assert.match(rules, /Undersøg den eksisterende app først/);
+    assert.match(rules, /Dockerfile.*COPY/s);
+    assert.match(rules, /0\.0\.0\.0.*PORT.*8080/s);
+    assert.match(rules, /\/healthz/);
+    assert.match(rules, /server\.cjs.*Node 24 Alpine.*uden ekstra npm-afhængigheder/s);
+    assert.match(rules, /filændringer kræver Byg/);
+  }
 });
 
 test('vejledninger beskriver de faktiske login- og udgivelseskrav uden at anbefale en udbyder', () => {

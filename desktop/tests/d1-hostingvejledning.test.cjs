@@ -19,9 +19,11 @@ test('de generelle værn sendes, også når Udgiv er slået fra', () => {
   for (const guard of guards) assert.match(appRules({ deling: false }), guard, `appreglerne uden Udgiv: ${guard}`);
 });
 
-test('udbyderdetaljerne sendes kun, når Udgiv er slået til', () => {
+test('udgivelsesdetaljerne kræver Udgiv, mens en konkret anmodning kan få lokal containervejledning', () => {
   assert.doesNotMatch(guidance(false), /Integrerede udgivelsesveje|Netlify Drop har vejledning|Cloudflare|Promte|Vercel|Azure|GitHub Pages/);
-  assert.match(guidance(true), /Integrerede udgivelsesveje, alfabetisk: Azure Static Web Apps, Cloudflare Pages, GitHub Pages, komplai Run, Promte Apps og Vercel/);
+  assert.match(guidance(false, { prepareContainers: true }), /KLARGØRING TIL AZURE CONTAINER APPS/);
+  assert.match(guidance(false, { prepareContainers: true }), /Opret ikke Azure-ressourcer/);
+  assert.match(guidance(true), /Integrerede udgivelsesveje, alfabetisk: Azure Container Apps, Azure Static Web Apps, Cloudflare Pages, GitHub Pages, komplai Run, Promte Apps og Vercel/);
 });
 
 test('Vercel-vejledningen nævner både Git-integrationen og én testversion fra Aura', () => {

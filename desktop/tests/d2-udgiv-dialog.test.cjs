@@ -40,6 +40,7 @@ class Element {
   prepend(...items) { for (const item of items.reverse()) { if (item.parent) item.parent.children = item.parent.children.filter(child => child !== item); item.parent = this; this.children.unshift(item); } }
   setAttribute(key, value) { this.attributes[key] = String(value); }
   getAttribute(key) { return this.attributes[key] ?? null; }
+  removeAttribute(key) { delete this.attributes[key]; }
   addEventListener(type, fn, options) { (this.listeners[type] ||= []).push({ fn, once: options?.once === true }); }
   dispatch(type) { for (const entry of [...(this.listeners[type] || [])]) { if (entry.once) this.listeners[type] = this.listeners[type].filter(other => other !== entry); entry.fn({ target: this }); } }
   focus() {} scrollIntoView() {} reportValidity() { return true; } setCustomValidity() {}
@@ -128,7 +129,7 @@ async function backend(t, { apps = [], connected = true } = {}) {
 function mount(harness) {
   const doc = new Document(); let setupArgs;
   const setup = { choose: async () => false, config: () => ({}), restore() {}, opened() {}, refresh: async () => {}, configurationStep() {}, pages: () => false, panel: step => step, render() {}, title: () => undefined, reset() {} };
-  const context = { document: doc, CustomEvent: class { constructor(type) { this.type = type; } }, setTimeout, clearTimeout, URL, console };
+  const context = { document: doc, CustomEvent: class { constructor(type) { this.type = type; } }, setTimeout, clearTimeout, setInterval: () => 0, clearInterval() {}, URL, console };
   context.Option = function Option(text, value) { return doc.option(text, value); };
   context.window = context; context.harness = harness; context.ShareView = view; context.sharingOn = () => true; context.dispatchEvent = () => {}; context.addEventListener = () => {};
   context.DeploymentSetupUI = { mount: args => { setupArgs = args; return setup; } };

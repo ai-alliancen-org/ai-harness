@@ -24,7 +24,8 @@ class UI {
 test('logout uden net: den udgåede forbindelse fjernes, og terminalen siger, at adgangen ikke er tilbagekaldt', async t => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'aura-cli-g2-'));
   const state = await privateDirectory(path.join(root, 'state'));
-  const ui = new UI(['gammel', 'ja']), app = new Application({ directory: state, vault: new Vault(state), ui });
+  // Først vælges forbindelsen, så bekræftes fjernelsen og til sidst kun den lokale fjernelse efter netfejlen.
+  const ui = new UI(['gammel', 'ja', 'ja']), app = new Application({ directory: state, vault: new Vault(state), ui });
   t.after(async () => { await app.close(); await fs.rm(root, { recursive: true, force: true }); });
   await app.vault.unlock(new UI(['adgangssætning-til-prøven', 'adgangssætning-til-prøven']));
   const secret = app.bench.store.encrypt('kp_live_' + 'a'.repeat(43));

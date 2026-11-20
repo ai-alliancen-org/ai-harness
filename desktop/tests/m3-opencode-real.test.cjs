@@ -24,7 +24,9 @@ async function falskModel(plan) {
     const trin = plan[Math.min(kald.filter(k => k.hoved).length, plan.length - 1)];
     kald.push({ hoved, status: trin.status });
     if (trin.status !== 200) { res.writeHead(trin.status, { 'content-type': 'application/json', ...(trin.retryAfter ? { 'retry-after': trin.retryAfter } : {}) }); return res.end(JSON.stringify({ error: { message: trin.tekst || `falsk ${trin.status}` } })); }
-    res.writeHead(200, { 'content-type': 'text/event-stream' }); res.end(svar('Færdig med prøven.'));
+    res.writeHead(200, { 'content-type': 'text/event-stream' });
+    if (trin.dropBeforeBody) { res.flushHeaders(); setTimeout(() => res.destroy(), 20); return; }
+    res.end(svar('Færdig med prøven.'));
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   return { server, kald, port: server.address().port, hovedkald: () => kald.filter(k => k.hoved).map(k => k.status) };
@@ -79,6 +81,15 @@ for (const [status, retryAfter] of [[429, '1'], [408, null], [500, null], [503, 
     assert.ok(!r.hændelser.some(e => e.type === 'engine.error' || e.type === 'session.error'));
   });
 }
+
+test('the real engine automatically retries a connection lost after headers and completes the same prompt', real, async t => {
+  const r = await kør(t, [{ status: 200, dropBeforeBody: true }, { status: 200 }]);
+  assert.equal(r.slutning, 'session.idle');
+  assert.deepEqual(r.model.hovedkald(), [200, 200]);
+  assert.equal(r.fejl.length, 0);
+  assert.ok(r.hændelser.some(e => e.type === 'session.status' && e.properties?.status?.type === 'retry'));
+  assert.ok(!r.hændelser.some(e => ['engine.error', 'session.error'].includes(e.type)));
+});
 
 test('5d: en vedvarende 503 ender med en klar fejl fra OpenCode inden for en afgrænset tid, og Aura låser ikke (ingen 409)', real, async t => {
   const r = await kør(t, [{ status: 503 }], { grænse: 100_000 });

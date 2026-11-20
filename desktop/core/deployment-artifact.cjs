@@ -30,7 +30,7 @@ async function deploymentArtifact(root, directory = '.') {
     if (files.length >= 2000 || size > 2 * 1024 * 1024 || bytes > 20 * 1024 * 1024) throw new Error('Udgivelsen overstiger 2.000 filer, 2 MB pr. fil eller 20 MB samlet.');
     const data = await run(root, ['cat-file', 'blob', sha]);
     if (secretContent(data.toString()) || /^version https:\/\/git-lfs.github.com\/spec\/v1\r?\n/.test(data.toString())) throw new Error(`Mulig hemmelighed eller Git LFS-pointer i ${source}. Gennemgå filen før udgivelse.`);
-    files.push({ file, source, data, sha256: createHash('sha256').update(data).digest('hex') });
+    files.push({ file, source, mode, data, sha256: createHash('sha256').update(data).digest('hex') });
   }
   if (!files.length) throw new Error('Mappen har ingen filer i den gemte Git-version. Ignorerede eller ugemte buildfiler udgives ikke.');
   files.sort((a, b) => a.file < b.file ? -1 : a.file > b.file ? 1 : 0);

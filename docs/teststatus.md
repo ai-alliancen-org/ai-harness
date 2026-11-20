@@ -1,8 +1,18 @@
 # Teststatus før invitation
 
-Senest kontrolleret 31. oktober 2026. Afsnittene er daterede, så tidligere begrænsninger kan læses i deres sammenhæng. Dette er status for den aktuelle arbejdsmappe, ikke en erklæring om, at alle installationsfiler eller modeller er klar. Særskilt godkendte Git-handlinger, udgivelser og GitHub-kørsler fremgår af de enkelte afsnit.
+Senest kontrolleret 20. november 2026. Afsnittene er daterede, så tidligere begrænsninger kan læses i deres sammenhæng. Dette er status for den aktuelle arbejdsmappe, ikke en erklæring om, at alle installationsfiler eller modeller er klar. Særskilt godkendte Git-handlinger, udgivelser og GitHub-kørsler fremgår af de enkelte afsnit.
 
 [Gennemgangen før offentlig beta](offentliggoerelse.md) samler historik- og logkontrol samt de lokale prøver af README, hjemmeside og udgivelseskontrol. Den offentliggør ikke appen og ændrer ikke installationsstatus nedenfor.
+
+## Kandidat 0.7.0-beta.4 · 20. november 2026
+
+**Kildekode:** 1.608 af 1.608 desktoptests består. Prøverne omfatter Azure Container Apps, klargøringsforslaget ved manglende Dockerfile, tidligt forbindelsesbrud og modtagerens lukning af et færdigt AI-svar. Den rigtige OpenCode 1.19.5 genforsøger det tidlige brud gennem gatewayen og afslutter samme opgave. CLI-prøverne af den delte kode består med 120 tests og fire platformsbestemte overspringninger. En ældre CLI-prøve manglede svaret til den ekstra bekræftelse af lokal fjernelse ved fejlet tilbagekaldelse; prøven er opdateret uden ændring af CLI-adfærden.
+
+**Udgivelsesflow i Electron:** Den rigtige dialog og IPC-forbindelse er prøvet mod kontrollerede lokale udbydersvar. Spinner, forløbne sekunder og trin følger upload og kontrol af udbyder/startside. Mens en kontrol venter, står den tidligere succes ikke som dens nye resultat. HTTP 200, 503, manglende svar, ventende revision, viderestilling og adgangskrav har særskilte resultater. Gamle hændelser fra en lukket dialog eller et andet projekt ignoreres, og et dobbeltklik starter ikke endnu en upload. 21 skærmtilstande består uden layoutoverløb, også ved 980 × 720 og 150 % tekststørrelse. Reduceret bevægelse er slået til i Electron-prøven.
+
+**Rigtig Azure-prøve.** [Container Apps-gennemgangen](azure-container-apps.md#gennemført-liveprøve-19-november-2026) beskriver udgivelsen fra Aura til et særskilt testmiljø med managed identity. Revision, image-digest, startside, statiske filer og sundhedstjek er bekræftet. Den efterfølgende ændring af fremdriftsvisningen er prøvet mod kontrollerede svar.
+
+**Pakker og offentliggørelse:** Version og opdateringsmeddelelse er hævet til 0.7.0-beta.4. Brugeren har godkendt Git- og udgivelsesforløbet. Den tilgængelige Developer ID-identitet er Komplai ApS med samme team-ID som tidligere pakker, 2UX98897JW. Den dokumenterede notariseringsprofil `ai-harness-notary` mangler aktuelt i denne Macs nøglering; ingen Apple-indsendelse er foretaget for kandidaten. Pakke- og installationsstatus opdateres efter de faktiske kontroller. Intel-hardware og Windows er endnu ikke installationsafprøvet for denne kandidat.
 
 ## Offentlig desktopbeta 0.7.0-beta.1 · 31. oktober 2026
 

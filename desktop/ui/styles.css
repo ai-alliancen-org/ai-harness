@@ -1119,6 +1119,19 @@ body.key-window { padding: 20px 22px; background: var(--surface); }
 #deployment-dialog .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 #deployment-dialog .publish-address { flex-wrap: wrap; }
 #deployment-form select, #deployment-form input { max-width: 100%; }
+.operation-progress.deployment-progress { display: block; padding: 16px; margin: 0 0 20px; border: 1px solid var(--accent-line); border-radius: 12px; background: var(--raised); }
+.deployment-progress-heading { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+.deployment-progress-heading strong { font-weight: 600; }
+#deployment-progress-time { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+#deployment-progress-step { margin: 12px 0 6px; }
+#deployment-progress-stages { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 16px; margin: 0; padding: 0; list-style: none; font-size: 12px; color: var(--muted); }
+#deployment-progress-stages li { display: flex; align-items: center; gap: 7px; }
+#deployment-progress-stages li::before { content: '○'; width: 12px; flex-shrink: 0; }
+#deployment-progress-stages li[data-state="done"]::before { content: '✓'; color: var(--success-ink); }
+#deployment-progress-stages li[data-state="current"] { color: var(--accent-text); font-weight: 600; }
+#deployment-progress-stages li[data-state="current"]::before { content: '●'; }
+#deployment-progress-note { margin: 12px 0 0; }
+#deployment-progress-note:empty { display: none; }
 
 #deployment-review-footer { position: sticky; bottom: -28px; padding: 14px 0 20px; margin-top: 18px; background: var(--raised); box-shadow: 0 -8px 12px var(--raised); z-index: 1; }
 #deployment-review-footer .dialog-actions { margin-top: 10px; }
@@ -1146,6 +1159,7 @@ body.key-window { padding: 20px 22px; background: var(--surface); }
 .deployment-status-symbol { display: grid; place-items: center; height: 20px; width: 20px; border-radius: 50%; background: var(--fill); color: var(--muted); font-size: 12px; font-weight: 600; }
 .deployment-verification[data-tone="positive"] .deployment-status-symbol { background: var(--success-bg); color: var(--success-ink); }
 .deployment-verification[data-tone="warning"] .deployment-status-symbol { background: var(--warning-bg); color: var(--warning-ink); }
+.deployment-verification[data-tone="pending"] .deployment-status-symbol::after { content: ''; width: 12px; height: 12px; border: 2px solid var(--accent-line); border-top-color: var(--accent); border-radius: 50%; animation: operation-spin 1s linear infinite; }
 #deployment-result .dialog-actions { gap: 10px; margin: 3px 0 22px; }
 #deployment-main-actions button { min-height: 40px; padding: 10px 16px; border-radius: 10px; }
 #deployment-result #deployment-main-actions { position: sticky; bottom: -28px; padding: 12px 0; background: var(--raised); box-shadow: 0 -8px 12px var(--raised); z-index: 1; }

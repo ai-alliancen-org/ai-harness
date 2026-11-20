@@ -8,9 +8,52 @@
     try { r = await window.harness[method](input, owner === undefined ? dialogOwner : owner); }
     catch (error) { if (owner === undefined) assertCurrent(token); throw error; }
     if (owner === undefined) assertCurrent(token);
-    if (!r.ok) throw Error(r.error); return r.value;
+    if (!r.ok) throw Object.assign(Error(r.error), r.recovery?.kind === 'azure-container-prepare' ? { recovery: r.recovery } : {}); return r.value;
   };
   let guides = [], review = null, last = null, context = null, step = 'destination', trail = [], busyNow = false;
+  let containerDraft = null;
+  let progressTimer = null, progressRun = null, checkSequence = 0;
+  const sendStages = () => containers()
+    ? [['verify', 'Kontrollér version'], ['build', 'Byg container'], ['activate', 'Aktivér version'], ['record', 'Gem kvittering']]
+    : [['verify', 'Kontrollér version'], ['upload', 'Send filer'], ['record', 'Gem kvittering']];
+  const checkStages = [['status', 'Hent udbyderstatus'], ['site', 'Kontrollér startside']];
+  function progressStage(stage) {
+    if (!progressRun) return;
+    const index = progressRun.stages.findIndex(([id]) => id === stage);
+    if (index < progressRun.index || index < 0) return;
+    progressRun.index = index;
+    $('#deployment-progress-label').textContent = `${progressRun.stages[index][1]} …`;
+    $('#deployment-progress-step').textContent = `Trin ${index + 1} af ${progressRun.stages.length}`;
+    for (const [i, item] of [...$('#deployment-progress-stages').children].entries()) {
+      item.dataset.state = i < index ? 'done' : i === index ? 'current' : 'waiting';
+      if (i === index) item.setAttribute('aria-current', 'step'); else item.removeAttribute('aria-current');
+    }
+  }
+  function trackProgress(operation, key, stages) {
+    progressRun = { operation, key, stages, index: -1 };
+    $('#deployment-progress-stages').replaceChildren(...stages.map(([, title]) => {
+      const li = document.createElement('li'); li.textContent = title; return li;
+    }));
+    $('#deployment-progress-stages').hidden = false; $('#deployment-progress-step').hidden = false;
+    $('#deployment-progress-note').textContent = operation === 'check'
+      ? 'Aura henter en ny status. Din app ændres ikke.'
+      : containers() ? 'Azure bygger og starter containeren. Det kan tage flere minutter. Du kan lukke vinduet og kontrollere status senere.'
+        : 'Vent, mens den gemte version sendes. Lukning af vinduet annullerer ikke udgivelsen.';
+    dialog.scrollTop = 0; progressStage(stages[0][0]);
+  }
+  window.harness.onEvent?.(event => {
+    if (event.type !== 'deployment-progress' || !busyNow || !dialog.open || !progressRun) return;
+    if (event.operation !== progressRun.operation || event.key !== progressRun.key || event.root !== dialogOwner?.root || event.chat !== dialogOwner?.chat) return;
+    progressStage(event.stage);
+  });
+  function clearContainerRepair() { containerDraft = null; $('#deployment-prepare-container').hidden = true; }
+  $('#deployment-prepare-container').onclick = () => {
+    if (busyNow || !containerDraft || !containers()) return;
+    const owner = dialogOwner, draft = containerDraft;
+    // Luk først, så skrivefelt og besked om en eksisterende kladde er synlige. Intet sendes automatisk.
+    dialog.addEventListener('close', () => window.draftMessage?.(draft, 'Forslaget står i skrivefeltet. Gennemgå det, og tryk Send, når du er klar.', { mode: 'free', owner }), { once: true });
+    dialog.close();
+  };
   // komplai: færdige filer fra en mappe som hidtil, eller en lokal bygning, når projektet har et byggescript og ingen færdig mappe.
   let komplaiSource = null, folderChosen = false, sourceToken = 0;
   // En app, komplai oprettede ved et forsøg, hvor uploaden blev afvist. Næste gennemgang bruger den i stedet for at oprette en ny.
@@ -24,6 +67,7 @@
   const onward = { name: 'access', confirmPublic: 'files', team: 'project', subscription: 'group', group: 'project', project: 'files', kind: 'directory', functions: 'files' };
   const fields = { name: ['deploy-komplai-name'], confirmPublic: ['deploy-komplai-confirm'], team: ['deploy-scope'], subscription: ['deploy-subscription'], group: ['deploy-group'], project: ['deploy-project'], directory: ['deploy-directory'], functions: ['deploy-frontend', 'deploy-api'] };
   const komplai = () => $('#deploy-provider').value === 'komplai';
+  const containers = () => $('#deploy-provider').value === 'azure-containers';
   const komplaiBuild = () => komplai() && komplaiSource?.build === true && !folderChosen;
   const chosenApp = () => publish.overview?.apps.find(app => app.id === $('#deploy-komplai-app').value);
   // Knapper, der ikke står i index.html: «Log ind og kontrollér» på kortet, når komplai-adgangen er udløbet, tilbagekaldt eller
@@ -60,7 +104,9 @@
     for (const panel of form.querySelectorAll('[data-deploy-step]')) panel.hidden = panel.dataset.deployStep !== setup.panel(step);
     form.hidden = ['review', 'result'].includes(step); $('#deployment-review').hidden = step !== 'review'; $('#deployment-result').hidden = step !== 'result';
     navigation();
-    $('#deployment-intro').textContent = step === 'destination' ? 'Giv andre et link til dit projekt.' : step === 'files' ? (komplai() ? 'Filerne sendes til organisationens app hos komplai.' : setup.pages() ? 'Den offentlige hjemmeside opdateres gennem GitHub Actions.' : $('#deploy-provider').value === 'promte' ? 'Kildekoden sendes til dit arbejdsområde hos Promte.' : 'Filerne sendes til et testmiljø hos den valgte udbyder.') : '';
+    $('#deployment-intro').textContent = step === 'destination' ? 'Giv andre et link til dit projekt.' : step === 'files' ? (containers() ? 'De gemte filer bygges i Azure Container Registry. Den nye container erstatter appens aktive version på dens eksisterende adresse.' : komplai() ? 'Filerne sendes til organisationens app hos komplai.' : setup.pages() ? 'Den offentlige hjemmeside opdateres gennem GitHub Actions.' : $('#deploy-provider').value === 'promte' ? 'Kildekoden sendes til dit arbejdsområde hos Promte.' : 'Filerne sendes til et testmiljø hos den valgte udbyder.') : '';
+    $('#deployment-container-files').hidden = !containers();
+    $('#deployment-directory-note').textContent = containers() ? 'Byggemappen og Dockerfile skal være gemt som en version. Azure bygger kun de gennemgåede filer. Brug COPY med stier inde i denne mappe.' : 'Filerne skal være gemt som en version. Aura bygger ikke projektet ved upload.';
     $('#deployment-intro').hidden = !$('#deployment-intro').textContent;
     $('#deployment-copy').hidden = !context?.viewingCopy || step === 'result' || step === 'sharingOff';
     // Konto og adgang står under Se detaljer på kvitteringen og som link ved appvalget. I resten af forløbet ligger kontoen under
@@ -92,18 +138,28 @@
     heading(titles[step] || setup.title(step) || titles.destination); setup.render(step);
   }
   function go(next, { remember = true, clear = true } = {}) {
+    clearContainerRepair();
     if (remember && step !== next) trail.push(step);
     step = next; if (clear) $('#deployment-feedback').textContent = ''; renderStep();
   }
   function progress(active, label = 'Arbejder …') {
+    if (progressTimer !== null) { clearInterval(progressTimer); progressTimer = null; }
+    progressRun = null;
     dialog.setAttribute('aria-busy', String(active)); $('#deployment-progress').hidden = !active;
     $('#deployment-progress-label').textContent = label; $('#deployment-fields').disabled = active;
+    $('#deployment-progress-stages').hidden = true; $('#deployment-progress-step').hidden = true;
+    $('#deployment-progress-note').textContent = '';
+    if (active) {
+      const started = Date.now();
+      const tick = () => { const seconds = Math.max(0, Math.floor((Date.now() - started) / 1000)); $('#deployment-progress-time').textContent = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`; };
+      tick(); progressTimer = setInterval(tick, 1000);
+    }
     for (const id of ['edit', 'another', 'copy-review', 'komplai-account']) $('#deployment-' + id).disabled = active;
   }
   async function busy(fn, label = 'Arbejder …') {
     if (busyNow) return; busyNow = true; const token = session; progress(true, label);
     for (const id of ['check', 'open', 'portal', 'new', 'login', 'workflow']) actionButton(id).disabled = true;
-    $('#deployment-feedback').textContent = '';
+    $('#deployment-feedback').textContent = ''; clearContainerRepair();
     try { await fn(); }
     catch (error) {
       if (error.stale || token !== session) return;
@@ -111,6 +167,7 @@
       // Tilbage fra filtrinnet skal føre til trinnet før det, ikke til filtrinnet selv.
       if (step === 'review') { if (trail.at(-1) === 'files') trail.pop(); go('files', { remember: false }); }
       $('#deployment-feedback').textContent = error.message;
+      if (containers() && error.recovery?.kind === 'azure-container-prepare' && typeof error.recovery.draft === 'string') { containerDraft = error.recovery.draft; $('#deployment-prepare-container').hidden = false; }
     } finally {
       if (token === session) {
         busyNow = false; progress(false);
@@ -133,8 +190,8 @@
   $('#hosting-guide-choice').onchange = () => showGuide('#hosting-guide-other', $('#hosting-guide-choice').value);
   function modes() {
     const id = $('#deploy-provider').value, azure = id === 'azure';
-    for (const option of $('#deploy-mode').options) option.disabled = id === 'promte' ? option.value !== 'source' : komplai() || ['github-pages', 'cloudflare'].includes(id) ? option.value !== 'static' : azure ? option.value === 'source' : option.value === 'functions';
-    if ($('#deploy-mode').selectedOptions[0]?.disabled) $('#deploy-mode').value = id === 'promte' ? 'source' : 'static';
+    for (const option of $('#deploy-mode').options) option.disabled = containers() ? option.value !== 'container' : option.value === 'container' || (id === 'promte' ? option.value !== 'source' : komplai() || ['github-pages', 'cloudflare'].includes(id) ? option.value !== 'static' : azure ? option.value === 'source' : option.value === 'functions');
+    if ($('#deploy-mode').selectedOptions[0]?.disabled) $('#deploy-mode').value = containers() ? 'container' : id === 'promte' ? 'source' : 'static';
     $('#deployment-account').hidden = !komplai(); $('#deployment-provider-settings').hidden = komplai();
     $('#deployment-change-app').hidden = !komplai(); $('#deployment-account-options > summary').hidden = !komplai();
     $('#deployment-change-destination').textContent = komplai() ? 'Destination og app' : 'Destination og opsætning';
@@ -178,7 +235,7 @@
     try { publish.overview = await api('komplaiPublishOverview'); fillApps(); $('#deploy-komplai-suffix').textContent = '.' + publish.overview.address; addressPreview(); return true; }
     catch (error) { if (error.stale) throw error; resetSignin(); publishNotice(error.message, 'error'); return false; }
   }
-  async function chooseProvider(provider) { invalidate(); pendingApp = null; $('#deploy-provider').value = provider; modes(); if (provider === 'komplai') { const ready = await loadPublish(); if (!ready) go('login'); else if (!showCreatedApp()) go('app'); } else await setup.choose(provider); }
+  async function chooseProvider(provider) { invalidate(); pendingApp = null; const previous = $('#deploy-provider').value; $('#deploy-provider').value = provider; if (provider === 'azure-containers' && previous !== provider) $('#deploy-directory').value = '.'; else if (previous === 'azure-containers' && provider !== previous) $('#deploy-directory').value = 'public'; modes(); if (provider === 'komplai') { const ready = await loadPublish(); if (!ready) go('login'); else if (!showCreatedApp()) go('app'); } else await setup.choose(provider); }
   for (const button of form.querySelectorAll('[data-provider]')) button.onclick = () => busy(() => chooseProvider(button.dataset.provider));
   $('#deployment-other').onclick = () => go('providers'); $('#deployment-guides').onclick = () => go('guides');
   function showOrganisation() {
@@ -289,7 +346,7 @@
   // Tilbage fra organisation eller forbindelse til login afbryder det ventende login, så «Log ind med komplai» står igen.
   function back() { invalidate(); const previous = trail.pop(); if (previous === 'login' && ['organisation', 'connect'].includes(step)) cancelLogin(); if (previous) go(previous, { remember: false }); }
   $('#deployment-back').onclick = back;
-  form.addEventListener('input', event => { if (['hosting-guide-choice', 'komplai-publish-org', 'deploy-komplai-search'].includes(event.target.id)) return; invalidate(); modes(); });
+  form.addEventListener('input', event => { if (['hosting-guide-choice', 'komplai-publish-org', 'deploy-komplai-search'].includes(event.target.id)) return; clearContainerRepair(); invalidate(); modes(); });
   async function prepareReview() {
     invalidate();
     $('#deployment-progress-label').textContent = komplaiBuild() ? 'Bygger den gemte version …' : 'Forbereder udgivelsen …';
@@ -302,10 +359,10 @@
     if (r.config.provider !== 'komplai' || r.config.appId !== createdApp) createdApp = null;
     appCard('deployment-review-app', r);
     if (r.config.provider === 'komplai') rows('#deployment-summary', [['Gemt version', view.version(r)], ...(r.built ? [['Bygget', `På din computer fra den gemte version med ${r.built.script}. Filerne kommer fra mappen ${r.built.output}.`]] : []), ['Udgivelse', r.target.created ? 'Opretter en ny app' : chosenApp()?.activeRelease === null ? 'Første version af appen' : 'Erstatter den udgivne version'], ['Hvem kan åbne den', r.config.visibility === 'private' ? 'Kun organisationen. Medlemmer logger ind med komplai.' : 'Alle med linket. Appen bliver offentlig. Undlad fortrolige oplysninger.'], ['Placering', r.target.region], ['Omkostninger', r.cost]]);
-    else rows('#deployment-summary', [['Gemt version', view.version(r)], ['Destination', view.destination(r) + (r.config.provider === 'azure' ? ' · erstatter indholdet i testmiljøet' : '')], ...(r.config.mode === 'source' ? [['Build', 'Udbyderen bygger kildekoden og kan køre dens installations- og buildscripts med testmiljøets værdier.']] : []), ['Adgang', `${r.target.access || 'Udbyderen oplyser ikke adgangsreglerne.'} Testpersonens adgang er ikke afprøvet.`], ...(setup.pages() ? [['Udgivelse', 'Starter én GitHub Actions-kørsel og erstatter den offentlige hjemmeside.']] : []), ['Omkostninger', r.cost]]);
+    else rows('#deployment-summary', [['Gemt version', view.version(r)], ['Destination', view.destination(r) + (r.config.provider === 'azure' ? ' · erstatter indholdet i testmiljøet' : '')], ...(r.config.mode === 'container' ? [['Build', r.build]] : []), ...(r.config.mode === 'source' ? [['Build', 'Udbyderen bygger kildekoden og kan køre dens installations- og buildscripts med testmiljøets værdier.']] : []), ['Adgang', `${r.target.access || 'Udbyderen oplyser ikke adgangsreglerne.'} Testpersonens adgang er ikke afprøvet.`], ...(setup.pages() ? [['Udgivelse', 'Starter én GitHub Actions-kørsel og erstatter den offentlige hjemmeside.']] : []), ['Omkostninger', r.cost]]);
     rows('#deployment-details', [['Versionens ID', r.head], ['Destinationens ID', r.target.id || 'Oprettes ved udgivelse'], ['Konto / abonnement', r.config.provider === 'komplai' ? r.target.owner : r.config.scope || r.config.subscription || 'Fra dit eksisterende login'], ['Indhold', `${r.files.length} filer · ${r.bytes} bytes · ${r.hash}`], ['Placering', r.target.region], ['Miljøvariabler', r.target.environmentNote || r.target.environmentKeys?.join(', ') || 'Ingen navne rapporteret. Kontrollér opsætningen hos udbyderen.'], ['Build', r.build], ['Materiale', r.material], ['Udeladte filer', r.excludedFiles?.join(', ') || 'Ingen'], ['Projekt', view.scope(context)]]);
     $('#deployment-files').replaceChildren(...r.files.map(file => { const li = document.createElement('li'); li.textContent = file; return li; }));
-    showGuide('#hosting-guide-current', r.config.provider); $('#deployment-technical').open = false; $('#deployment-send').disabled = false; $('#deployment-send').textContent = setup.pages() ? 'Udgiv med GitHub Actions' : ['komplai', 'promte'].includes(r.config.provider) ? 'Udgiv' : 'Udgiv til test'; go('review');
+    showGuide('#hosting-guide-current', r.config.provider); $('#deployment-technical').open = false; $('#deployment-send').disabled = false; $('#deployment-send').textContent = containers() ? 'Byg og udgiv container' : setup.pages() ? 'Udgiv med GitHub Actions' : ['komplai', 'promte'].includes(r.config.provider) ? 'Udgiv' : 'Udgiv til test'; go('review');
     $('#deployment-feedback').textContent = 'Ingen filer er uploadet endnu.';
   }
   form.onsubmit = event => {
@@ -383,6 +440,7 @@
   async function followCreatedApp() { if (await loadPublish()) showCreatedApp(); }
   $('#deployment-send').onclick = () => busy(async () => {
     const token = review, generation = session; invalidate(); if (!token) return;
+    trackProgress('send', token, sendStages());
     // Ved en ny komplai-app kan appen være oprettet, selv om komplai bagefter afviste uploaden.
     const creating = komplai() && !chosenApp(), before = last;
     $('#deployment-feedback').textContent = 'Lukning af vinduet annullerer ikke udgivelsen.';
@@ -398,7 +456,30 @@
       }
     }
   }, 'Udgiver …');
-  $('#deployment-check').onclick = () => busy(async () => { receipt(await api('deploymentCheck')); await setup.refresh(); });
+  $('#deployment-check').onclick = () => busy(async () => {
+    const requestId = `${Date.now()}-${session}-${++checkSequence}`;
+    trackProgress('check', requestId, checkStages);
+    $('#deployment-check').textContent = 'Kontrollerer …';
+    $('#deployment-publication').dataset.tone = 'neutral'; $('#deployment-state').textContent = 'Kontrollerer udgivelsen …';
+    $('#deployment-state-note').textContent = 'Henter en ny status hos udbyderen.';
+    const box = $('#deployment-verification'); box.hidden = false; box.dataset.tone = 'pending';
+    $('#deployment-verification h4').textContent = 'Kontrollerer, om siden svarer …';
+    $('#deployment-verification p').textContent = 'Resultatet vises her, når kontrollen er færdig.';
+    $('#deployment-verification .deployment-status-symbol').textContent = '';
+    try { receipt(await api('deploymentCheck', { requestId })); await setup.refresh(); }
+    catch (error) {
+      if (!error.stale) {
+        $('#deployment-state').textContent = 'Kontrollen kunne ikke gennemføres';
+        $('#deployment-state-note').textContent = 'Prøv kontrollen igen.';
+        box.dataset.tone = 'warning';
+        $('#deployment-verification h4').textContent = 'Siden er ikke bekræftet';
+        $('#deployment-verification p').textContent = 'Det seneste forsøg gav ikke et nyt resultat.';
+        $('#deployment-verification .deployment-status-symbol').textContent = '!';
+        $('#deployment-check').textContent = 'Prøv kontrollen igen';
+      }
+      throw error;
+    }
+  }, 'Kontrollerer status og startside …');
   $('#deployment-open').onclick = () => busy(async () => { await api('deploymentOpen', 'site'); $('#deployment-feedback').textContent = 'Appen er åbnet i din browser.'; });
   $('#deployment-portal').onclick = () => busy(async () => { await api('deploymentOpen', 'portal'); $('#deployment-feedback').textContent = 'Oversigten er åbnet. Kontrollér udgivelsen dér, før du uploader igen.'; });
   workflow.onclick = () => busy(async () => { await api('deploymentOpen', 'workflow'); $('#deployment-feedback').textContent = 'Kørslen er åbnet på GitHub i din browser.'; });

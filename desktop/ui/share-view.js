@@ -5,11 +5,12 @@
 })(typeof globalThis === 'object' ? globalThis : this, () => {
   const time = at => at && Number.isFinite(Date.parse(at)) ? new Date(at).toLocaleString('da-DK', { dateStyle: 'short', timeStyle: 'short' }) : 'tidspunkt ikke registreret';
   const version = r => `${r.version?.name || 'Gemt version'} · ${time(r.version?.at)}`;
-  const provider = name => ({ komplai: 'komplai Run', azure: 'Azure Static Web Apps', vercel: 'Vercel', promte: 'Promte Apps', 'github-pages': 'GitHub Pages', cloudflare: 'Cloudflare Pages' })[name] || 'Udbyder';
+  const provider = name => ({ komplai: 'komplai Run', azure: 'Azure Static Web Apps', 'azure-containers': 'Azure Container Apps', vercel: 'Vercel', promte: 'Promte Apps', 'github-pages': 'GitHub Pages', cloudflare: 'Cloudflare Pages' })[name] || 'Udbyder';
   const states = { PREPARED: 'Version oprettet; upload ikke bekræftet', REVIEWING: 'Gennemgås hos udbyderen', BLOCKED: 'Kræver handling hos udbyderen', REJECTED: 'Afvist hos udbyderen', SUBMITTING: 'Upload påbegyndt; udfald endnu ikke bekræftet', UNKNOWN: 'Upload ikke bekræftet', QUEUED: 'I kø', BUILDING: 'Bygger', INITIALIZING: 'Forbereder', UPLOADED: 'Uploadsvaret er modtaget', READY: 'Udgivet ifølge udbyderen', ERROR: 'Fejl hos udbyderen', CANCELED: 'Annulleret hos udbyderen', AWAITING_UPDATE: 'Den nye version er endnu ikke bekræftet', REPLACED: 'En nyere version er udgivet siden', UNPUBLISHED: 'Appen er ikke udgivet lige nu', REMOVED: 'Appen er slettet hos komplai' };
   const address = value => { try { const u = new URL(value); return u.hostname + (u.pathname === '/' ? '' : u.pathname); } catch { return ''; } };
   const host = value => { try { return new URL(value).hostname; } catch { return ''; } };
   function destination(r) {
+    if (r.config.provider === 'azure-containers') return `Azure Container Apps · ${r.config.subscription} / ${r.config.group} · ${r.target.name} · erstatter den aktive version`;
     if (r.config.provider === 'promte') return `Promte Apps · ${r.target.owner || r.config.workspaceId} · ${r.target.name || 'App-arbejdsområde'}`;
     if (['github-pages', 'cloudflare'].includes(r.config.provider)) return `${provider(r.config.provider)} · ${r.config.repository} · ${r.config.branch} · offentlig hjemmeside`;
     if (r.config.provider === 'komplai') return `komplai Run · ${r.target.owner || 'organisation'} · ${host(r.url) || host(r.target.url) || r.target.host}`;
@@ -105,16 +106,19 @@
       : visibility === 'public' ? { title: 'Alle med linket', detail: 'Appen er offentlig.', tone: changed ? 'warning' : 'neutral' }
       : { title: 'Adgang ikke kontrolleret', detail: r.config.visibility === 'private' ? 'Valgt ved upload: kun organisationen.' : r.config.visibility === 'public' ? 'Valgt ved upload: alle med linket.' : 'Se adgangsindstillingerne hos udbyderen.', tone: 'neutral' };
     if (changed) access.detail += ' Adgangen er ændret siden uploaden.';
-    let verification = { title: 'Startside ikke kontrolleret', detail: 'Kontrollér status og startside, eller prøv appen.', tone: 'neutral', hidden: true };
+    let verification = { title: 'Startside ikke kontrolleret', detail: 'Kontrollér status og startside for at se, om appen er klar.', tone: 'neutral', hidden: r.config.provider === 'promte' };
     if (pending) verification = { title: 'Indhold ikke kontrolleret', detail: '', tone: 'neutral', hidden: true };
     else if (failed) verification = { title: 'Kontrollen kunne ikke gennemføres', detail: 'Indhold og adgang skal kontrolleres igen.', tone: 'neutral' };
     else if (exposed) verification = { title: 'Kontrollér adgangsindstillingerne', detail: 'Den godkendte startside blev vist uden login, selv om appen er markeret privat.', tone: 'warning' };
     else if (c?.content?.status === 'matched') verification = { title: 'Startsiden matcher den gemte fil', detail: '', tone: 'positive' };
     else if (c?.content?.status === 'different') verification = { title: 'Startsiden er anderledes', detail: 'Indholdet matcher ikke den godkendte fil.', tone: 'warning' };
-    else if (c?.site?.status === 'unreachable') verification = { title: 'Startsiden kunne ikke nås', detail: 'Prøv kontrollen igen, eller åbn appen.', tone: 'warning' };
+    else if (c?.site?.status === 'unreachable') verification = { title: 'Nej, startsiden kunne ikke nås', detail: 'Appen kan stadig være ved at starte. Prøv kontrollen igen om lidt.', tone: 'warning' };
     else if (c?.site?.status === 'answered' && [401, 403].includes(c.site.http)) verification = { title: visibility === 'private' ? 'Medlemsadgang er ikke afprøvet' : 'Startsiden kræver adgang', detail: visibility === 'private' ? 'Besøg uden login blev afvist. Åbn appen for at afprøve din adgang.' : 'Åbn linket med testpersonens adgang.', tone: 'neutral', hidden: visibility === 'private' };
-    else if (c?.content?.status === 'built') verification = { title: 'Filernes indhold er ikke sammenlignet', detail: 'Udbyderen bygger appen fra kildekoden. Prøv resultatet i browseren.', tone: 'neutral', hidden: true };
-    else if (c?.site?.status === 'answered') verification = { title: c.site.http >= 200 && c.site.http < 300 ? 'Startsiden svarer' : 'Kontrollér startsiden', detail: 'Indholdet er ikke bekræftet. Se kontrollens detaljer.', tone: c.site.http >= 400 ? 'warning' : 'neutral' };
+    else if (c?.site?.status === 'answered') verification = c.site.http >= 200 && c.site.http < 300
+      ? { title: 'Ja, startsiden svarer', detail: 'Siden kunne åbnes uden login. Åbn appen og afprøv dens funktioner.', tone: 'positive' }
+      : c.site.http >= 300 && c.site.http < 400 ? { title: 'Siden viderestiller', detail: 'Åbn linket for at kontrollere, hvor det fører hen.', tone: 'neutral' }
+      : { title: 'Nej, startsiden svarer med en fejl', detail: 'Appen kan stadig være ved at starte. Prøv kontrollen igen om lidt. Se detaljer for fejlsvaret.', tone: 'warning' };
+    else if (known && !['READY', 'PREPARED'].includes(r.state) && r.config.provider !== 'promte') verification = { title: 'Appen er ikke klar endnu', detail: ['ERROR', 'CANCELED', 'REJECTED', 'REMOVED', 'UNPUBLISHED'].includes(r.state) ? 'Se udgivelsens status og oversigten hos udbyderen.' : 'Startsiden kan først kontrolleres, når udbyderen har gjort versionen klar. Prøv kontrollen igen om lidt.', tone: 'neutral' };
     return { publication, access, verification };
   }
   const scope = c => c?.copyCount ? `Udgivelsen bruger projektets gemte version. ${c.copyCount === 1 ? 'En samtalekopi er' : `${c.copyCount} samtalekopier er`} endnu ikke flettet ind og kommer ikke med. Gennemgå ændringerne og flet dem ind, hvis de skal med.` : 'Udgivelsen bruger projektets gemte version. Ugemte rettelser kommer ikke med.';

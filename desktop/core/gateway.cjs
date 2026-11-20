@@ -135,11 +135,14 @@ async function startGateway(connection, model, key, route, onFailure = () => {},
         fail(message, kind, response.status, detail);
         res.writeHead(response.status, { 'content-type': 'application/json' }); return res.end(JSON.stringify({ error: { message, type: 'api_error' } }));
       }
-      res.writeHead(200, { 'content-type': response.headers.get('content-type') || 'application/json', 'cache-control': 'no-store' });
+      const responseHeaders = { 'content-type': response.headers.get('content-type') || 'application/json', 'cache-control': 'no-store' };
       const sse = (response.headers.get('content-type') || '').includes('text/event-stream');
-      for await (const chunk of response.body) { network.observeResponseChunk(response, chunk); touch(); if (res.destroyed) break; res.write(chunk); sentBody = true; try { progress.write(chunk, sse); } catch { /* Fremdrift må ikke afbryde svaret. */ } }
+      // Vent med svarets headers til første bid. Falder forbindelsen efter HTTP 200, men før indholdet,
+      // kan fejlen stadig gives til motorens afgrænsede genforsøg som 502. Intet delvist svar gentages.
+      for await (const chunk of response.body) { network.observeResponseChunk(response, chunk); touch(); if (res.destroyed) break; if (!res.headersSent) res.writeHead(200, responseHeaders); res.write(chunk); sentBody = true; try { progress.write(chunk, sse); } catch { /* Fremdrift må ikke afbryde svaret. */ } }
       try { progress.end(sse); } catch { /* Selve svaret er allerede sendt videre. */ }
       network.finishResponse(response, { outcome: controller.signal.aborted ? 'cancelled' : 'completed' });
+      if (!res.headersSent) res.writeHead(200, responseHeaders);
       res.end();
     } catch (error) {
       if (error instanceof LocalError && !reachedUpstream && !res.headersSent) {
@@ -148,6 +151,10 @@ async function startGateway(connection, model, key, route, onFailure = () => {},
         return res.end(JSON.stringify({ error: { message: error.message, type: 'invalid_request_error' } }));
       }
       network.finishResponse(observedResponse, { outcome: controller.signal.aborted ? 'cancelled' : 'failed', error: idle.signal.aborted ? { kind: 'idle' } : error });
+      // Motoren kan lukke en strøm, når den har læst det sidste SSE-event, før udbyderen lukker HTTP.
+      // Det er modtagerens afbrydelse, ikke en fejl hos udbyderen. Motoren afgør selv sit udfald;
+      // gatewayen må hverken vise et falsk netfejlkort, låse næste kald eller genafspille svaret.
+      if (controller.signal.aborted && sentBody && !idle.signal.aborted && !total.aborted) { res.destroy(); return; }
       if (idle.signal.aborted) fail(`Modellen svarede ikke i ${idleLimit >= 60_000 ? `${Math.round(idleLimit / 60_000)} min` : `${Math.max(1, Math.round(idleLimit / 1000))} s`}, så forbindelsen blev afbrudt. Din besked er bevaret.`, 'idle');
       // En netfejl, før modellen har svaret (forbindelse nægtet, DNS, afbrudt), er forbigående: den sendes videre som 502, så OpenCode kan
       // prøve igen, og forbindelsen låses ikke. En strøm, der afbrydes midt i svaret, er stadig endelig, fordi svaret er ufuldstændigt.

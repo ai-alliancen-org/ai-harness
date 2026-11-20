@@ -147,7 +147,7 @@ function handle(channel, action) {
       // forbindelsen, der fejler (fund 13). Andre omfang sendes ikke. En opgave, der fejler under opstarten, fx under
       // sammenfatningen, bærer fejlens type med til resultatkortet (fund 12). Kun en kort typebetegnelse sendes, og et tidspunkt
       // fra et langt Retry-After kun som tal.
-      return { ok: false, error: messages[error.code] || error.message, ...(error.scope === 'connection' ? { scope: 'connection' } : {}), ...(typeof error.failure === 'string' && /^[a-z]{2,16}$/.test(error.failure) ? { failure: error.failure, ...(Number.isFinite(error.retryAt) ? { retryAt: error.retryAt } : {}) } : {}) };
+      return { ok: false, error: messages[error.code] || error.message, ...(channel === 'deployment:review' && error.recovery?.kind === 'azure-container-prepare' && typeof error.recovery.draft === 'string' && error.recovery.draft.length <= 8000 ? { recovery: { kind: error.recovery.kind, draft: error.recovery.draft } } : {}), ...(error.scope === 'connection' ? { scope: 'connection' } : {}), ...(typeof error.failure === 'string' && /^[a-z]{2,16}$/.test(error.failure) ? { failure: error.failure, ...(Number.isFinite(error.retryAt) ? { retryAt: error.retryAt } : {}) } : {}) };
     }
   });
 }
@@ -598,8 +598,19 @@ handle('deployment:tracking', async input => {
   return { root, ...await deploymentSetup.tracking(root, input?.refresh === true) };
 });
 handle('deployment:review', input => exclusive(async () => ({ ...await deployments.review(requireProject(), input), context: await sharingContext() })));
-handle('deployment:send', token => exclusive(() => deployments.deploy(requireIdleProject(), token)));
-handle('deployment:check', () => exclusive(() => deployments.check(requireProject())));
+// Kun trin fra kernen sendes, aldrig CLI-output, adresser eller adgangsnøgler. Nøglen binder hændelser til netop dette klik.
+function deploymentProgress(operation, key, root) {
+  const chat = requests.getStore()?.chat;
+  return stage => sendEvent({ type: 'deployment-progress', operation, key, root, chat, stage });
+}
+handle('deployment:send', token => exclusive(() => {
+  const root = requireIdleProject();
+  return deployments.deploy(root, token, { onProgress: deploymentProgress('send', token, root) });
+}));
+handle('deployment:check', input => exclusive(() => {
+  const root = requireProject(), key = typeof input?.requestId === 'string' ? input.requestId.slice(0, 100) : null;
+  return deployments.check(root, { onProgress: deploymentProgress('check', key, root) });
+}));
 handle('deployment:open', async kind => {
   if (kind?.komplaiApp) {
     const app = (await deployments.providers.komplai.overview()).apps.find(app => app.id === kind.komplaiApp);

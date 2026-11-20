@@ -48,6 +48,7 @@ class Element {
   get textContent() { return this.children.map(child => child.textContent).join(''); }
   set textContent(value) { this.replaceChildren(); if (value !== null && value !== undefined && String(value) !== '') this.append(new Text(String(value))); }
   get parentElement() { return this.parent; }
+  get lastChild() { return this.children.at(-1) || null; }
   adopt(node) { if (node.parent) node.parent.children = node.parent.children.filter(child => child !== node); node.parent = this; }
   append(...nodes) { for (const item of nodes) { const node = typeof item === 'string' ? new Text(item) : item; this.adopt(node); this.children.push(node); } if (this.tagName === 'SELECT' && this.selectedIndex < 0 && this.options.length) this.selectedIndex = 0; }
   prepend(...nodes) { const list = nodes.map(item => typeof item === 'string' ? new Text(item) : item); for (const node of list) this.adopt(node); this.children.unshift(...list); }
@@ -285,16 +286,24 @@ async function backend(t, { apps = [], connected = true, organisations = ORGANIS
 
 // Den rigtige ui/deployment.js og ui/share-view.js mod markuppen. Opsætningen for de andre udbydere (deployment-setup.js)
 // er en attrap, som i d2-udgiv-dialog.test.cjs.
-function mount(harness) {
+function mount(harness, { realSetup = false, clock = {} } = {}) {
   const doc = new Document(); let setupArgs;
   const setup = { choose: async () => false, config: () => ({}), restore() {}, opened() {}, refresh: async () => {}, configurationStep() {}, pages: () => false, panel: step => step, render() {}, title: () => undefined, reset() {} };
-  const context = { document: doc, CustomEvent: class { constructor(type) { this.type = type; } }, setTimeout, clearTimeout, URL, console };
+  const context = { document: doc, CustomEvent: class { constructor(type) { this.type = type; } }, setTimeout, clearTimeout, setInterval: () => 0, clearInterval() {}, ...clock, MutationObserver: class { observe() {} }, URL, console };
   context.Option = function Option(text, value) { return doc.option(text, value); };
   context.window = context; context.harness = harness; context.sharingOn = () => true; context.dispatchEvent = () => {}; context.addEventListener = () => {};
   context.selectedOwner = () => ({ root, chat: 'samtale' });
   context.DeploymentSetupUI = { mount: args => { setupArgs = args; return setup; } };
   vm.createContext(context);
   vm.runInContext(fs.readFileSync(path.join(desktop, 'ui/share-view.js'), 'utf8'), context, { filename: 'ui/share-view.js' });
+  if (realSetup) {
+    for (const id of ['deployment-status', 'workspace']) {
+      const element = doc.createElement(id === 'deployment-status' ? 'button' : 'section'); element.id = id; doc.root.append(element);
+    }
+    vm.runInContext(fs.readFileSync(path.join(desktop, 'ui/deployment-setup.js'), 'utf8'), context, { filename: 'ui/deployment-setup.js' });
+    const original = context.DeploymentSetupUI.mount;
+    context.DeploymentSetupUI.mount = args => { setupArgs = args; return original(args); };
+  }
   vm.runInContext(fs.readFileSync(path.join(desktop, 'ui/deployment.js'), 'utf8'), context, { filename: 'ui/deployment.js' });
   const $ = id => { const el = doc.querySelector('#' + id); assert.ok(el, `#${id} findes ikke i Udgiv`); return el; };
   const dialog = $('deployment-dialog');
@@ -320,7 +329,7 @@ function mount(harness) {
   const radio = async value => click(doc.querySelectorAll('[name="komplai-visibility"]').find(item => item.value === value));
   const mainActions = () => $('deployment-main-actions').children.map(button => button.id);
   const details = () => $('deployment-receipt-details');
-  return { doc, $, dialog, idle, heading, choices, visible, click, open, status, close, choose, submit, radio, mainActions, details, setup: () => setupArgs };
+  return { doc, $, dialog, idle, heading, choices, visible, click, open, status, close, choose, submit, radio, mainActions, details, setup: () => setupArgs, window: context };
 }
 
 module.exports = { Document, Element, parse, visible, CONTROLS, label, backend, mount, root, ORGANISATIONS, artifact };

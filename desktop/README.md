@@ -40,7 +40,7 @@ npm run test:skills-opencode
 
 Kun de viste filer ændres. Nye filer uden for historikken, ignorerede filer, installerede pakker og eksterne databaser bevares. Gendannelse stopper den preview-server, appen selv har startet, og afslutter den gamle agentsession. Staged ændringer, konflikter, symbolske links, Git LFS, store filer og muligt nøgleindhold kan kræve manuel gennemgang i et Git-værktøj. Appens kopier ligger uden for projektet og er ikke en online sikkerhedskopi.
 
-Ved fejl fra modelserveren stopper forbindelsen, så agentmotorens genforsøg ikke udløser flere kald. Appen vælger ingen reserveudbyder. Beskeden bevares som kladde; brugeren vælger selv at prøve igen. En afbrudt strøm bliver behandlet som en fejl, ikke som en godkendt plan.
+Midlertidige HTTP-fejl (408, 429 og 5xx) og netfejl før svarets første indhold går gennem agentmotorens afgrænsede genforsøg. Det gælder også en forbindelse, der falder efter HTTP-headers. Statuslinjen viser ventetid og forsøg; Stop afbryder. En modtager, der lukker efter at have læst SSE-svaret, udløser intet netfejlkort og låser ikke næste modelkald. Ved en reel afbrydelse midt i svaret stopper opgaven, og brugeren kan gennemgå resultatet og vælge Prøv igen. Afviste nøgler og adgangsfejl er endelige. Appen vælger ingen reserveudbyder.
 
 **Indstillinger → Hjælp og feedback** viser appversion og en lokal fejlrapport med faste statusfelter. Rapporten indeholder ingen samtaler, projektfiler, stier, serveradresser, kontonavne eller API-nøgler. Den gemmes og deles kun efter brugerens eget valg. Samme sted findes vejledning til at installere næste testversion med bevarede projekter og indstillinger.
 
@@ -105,7 +105,7 @@ Tekniske aktiviteter står under fanen **Aktivitet**; samtalen viser én linje p
 
 Farver, afstande, typografi og principper for synlige valg er beskrevet i [designstandarden](DESIGN.md).
 
-Fejl i modelkataloget før afsendelse vises i arbejdsområdet med **Gennemgå AI-forbindelse** og **Fortsæt uden AI**. En fejl under en opgave står ét sted: på resultatkortet med en forklaring efter fejlens type og den handling, der kan hjælpe, fx **Gennemgå AI-forbindelse** ved en afvist nøgle, **Åbn kontoen hos udbyderen** ved opbrugt kvote og **Prøv igen** ved en afbrudt forbindelse. Udbyderens egen besked står under **Se detaljer**. Projekt, preview og beskedkladde bevares. Ingen automatisk gentagelse eller baggrundskontrol. GitHub er valgfri sikkerhedskopi og samarbejde; manglende adgang blokerer kun publiceringen. Manglende Git blokerer ikke oprettelse eller preview.
+Fejl i modelkataloget før afsendelse vises i arbejdsområdet med **Gennemgå AI-forbindelse** og **Fortsæt uden AI**. En endelig fejl under en opgave står ét sted: på resultatkortet med en forklaring efter fejlens type og den handling, der kan hjælpe, fx **Gennemgå AI-forbindelse** ved en afvist nøgle, **Åbn kontoen hos udbyderen** ved opbrugt kvote og **Prøv igen** ved en afbrudt forbindelse. Udbyderens egen besked står under **Se detaljer**. Projekt, preview og beskedkladde bevares. En endeligt fejlet opgave startes igen ved brugerens valg. GitHub er valgfri sikkerhedskopi og samarbejde; manglende adgang blokerer kun publiceringen. Manglende Git blokerer ikke oprettelse eller preview.
 
 ## Brugerrejse
 
@@ -391,7 +391,7 @@ Hostingønsket vises i projektoplysninger og medsendes som kontekst efter datage
 
 ## Udgiv til test
 
-**Udgiv** er valgfri. Guiden viser udbydere alfabetisk uden anbefaling eller forvalg: Azure Static Web Apps, Cloudflare Pages, GitHub Pages, komplai Run, Promte Apps og Vercel. Derudover findes en vejledning til Netlify Drop. GitHub-forbindelse kræves til Pages; Vercel bruger sit projekts Git-integration. Azure, komplai og Promte har deres egne loginforløb.
+**Udgiv** er valgfri. Guiden viser udbydere alfabetisk uden anbefaling eller forvalg: Azure Container Apps, Azure Static Web Apps, Cloudflare Pages, GitHub Pages, komplai Run, Promte Apps og Vercel. Derudover findes en vejledning til Netlify Drop. GitHub-forbindelse kræves til Pages; Vercel bruger sit projekts Git-integration. Azure, komplai og Promte har deres egne loginforløb.
 
 Opsætningen gemmes efter særskilt gennemgang i `.aura/publishing/<udbyder>.json`. Pages får desuden et manuelt workflow i `.github/workflows/`. Eksisterende indhold vises før skrivning og kontrolleres igen; ændringer, links og usikre filstier afvises. Tokens og nøgler medtages ikke. Brugeren håndterer selv commit og push. Appen opretter eller ændrer ikke Git-historik som en del af opsætningen. Den lokale destination og seneste kvittering huskes desuden i appdata.
 
@@ -405,7 +405,7 @@ GitHubs særskilte sikkerhedskopiering viser versionsnavn, destination, synlighe
 
 ### Vejledninger og dataplacering
 
-**Udgiv** starter med **Udgiv fra Aura** og **Se udgivelsesvejledning**. De seks integrerede udbydere vises som ligeværdige valg; Netlify Drop ligger blandt vejledningerne. En tidligere valgt destination kan genbruges. Kontooprettelse, installation af manglende værktøjer og oprettelse af cloudressourcer foregår hos udbyderen. Åbning af en vejledning udgiver intet.
+**Udgiv** starter med **Udgiv fra Aura** og **Se udgivelsesvejledning**. De syv integrerede udbydere vises som ligeværdige valg; Netlify Drop ligger blandt vejledningerne. En tidligere valgt destination kan genbruges. Kontooprettelse, installation af manglende værktøjer og oprettelse af cloudressourcer foregår hos udbyderen. Åbning af en vejledning udgiver intet.
 
 Hvert valg har en kort beskrivelse af leverandør og dataplacering. **Opsætning, data og aftaler** viser trin, anvendelsesområde, adgangsforhold, kilder og kontroldato. En leverandørs hjemland, en API-region, global levering og databehandleraftalen beskrives særskilt. Aura kender ikke automatisk organisationens aftale eller godkendelse. Katalog og faste links ligger i `core/hosting-guidance.cjs`; samme fil beskriver appens reelle muligheder for agenten, så den kan henvise til Udgiv uden at gætte.
 
@@ -449,6 +449,16 @@ Aura gemmer forbindelsen som ikke-hemmelig projektkonfiguration. Brugeren commit
 
 Status læses fra Vercel og knyttes til projekt, repository, branch, Git-version og udgivelsens kilde. En manuel upload med lignende Git-metadata tæller ikke som en Git-udgivelse. Buildindstillinger, miljøvariabler, region og adgang administreres i Vercel. Projektets buildkode kan læse de miljøværdier, der er tilgængelige dér. En klar udgivelse er ikke dokumentation for afprøvede brugerrejser.
 
+### Azure Container Apps
+
+Kræver Azure CLI med containerapp-udvidelsen, en eksisterende Container App og én Azure Container Registry i samme abonnement. Vælg en særskilt app med én container, Single revision, ekstern HTTP-adgang og managed identity til registry. SWA CLI og en lokal Docker-daemon er ikke nødvendige. Aura opretter ikke ressourcer eller tildeler adgang.
+
+Vælg abonnement og app, byggemappe og Dockerfile i guiden. ACR bygger Linux/amd64 fra den gemte Git-version med netadgang. Efter gennemgangen erstatter **Byg og udgiv container** appens aktive version på dens eksisterende adresse. Den nye kode bruger appens eksisterende runtime-værdier og adgang; de sendes ikke som build-argumenter. Målporten skal passe til serveren. Se [opsætning og eksempel](../docs/azure-container-apps.md).
+
+I **Byg** kan brugeren skrive **Gør projektet klar til Azure Container Apps**. AI'en får Auras vejledning om Dockerfile og tilpasning til appens eksisterende teknologi. Mangler den gemte Dockerfile ved udgivelse, tilbyder **Gør klar med AI** et forslag i skrivefeltet med den valgte mappe, Dockerfile-sti og appens målport, når den kan læses. Brugeren gennemgår og sender selv forslaget; en eksisterende kladde bevares.
+
+Aura fastlåser image-digest, kontrollerer destinationens indstillinger igen efter bygningen og knytter kvitteringen til den præcise revision. Status kræver den aktive, raske revision og den forventede Azure-adresse. En app, der er skaleret til nul, kan stadig være klar. Containerindhold sammenlignes ikke byte for byte med en statisk startside.
+
 ### Azure Static Web Apps
 
 Kræver Azure CLI, SWA CLI og en eksisterende Static Web App i Azure Public Cloud. Guiden kontrollerer de lokale værktøjer, åbner Microsoft-login gennem Azure CLI og viser de tilgængelige abonnementer og apps. Ressourcegruppe og navn kommer fra den valgte app. Hvis en ressource eller et værktøj mangler, åbnes den relevante vejledning eller Azure-portalen; Aura opretter intet automatisk.
@@ -475,7 +485,7 @@ Se [teststatus](../docs/teststatus.md) for den aktuelle samlede suite og appens 
 
 **Historisk Vercel-prøve, 24. september 2026:** Det daværende manuelle uploadforløb blev afprøvet gennem Electron med en syntetisk HTML-side i `progressify/ai-harness-test`; Vercel bekræftede `target: null` og `READY`. Den anonyme kontrol registrerede viderestilling til login. En særskilt autentificeret CLI-kontrol hentede den godkendte HTML-side; Vercel havde tilføjet sit feedback-script, så hele HTTP-svaret var ikke byteidentisk. De to syntetiske udgivelser, som Vercel klassificerede som produktion under fejlsøgningen, blev fjernet. Kontrollen før upload afviste derefter korrekt manglende startversion. Kun preview-testudgivelsen blev efterladt. Denne prøve dokumenterer ikke det nye Git-forløb.
 
-Azure er ikke liveafprøvet; der er endnu ingen testressource. Windows og framework-/Functions-apps er ikke afprøvet live i denne milepæl. Browserlogin og ressourcevalg er nu en del af guiden, mens installation af værktøjer og oprettelse af manglende ressourcer fortsat sker uden for Aura.
+Den 19. november 2026 blev en app bygget med Azure OpenAI i Aura og udgivet til en særskilt Static Web App i et ikke-produktionsmiljø. Samme dag byggede ACR mødelokalefinderen, og Aura udgav containeren. Den aktive revision, image-digest, `/healthz`, de gemte webfiler, søgning og kapacitetsfilter blev kontrolleret. Windows og framework-/Functions-apps er ikke afprøvet live i denne milepæl. Browserlogin og ressourcevalg er en del af guiden. Installér værktøjer og opret Azure-ressourcer før udgivelse. [Videodemo og opsætning](../docs/azure-video-demo.md) · [Container Apps-prøven](../docs/azure-container-apps.md)
 
 Integrationskilder kontrolleret 20. oktober 2026: [GitHub Pages-workflows](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages), [GitHub workflow dispatch](https://docs.github.com/en/rest/actions/workflows#create-a-workflow-dispatch-event), [Cloudflare Pages fra CI](https://developers.cloudflare.com/pages/how-to/use-direct-upload-with-continuous-integration/), [Vercel for GitHub](https://vercel.com/docs/git/vercel-for-github), [Azure browserlogin](https://learn.microsoft.com/en-us/cli/azure/authenticate-azure-cli-interactively), [SWA deploy](https://azure.github.io/static-web-apps-cli/docs/cli/swa-deploy/) og [Promtes officielle uploadværktøj](https://www.npmjs.com/package/@promte/app-upload). Daterede historiske prøver erstatter ikke en kontrol af den aktuelle konto og opsætning.
 
@@ -551,7 +561,7 @@ Pakningen kræver, at produktfilerne er committet, og lægger et kildebevis (`so
 
 Intel-Mac bruger `darwin-x64` og `--x64`. Windows bruger mål `win32-x64` og `npm run package:windows -- --x64`; ARM64 bruger `win32-arm64` og `--arm64`. Windows-pakken kan også bygges lokalt fra Mac med de nødvendige byggeværktøjer. En krydsbygget `.exe` er ikke en afprøvning på Windows: installation, første start og opdatering skal stadig prøves der. Pakken er en betaversion.
 
-Signering sker kun, når `HARNESS_SIGN_IDENTITY` eksplicit angives til det godkendte Developer ID-certifikat ved Mac-bygning. Angiv certifikatnavnet uden præfikset `Developer ID Application:`; den lokalt godkendte identitet er `mekbas IVS (2UX98897JW)`. Der er ingen automatisk valg af certifikat. Notarisation er særskilt og kræver en opsat Apple-profil; en signeret pakke er ikke automatisk notariseret. Indtil notarisation er gennemført, må testpakken ikke beskrives som en friktionsfri installation på andre Mac-computere. Omgå ikke kommunens installationspolitik.
+Signering sker kun, når `HARNESS_SIGN_IDENTITY` eksplicit angives til det godkendte Developer ID-certifikat ved Mac-bygning. Angiv certifikatnavnet uden præfikset `Developer ID Application:`; den aktuelle lokale identitet er `Komplai ApS (2UX98897JW)` (kontrolleret 20. november 2026). Ældre pakker bruger certifikatnavnet `mekbas IVS` med samme team-ID. Der er ingen automatisk valg af certifikat. Notarisation er særskilt og kræver en opsat Apple-profil; en signeret pakke er ikke automatisk notariseret. Indtil notarisation er gennemført, må testpakken ikke beskrives som en friktionsfri installation på andre Mac-computere. Omgå ikke kommunens installationspolitik.
 
 ```bash
 npm run test:package -- "release/mac-arm64/Aura.app"
@@ -580,6 +590,8 @@ caffeinate -is node scripts/notarize.cjs release/Aura-VERSION-mac-arm64.dmg ai-h
 ```
 
 `caffeinate -is` forhindrer dvale, så længe scriptet kører og Mac'en er på strøm. Scriptet sender filen uden at holde forbindelsen åben under Apples behandling. Så snart Apple har givet et indsendelses-id, gemmes id, filnavn og SHA-256 i `FIL.notarization-pending.json` ved siden af filen. Derefter venter scriptet med `notarytool wait`. Før billetten hæftes på, kontrollerer det med `notarytool log`, at Apples SHA-256 er den samme som den sendte fils. Til sidst skrives kvitteringen `FIL.notarized.json` med filnavn, SHA-256, status, id og kontroltidspunkt, og ventefilen slettes. For en DMG gælder kvitteringens SHA-256 filen med billet. En ZIP kan ikke selv staples; scriptet pakker den ud og kontrollerer appens signatur, billet og distributionskontrol.
+
+En låst Mac kan gøre nøgleringsprofilen utilgængelig. Ved prøven 20. november gav `notarytool` beskeden `No Keychain password item found`, mens skærmen var låst; den samme profil virkede igen efter normal oplåsning. `caffeinate` ændrer ikke låseskærmens indstillinger. Lås Mac'en op, og genoptag samme kommando fra det gemte indsendelses-id, hvis dette sker under forløbet.
 
 Downloadsiden markerer kun en fil som notariseret, hvis kvittering og aktuel kontrolsum matcher. En ny bygning kræver ny notarisation. Profilnavnet er ikke en adgangskode; profilen oprettes lokalt med Apples værktøj. Apple-login og private nøgler må ikke lægges i repositoryet.
 

@@ -1,6 +1,7 @@
 (() => {
   const $ = selector => document.querySelector(selector);
   const providers = [
+    ['azure-containers', 'Azure Container Apps', 'Kræver Azure CLI, Container Registry og en Container App'],
     ['azure', 'Azure Static Web Apps', 'Kræver Microsoft-konto og Azure-abonnement'],
     ['cloudflare', 'Cloudflare Pages', 'Kræver Cloudflare-konto og GitHub-konto'],
     ['github-pages', 'GitHub Pages', 'Kræver GitHub-konto'],
@@ -12,6 +13,7 @@
   const names = Object.fromEntries(providers.map(([id, name]) => [id, name]));
   const stateLabels = { READY: 'Udgivet', ERROR: 'Udgivelse fejlede', CANCELED: 'Annulleret', BLOCKED: 'Kræver handling', REJECTED: 'Afvist', QUEUED: 'I kø', BUILDING: 'Bygger', INITIALIZING: 'Forbereder', PREPARED: 'Upload afventer', REVIEWING: 'Under gennemgang', SUBMITTING: 'Udgivelse afventer', UNKNOWN: 'Kontrollér status', AWAITING_UPDATE: 'Afventer udgivelsen', UPLOADED: 'Upload modtaget', REPLACED: 'Nyere version udgivet', UNPUBLISHED: 'Ikke udgivet', REMOVED: 'Fjernet' };
   const logos = new Map([
+    ['azure-containers', 'provider-azure.svg'],
     ['azure', 'provider-azure.svg'], ['cloudflare', 'provider-cloudflare.png'],
     ['github-pages', 'provider-github-pages.svg'], ['komplai', 'provider-komplai.svg'],
     ['promte', 'provider-promte.svg'], ['vercel', 'provider-vercel.svg']
@@ -45,11 +47,13 @@
       }));
     }
     function config() {
+      if (provider() === 'azure-containers') return { dockerfile: $('#deploy-dockerfile').value.trim() };
       if (provider() === 'promte') return { host: $('#deploy-promte-host').value.trim(), workspaceId: promteWorkspaceId(), mode: 'source' };
       if (pages()) return { repository: $('#deploy-repository').value.trim(), branch: $('#deploy-branch').value.trim(), accountId: $('#deploy-cloudflare-account').value.trim(), project: $('#deploy-cloudflare-project').value.trim(), mode: 'static' };
       return {};
     }
     function restore(c = {}) {
+      $('#deploy-dockerfile').value = c.dockerfile || 'Dockerfile';
       for (const [key, id] of Object.entries({ host: 'promte-host', repository: 'repository', branch: 'branch', accountId: 'cloudflare-account' })) if (c[key]) $('#deploy-' + id).value = c[key];
       if (c.provider === 'promte' && c.workspaceId) { promteHost = normalizedHost(c.host); promteSaved = c.workspaceId; $('#deploy-promte-workspace-id').value = c.workspaceId; }
       if (c.provider === 'cloudflare' && c.project) $('#deploy-cloudflare-project').value = c.project;
@@ -107,8 +111,9 @@
     bind('#deployment-choice-portal', () => open('portal'));
     async function azureApps(subscription) {
       $('#deploy-subscription').value = subscription;
-      const items = await act('azure-apps', { subscription });
-      showChoice('azure-app', items, 'Hvilken Azure-app vil du bruge?', items.length ? 'Udgiver til appens testmiljø.' : 'Ingen apps fundet. Opret en Static Web App i Azure, og kontrollér igen.', item => { $('#deploy-project').value = item.name; $('#deploy-group').value = item.group; go('files'); }, () => azureApps(subscription));
+      const containers = provider() === 'azure-containers';
+      const items = await act(containers ? 'azure-containers-apps' : 'azure-apps', { subscription });
+      showChoice('azure-app', items, containers ? 'Hvilken Container App vil du opdatere?' : 'Hvilken Azure-app vil du bruge?', containers ? (items.length ? 'Erstatter appens aktive version. Vælg en særskilt demo- eller testapp med Container Registry og managed identity.' : 'Ingen apps med ekstern HTTP-adgang fundet. Opret en særskilt Container App i Azure med én container, Single revision og managed identity til én Container Registry. Kontrollér derefter igen.') : items.length ? 'Udgiver til appens testmiljø.' : 'Ingen apps fundet. Opret en Static Web App i Azure, og kontrollér igen.', item => { $('#deploy-project').value = item.name; $('#deploy-group').value = item.group; go('files'); }, () => azureApps(subscription));
     }
     async function vercelProjects(scope) {
       $('#deploy-scope').value = scope;
@@ -137,6 +142,7 @@
     async function loadConnection(login = false) {
       const id = provider(), token = epoch;
       const auth = pages() ? 'github' : id;
+      const azure = ['azure', 'azure-containers'].includes(auth);
       const pending = auth === 'promte' && login ? { host: $('#deploy-promte-host').value.trim(), cancelled: false } : null;
       if (pending) { promteLogin = pending; $('#deployment-cancel-login').hidden = false; $('#deployment-cancel-login').disabled = false; $('#deployment-progress-label').textContent = 'Venter på login …'; }
       let state;
@@ -157,7 +163,7 @@
       }
       if (token !== epoch || !dialog.open) return;
       if (auth === 'promte' && state.connected) { await promteWorkspaces(state); return; }
-      if (auth === 'azure' && state.status === 'ready') {
+      if (azure && state.status === 'ready') {
         showChoice('azure-subscription', state.subscriptions, 'Hvilket Azure-abonnement vil du bruge?', '', item => azureApps(item.id), () => loadConnection()); return;
       }
       if (auth === 'vercel' && state.status === 'ready') {
@@ -169,7 +175,7 @@
       $('#deployment-connect').hidden = toolsMissing || auth === 'github' && !state.browserLogin && !state.localLogin;
       $('#deployment-connect').textContent = auth === 'github' && state.localLogin ? 'Brug dit GitHub-login på computeren' : 'Log ind i browseren';
       $('#deployment-connection-note').textContent = connectionError || (toolsMissing ? 'Installér udbyderens værktøj, og vælg Kontrollér igen.' : auth === 'github' && !state.browserLogin && !state.localLogin ? 'Log ind med GitHub CLI på computeren, eller brug en adgangsnøgle under hjælpen.' : state.status === 'no-subscriptions' ? 'Ingen Azure-abonnementer med adgang. Prøv en anden konto, eller bed jeres administrator om adgang.' : state.status === 'no-teams' ? 'Ingen Vercel-teams med adgang. Kontrollér din konto hos Vercel.' : 'Fortsæt med din konto hos udbyderen.');
-      $('#deployment-install-note').textContent = auth === 'azure' ? 'Azure CLI bruges til login. SWA CLI bruges til udgivelse.' : auth === 'github' ? 'GitHub CLI kan logge ind i browseren. Aura bruger først kontoen, når du vælger det.' : auth === 'promte' ? 'Aura åbner Promte i browseren. Log ind, og godkend Aura. Du skal være administrator i appens arbejdsområde for at udgive.' : 'Vercels værktøj åbner login i browseren.';
+      $('#deployment-install-note').textContent = auth === 'azure-containers' ? 'Azure CLI bruges til login, bygning i Container Registry og udgivelse. Installér også containerapp-udvidelsen med az extension add --name containerapp.' : auth === 'azure' ? 'Azure CLI bruges til login. SWA CLI bruges til udgivelse.' : auth === 'github' ? 'GitHub CLI kan logge ind i browseren. Aura bruger først kontoen, når du vælger det.' : auth === 'promte' ? 'Aura åbner Promte i browseren. Log ind, og godkend Aura. Du skal være administrator i appens arbejdsområde for at udgive.' : 'Vercels værktøj åbner login i browseren.';
       $('#deployment-install').hidden = auth === 'promte';
       $('#deployment-install').textContent = auth === 'azure' && state.tools?.azureCli ? 'Installér SWA CLI' : auth === 'github' ? 'Se login med GitHub CLI' : 'Installér udbyderens værktøj';
       $('#deployment-github-token').hidden = auth !== 'github';

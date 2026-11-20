@@ -2,6 +2,14 @@
 const checkedAt = '2026-10-20';
 const options = [
   {
+    id: 'azure-containers', name: 'Azure Container Apps', integrated: true, checkedAt: '2026-11-19',
+    summary: 'Microsoft. Kører frontend og backend som en container i dit Azure-miljø.',
+    scope: 'Aura bygger Dockerfile i en eksisterende Azure Container Registry og opdaterer én eksisterende Container App. Det erstatter appens aktive version.',
+    data: 'Byggefiler sendes til Azure. Den nye kode får appens eksisterende runtime-værdier og adgang. Konto, region, logs, adgang og forbrug følger din Azure-opsætning.',
+    steps: ['Installér Azure CLI og containerapp-udvidelsen. Log ind med Azure CLI, eller vælg browserlogin i Aura.', 'Opret en særskilt Container App med én container, Single revision og ekstern HTTP-adgang. Forbind én Azure Container Registry med managed identity og pull-adgang. Aura opretter ikke ressourcer eller ændrer adgangsrettigheder.', 'Bed AI’en skrive en Dockerfile, og gem byggemappen som en version. Vælg appen i Aura, gennemgå filer, build og destination, og vælg Byg og udgiv container. Azure CLI-kontoen skal kunne bygge og læse images i registry samt opdatere containerappen.'],
+    links: { guide: 'https://learn.microsoft.com/en-us/azure/container-apps/get-started-existing-container-image', data: 'https://www.microsoft.com/licensing/docs/view/Microsoft-Products-and-Services-Data-Protection-Addendum-DPA', region: 'https://learn.microsoft.com/en-us/azure/container-apps/overview' }
+  },
+  {
     id: 'vercel', name: 'Vercel', integrated: true,
     summary: 'Amerikansk leverandør. Global levering af frontend; backendens region vælges i projektet.',
     scope: 'Aura forbinder til et eksisterende Vercel-projekts GitHub-integration og viser dets udgivelsesstatus. Vercel bygger de versioner, du pusher.',
@@ -58,18 +66,19 @@ const options = [
     links: { guide: 'https://app.promte.dk/docs/admin/udvikl-apps-med-kodeagenter', data: 'https://docs.promte.com/GDPR-hosting-og-databehandling-1a79a6ea8b0a80e2bc04f4e2b41bab42' }
   }
 ];
-function catalog() { return options.map(option => ({ ...option, checkedAt })).sort((a, b) => a.name.localeCompare(b.name, 'da')); }
+function catalog() { return options.map(option => ({ ...option, checkedAt: option.checkedAt || checkedAt })).sort((a, b) => a.name.localeCompare(b.name, 'da')); }
 function link(id, kind) {
   const option = options.find(item => item.id === id);
   if (!option || !['guide', 'data', 'region'].includes(kind) || !option.links[kind]) throw Error('Denne hostingvejledning findes ikke.');
   return option.links[kind];
 }
-function guidance(enabled) {
+function publishingGuidance(enabled) {
   const entry = enabled ? 'Auras knap Udgiv står øverst i projektet og åbner valget mellem Udgiv fra Aura og Se udgivelsesvejledning. Ingen udbyder anbefales eller vælges på forhånd. Den findes; bed ikke brugeren undersøge, om appen har en Udgiv-knap.' : 'Udgivelse er slået fra. Brugeren kan slå den til med Udgiv → Slå udgivelse til eller under Indstillinger → Funktioner. Forklar gerne mulighederne, men udgiv ikke.';
   // De generelle værn gælder altid, også når Udgiv er slået fra. Udbyderdetaljerne sendes kun, når Udgiv er slået til;
   // ellers er de bare vægt i hver besked.
   const guards = 'Afklar frontend, backend, database, AI-modtagere og adgang før valg. Almindelige Python/Node-servere kan ikke udgives som statiske filer. Sikkerhedskopi til GitHub udgiver ikke i sig selv et applink; et repository med tilsluttet hosting kan dog udløse udgivelse ved push.\nOplys ikke, at hosting er gratis eller udelukkende i EU uden at kontrollere de aktuelle vilkår og den konkrete opsætning. Region, leverandørens hjemland, CDN, logs og databehandleraftale er forskellige forhold. Brugeren godkender upload, adgang og omkostninger; du må ikke udgive fra agentens kommandoværktøj.';
   if (!enabled) return `${entry}\n${guards}`;
-  return `${entry}\nIntegrerede udgivelsesveje, alfabetisk: Azure Static Web Apps, Cloudflare Pages, GitHub Pages, komplai Run, Promte Apps og Vercel. Netlify Drop har vejledning, men ingen uploadintegration.\nAzure bruger browserlogin gennem Azure CLI og viser abonnementer og eksisterende Static Web Apps; SWA CLI udgiver efter gennemgang til harness-test. komplai Run kræver komplai-konto. Promte Apps kræver konto og betalt aftale. komplai modtager færdige frontendfiler. Promte modtager kildekode gennem den officielle app-upload-kontrakt og kræver administratoradgang til app-arbejdsområdet.\nCloudflare Pages og GitHub Pages bruger manuelle GitHub-workflows. Aura kan efter særskilt gennemgang skrive opsætningen lokalt. Brugeren committer og pusher selv. Før Udgiv skal workflow og gemt Git-version matche GitHub; Udgiv starter én konkret kørsel. Cloudflares token gemmes i GitHubs Actions secrets, aldrig i projektet. Vercel bruger projektets eksisterende Git-integration, hvor push kan udgive automatisk, og Aura viser status. Aura kan også efter gennemgang uploade den gemte version som én testversion (preview) til et eksisterende Vercel-projekt; det udgiver aldrig til produktion.\n${guards}`;
+  return `${entry}\nIntegrerede udgivelsesveje, alfabetisk: Azure Container Apps, Azure Static Web Apps, Cloudflare Pages, GitHub Pages, komplai Run, Promte Apps og Vercel. Netlify Drop har vejledning, men ingen uploadintegration.\nAzure Container Apps bygger en Dockerfile i en eksisterende Container Registry og erstatter den aktive version af en eksisterende Container App med managed identity. Aura ændrer ikke ressourcer, adgangsrettigheder, skalering eller miljøvariabler. Vælg en særskilt demo- eller testapp.\nAzure bruger browserlogin gennem Azure CLI og viser abonnementer og eksisterende Static Web Apps; SWA CLI udgiver efter gennemgang til harness-test. komplai Run kræver komplai-konto. Promte Apps kræver konto og betalt aftale. komplai modtager færdige frontendfiler. Promte modtager kildekode gennem den officielle app-upload-kontrakt og kræver administratoradgang til app-arbejdsområdet.\nCloudflare Pages og GitHub Pages bruger manuelle GitHub-workflows. Aura kan efter særskilt gennemgang skrive opsætningen lokalt. Brugeren committer og pusher selv. Før Udgiv skal workflow og gemt Git-version matche GitHub; Udgiv starter én konkret kørsel. Cloudflares token gemmes i GitHubs Actions secrets, aldrig i projektet. Vercel bruger projektets eksisterende Git-integration, hvor push kan udgive automatisk, og Aura viser status. Aura kan også efter gennemgang uploade den gemte version som én testversion (preview) til et eksisterende Vercel-projekt; det udgiver aldrig til produktion.\n${guards}`;
 }
+function guidance(enabled, { prepareContainers = enabled } = {}) { return publishingGuidance(enabled) + (prepareContainers ? '\n' + require('./container-preparation.cjs').guidance : ''); }
 module.exports = { catalog, link, guidance };

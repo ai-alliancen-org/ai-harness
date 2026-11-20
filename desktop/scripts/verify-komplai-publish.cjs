@@ -170,7 +170,7 @@ const digest = data => createHash('sha256').update(data).digest('hex');
       const image = await app.evaluate(async ({ BrowserWindow }) => (await BrowserWindow.getAllWindows().find(w => w.webContents.getURL().startsWith('harness://')).webContents.capturePage()).toPNG().toString('base64'));
       await fs.writeFile(path.join(root, name + '.png'), Buffer.from(image, 'base64'));
       const providers = await page.locator('[data-deploy-step="providers"]').isVisible();
-      if (providers) { const visible = await page.locator('[data-deploy-step="providers"] [data-provider]:visible').evaluateAll(items => items.map(item => item.dataset.provider)); assert.deepEqual(visible, ['azure', 'cloudflare', 'github-pages', 'komplai', 'promte', 'vercel']); assert.equal(await page.locator('#deployment-more-providers').count(), 0); }
+      if (providers) { const visible = await page.locator('[data-deploy-step="providers"] [data-provider]:visible').evaluateAll(items => items.map(item => item.dataset.provider)); assert.deepEqual(visible, ['azure-containers', 'azure', 'cloudflare', 'github-pages', 'komplai', 'promte', 'vercel']); assert.equal(await page.locator('#deployment-more-providers').count(), 0); }
       screens.push(await page.locator('#deployment-dialog').evaluate((dialog, { name, providers }) => ({ name, providers, result: !document.querySelector('#deployment-result').hidden, app: !dialog.querySelector('[data-deploy-step="app"]').hidden, appAccount: dialog.querySelector('#deploy-komplai-account')?.checkVisibility() === true, details: [...dialog.querySelectorAll('#deployment-receipt-details[open], #deployment-technical[open]')].some(el => el.checkVisibility()), heading: document.getElementById(dialog.getAttribute('aria-labelledby')).textContent, words: dialog.innerText.trim().split(/\s+/).length, choices: [...dialog.querySelectorAll('button,select,input[type=checkbox],input[type=radio],summary')].filter(el => el.checkVisibility()).length, fields: [...dialog.querySelectorAll('input:not([type=checkbox]):not([type=radio]):not([type=hidden])')].filter(el => el.checkVisibility()).length, overflow: dialog.scrollWidth > dialog.clientWidth + 1 }), { name, providers }));
     };
     const reveal = async selector => { if (!await page.locator(selector).isVisible()) await page.locator('#deployment-receipt-details > summary').click(); };
@@ -183,7 +183,7 @@ const digest = data => createHash('sha256').update(data).digest('hex');
     assert.equal(await page.inputValue('#deploy-provider'), '');
     assert.doesNotMatch(await page.locator('[data-deploy-step="destination"]').innerText(), /komplai|Vercel|Azure/i);
     await page.click('#deployment-other'); await capture('udbydere');
-    assert.deepEqual(await page.locator('[data-deploy-step="providers"] [data-provider]').evaluateAll(items => items.map(item => item.dataset.provider)), ['azure', 'cloudflare', 'github-pages', 'komplai', 'promte', 'vercel']);
+    assert.deepEqual(await page.locator('[data-deploy-step="providers"] [data-provider]').evaluateAll(items => items.map(item => item.dataset.provider)), ['azure-containers', 'azure', 'cloudflare', 'github-pages', 'komplai', 'promte', 'vercel']);
     assert.equal(calls.length, 0, 'Der må ikke ske netkald, før brugeren vælger en udbyder.');
     await selectProvider('komplai'); await idle(); await capture('login');
     assert.equal(await page.isVisible('#deployment-next'), false);

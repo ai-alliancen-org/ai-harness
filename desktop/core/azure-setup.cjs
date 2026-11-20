@@ -38,25 +38,42 @@ function apps(value, subscription) {
   }).sort((a, b) => a.name.localeCompare(b.name, 'da') || a.group.localeCompare(b.group, 'da'));
 }
 
+function containerApps(value, subscription) {
+  if (!Array.isArray(value)) throw Error('Azure gav ikke en liste over containerapps.');
+  const seen = new Set();
+  return value.flatMap(item => {
+    const match = typeof item?.id === 'string' && /^\/subscriptions\/([^/]+)\/resourceGroups\/([^/]+)\/providers\/Microsoft\.App\/containerApps\/([^/]+)$/i.exec(item.id);
+    if (!match || match[1].toLowerCase() !== subscription.toLowerCase() || item.name !== match[3] || seen.has(item.id.toLowerCase())) return [];
+    try {
+      const group = azureResourceGroup(match[2]);
+      const host = new URL(require('./azure-containers.cjs').hostURL(item.properties?.configuration?.ingress?.fqdn)).hostname;
+      if (!item.properties.configuration.ingress.external) return [];
+      seen.add(item.id.toLowerCase());
+      return [{ id: item.id, name: item.name, group, subscription, location: displayName(item.location), host }];
+    } catch { return []; }
+  }).sort((a, b) => a.name.localeCompare(b.name, 'da') || a.group.localeCompare(b.group, 'da'));
+}
+
 class AzureSetup {
-  constructor(run = command) { this.run = run; this.pending = null; }
+  constructor(run = command, { containers = false } = {}) { this.run = run; this.pending = null; this.containers = containers; }
   async az(args, options) {
     const text = await this.run(process.env.HARNESS_AZ_PATH || 'az', [...args, '--only-show-errors', '--output', 'json'], options);
     try { return JSON.parse(text); } catch { throw Error('Azure gav et svar, der ikke kunne læses. Prøv igen.'); }
   }
   async state() {
-    const tools = { azureCli: false, swaCli: false };
+    const tool = this.containers ? 'containerAppsCli' : 'swaCli';
+    const tools = { azureCli: false, [tool]: false };
     const found = await Promise.allSettled([
       this.az(['version']),
-      this.run(process.env.HARNESS_SWA_PATH || 'swa', ['--version'])
+      this.containers ? this.run(process.env.HARNESS_AZ_PATH || 'az', ['containerapp', '--help']) : this.run(process.env.HARNESS_SWA_PATH || 'swa', ['--version'])
     ]);
     tools.azureCli = found[0].status === 'fulfilled';
-    tools.swaCli = found[1].status === 'fulfilled';
+    tools[tool] = found[1].status === 'fulfilled';
     if (!tools.azureCli) return { status: 'tools-required', tools, subscriptions: [] };
     let list;
     try { list = subscriptions(await this.az(['account', 'list', '--refresh'])); }
     catch { return { status: 'login-required', tools, subscriptions: [] }; }
-    return { status: !tools.swaCli ? 'tools-required' : list.length ? 'ready' : 'no-subscriptions', tools, subscriptions: list };
+    return { status: !tools[tool] ? 'tools-required' : list.length ? 'ready' : 'no-subscriptions', tools, subscriptions: list };
   }
   async login() {
     if (this.pending) throw Error('Azure-login er allerede i gang.');
@@ -74,9 +91,9 @@ class AzureSetup {
   async apps(subscription) {
     subscriptionID(subscription);
     try {
-      return apps(await this.az(['staticwebapp', 'list', '--subscription', subscription]), subscription);
+      return (this.containers ? containerApps : apps)(await this.az([this.containers ? 'containerapp' : 'staticwebapp', 'list', '--subscription', subscription]), subscription);
     } catch { throw Error('Dine Azure-apps kunne ikke hentes. Kontrollér login og adgang til det valgte abonnement.'); }
   }
 }
 
-module.exports = { AzureSetup, subscriptions, apps };
+module.exports = { AzureSetup, subscriptions, apps, containerApps };

@@ -11,6 +11,7 @@ class DeploymentSetup {
   constructor(store, github, deployments, dependencies = {}) {
     this.store = store; this.github = github; this.deployments = deployments;
     this.azure = dependencies.azure || new AzureSetup(); this.promte = dependencies.promte || new PromteSetup(store);
+    this.azureContainers = dependencies.azureContainers || new AzureSetup(command, { containers: true });
     this.vercel = dependencies.vercel || new VercelSetup(store); this.files = dependencies.files || new DeploymentConfiguration();
     this.run = dependencies.command || command; this.vercelReviews = new Map();
   }
@@ -20,6 +21,9 @@ class DeploymentSetup {
       case 'azure-state': return this.azure.state();
       case 'azure-login': return this.azure.login();
       case 'azure-apps': return this.azure.apps(config.subscription);
+      case 'azure-containers-state': return this.azureContainers.state();
+      case 'azure-containers-login': return this.azureContainers.login();
+      case 'azure-containers-apps': return this.azureContainers.apps(config.subscription);
       case 'promte-state': return this.promte.state({ host: config.host });
       case 'promte-login': return this.promte.login({ host: config.host, owner: root });
       case 'promte-logout': return this.promte.logout({ host: config.host });
@@ -97,6 +101,7 @@ class DeploymentSetup {
     }
     const links = {
       azure: { account: 'https://azure.microsoft.com/free/', install: 'https://learn.microsoft.com/en-us/cli/azure/install-azure-cli', swa: 'https://azure.github.io/static-web-apps-cli/docs/use/install/', portal: 'https://portal.azure.com/#browse/Microsoft.Web%2FStaticSites' },
+      'azure-containers': { account: 'https://azure.microsoft.com/free/', install: 'https://learn.microsoft.com/en-us/azure/container-apps/get-started-existing-container-image', portal: 'https://portal.azure.com/#browse/Microsoft.App%2FcontainerApps' },
       promte: { account: 'https://promte.com/kontakt', install: 'https://www.npmjs.com/package/@promte/app-upload' },
       komplai: { portal: 'https://app.komplai.dk' },
       vercel: { account: 'https://vercel.com/signup', portal: 'https://vercel.com/dashboard', install: 'https://vercel.com/docs/cli', guide: 'https://vercel.com/docs/git/vercel-for-github' },
@@ -154,7 +159,7 @@ class DeploymentSetup {
       return host;
     }
     if (receipt.state === 'READY' && receipt.url) {
-      if (['vercel', 'azure', 'komplai'].includes(provider)) return publicURL(receipt.url, { vercel: '.vercel.app', azure: '.azurestaticapps.net', komplai: '.komplai.run' }[provider]);
+      if (['vercel', 'azure', 'azure-containers', 'komplai'].includes(provider)) return publicURL(receipt.url, { vercel: '.vercel.app', azure: '.azurestaticapps.net', 'azure-containers': '.azurecontainerapps.io', komplai: '.komplai.run' }[provider]);
       if (provider === 'cloudflare') {
         // Statusadapteren matcher Git-version og præcis workflowkørsel.
         // Cloudflares tildelte subdomæne kan afvige fra projektnavnet.

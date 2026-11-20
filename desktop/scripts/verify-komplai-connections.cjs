@@ -64,7 +64,7 @@ async function installFixture(app, mode, project) {
       const choices = await page.locator('#deployment-dialog :is(button,select,summary,input[type=checkbox],input[type=radio]):visible').count();
       const providers = await page.locator('[data-deploy-step="providers"]').isVisible();
       // Alle seks udbydere står på samme skærm med Tilbage og Luk (DESIGN.md:171, udtrykkelig undtagelse fra fire valg).
-      if (providers) assert.deepEqual(await page.locator('#deployment-dialog button:visible').evaluateAll(items => items.map(item => item.dataset.provider || item.id || 'luk').sort()), ['azure', 'cloudflare', 'deployment-back', 'github-pages', 'komplai', 'luk', 'promte', 'vercel']);
+      if (providers) assert.deepEqual(await page.locator('#deployment-dialog button:visible').evaluateAll(items => items.map(item => item.dataset.provider || item.id || 'luk').sort()), ['azure', 'azure-containers', 'cloudflare', 'deployment-back', 'github-pages', 'komplai', 'luk', 'promte', 'vercel']);
       assert(providers ? choices === 8 : choices <= 4, `${mode}: ${choices} synlige kontroller`); screens.push({ mode, choices, providers });
     } else screens.push({ mode });
     await page.screenshot({ path: path.join(root, mode + '.png') });
@@ -82,7 +82,7 @@ async function installFixture(app, mode, project) {
     await page.click('#deployment-other');
     const cards = page.locator('[data-deploy-step="providers"] [data-provider]:visible');
     // Seks ligestillede udbydere i alfabetisk rækkefølge på én skærm; ingen er fremhævet.
-    assert.deepEqual(await cards.evaluateAll(items => items.map(item => item.dataset.provider)), ['azure', 'cloudflare', 'github-pages', 'komplai', 'promte', 'vercel']);
+    assert.deepEqual(await cards.evaluateAll(items => items.map(item => item.dataset.provider)), ['azure-containers', 'azure', 'cloudflare', 'github-pages', 'komplai', 'promte', 'vercel']);
     assert.equal(await cards.evaluateAll(items => items.some(item => item.matches('.primary, [aria-pressed="true"]') || /anbefalet/i.test(item.innerText))), false);
     assert.equal(await page.locator('#deployment-more-providers').count(), 0);
     assert.equal(await app.evaluate(() => globalThis.komplaiFixtureCalls.length), calls, 'Indgangen og udbydervalget må ikke kontakte en tjeneste.');

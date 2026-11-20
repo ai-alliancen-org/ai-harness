@@ -51,3 +51,14 @@ test('mistænkeligt indhold i almindelig fil afvises', async t => {
   await fs.writeFile(path.join(root, 'public/config.js'), 'const api_key = "kun-syntetisk-testhemmelighed";'); await save();
   await assert.rejects(deploymentArtifact(root, 'public'), /hemmelighed/);
 });
+test('containerbyggemateriale bevarer den gemte Git-filtilstand for startscripts', async t => {
+  const { root, save } = await fixture(t);
+  await fs.writeFile(path.join(root, 'public/start.sh'), '#!/bin/sh\nexec node server.cjs\n');
+  await save();
+  await run(root, ['update-index', '--chmod=+x', 'public/start.sh']);
+  await run(root, ['-c', 'core.hooksPath=/dev/null', '-c', 'commit.gpgsign=false', '-c', 'user.name=Testbruger', '-c', 'user.email=test@example.invalid', 'commit', '-m', 'gem kørbart startscript']);
+  if (process.platform !== 'win32') await fs.chmod(path.join(root, 'public/start.sh'), 0o755);
+  const artifact = await deploymentArtifact(root, 'public');
+  assert.equal(artifact.files.find(f => f.file === 'start.sh').mode, '100755');
+  assert.equal(artifact.files.find(f => f.file === 'index.html').mode, '100644');
+});
