@@ -12,7 +12,14 @@ Senest kontrolleret 20. november 2026. Afsnittene er daterede, så tidligere beg
 
 **Rigtig Azure-prøve.** [Container Apps-gennemgangen](azure-container-apps.md#gennemført-liveprøve-19-november-2026) beskriver udgivelsen fra Aura til et særskilt testmiljø med managed identity. Revision, image-digest, startside, statiske filer og sundhedstjek er bekræftet. Den efterfølgende ændring af fremdriftsvisningen er prøvet mod kontrollerede svar.
 
-**Pakker og offentliggørelse:** Version og opdateringsmeddelelse er hævet til 0.7.0-beta.4. Brugeren har godkendt Git- og udgivelsesforløbet og oprettet en valideret notariseringsprofil lokalt. Developer ID-identiteten er Komplai ApS med samme team-ID som tidligere pakker, 2UX98897JW. Apple har godkendt begge første DMG-filer: Apple Silicon under `148b4a46-c4d5-407f-a073-db4e0ee814c0` og Intel under `c2b7c914-fb02-4a1e-b30b-ac8b30db503c`. Begge apps har fået deres billet og består signatur-, billet-, kilde-, runtime- og distributionskontrol. De samme apps er ompakket til de endelige DMG- og ZIP-filer. Apps i alle fire endelige arkiver er kontrolleret igen, og indholdet i de monterede DMG-filer matcher de godkendte apps. De fire endelige filer afventer deres egne Apple-kvitteringer. Intel-hardware og Windows er endnu ikke installationsafprøvet for denne kandidat.
+**Pakker og notariseringskontrol.** Version og opdateringsmeddelelse er hævet til 0.7.0-beta.4. Developer ID-identiteten er Komplai ApS med team-ID `2UX98897JW`. Begge apps har fået deres billet og består signatur-, billet-, kilde-, runtime- og distributionskontrol. Apps i alle fire endelige arkiver er kontrolleret igen, og indholdet i de monterede DMG-filer matcher de godkendte apps. Apple har godkendt alle fire endelige Mac-filer, og de fem programfiler matcher deres SHA-256-kontrolsummer. Downloadsiden er afprøvet lokalt i Chrome på desktop og mobil med download af de tre installationsfiler. Intel-hardware og Windows er endnu ikke installationsafprøvet.
+
+| Fil | Apples godkendte indsendelse |
+| --- | --- |
+| Apple Silicon DMG | `8f33449f-0e43-45a5-b4e7-91a4f2b14da8` |
+| Apple Silicon ZIP | `bd93c88a-ef0d-4718-bb3a-945576f4cf03` |
+| Intel DMG | `60480a91-6e42-4a33-80e2-405e2102718d` |
+| Intel ZIP | `b6430e27-8a3b-452e-a3fd-53e6a3857001` |
 
 De første pakker til Apple Silicon, Intel-Mac og Windows x64 er bygget lokalt efter `npm ci` (nul rapporterede sårbarheder) og forberedelse af de tre fastlåste runtimes. Kildebeviserne i de tre pakker dækker 212 produktfiler. Begge Mac-apps består den dybe, strenge kodesignaturkontrol og runtimekontrollen mod kvitteringen fra deres konkrete signering. Windows-installationsfilens faktiske NSIS-payload er pakket ud og kontrolleret mod samme kildekode, runtime, PE-arkitektur, versionsmetadata, ASAR-integritet og plugin-afhængigheder. Den er fortsat usigneret og ikke startet på Windows.
 
