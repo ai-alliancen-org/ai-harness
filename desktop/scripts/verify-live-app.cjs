@@ -139,6 +139,7 @@ async function main() {
     // Fejl fra AI'ens egne projektfiler i forhåndsvisningen (http://127.0.0.1:port) er prøvens emne,
     // ikke appfejl. De fanges i stedet af funktionstjekket på siden. Appens egne fejl (harness://) tæller med.
     page.on('pageerror', e => { if (!/\/\/127\.0\.0\.1:\d+\//.test(String(e.stack || ''))) errors.push(e.message); });
+    await page.locator('#welcome-build').waitFor({ state: 'attached' });
     await page.waitForFunction(() => !document.querySelector('#welcome-build').disabled);
     await page.exposeFunction('liveDemoEvent', event => {
       if (event.type === 'run.review') reviews.push(event);
