@@ -119,7 +119,7 @@ test('svar på AI’ens spørgsmål sendes som etiketter og kommer i briefen; sp
 
 test('motoren får spørgeværktøjet; OpenCode tilbyder det ellers kun til sine egne klienter', () => {
   const { isolatedEnv } = require('../core/engine.cjs');
-  const env = isolatedEnv(os.tmpdir(), {}, 'adgangskode');
+  const env = isolatedEnv(os.tmpdir(), {});
   assert.equal(env.OPENCODE_CLIENT, 'harness'); assert.equal(env.OPENCODE_ENABLE_QUESTION_TOOL, 'true');
 });
 

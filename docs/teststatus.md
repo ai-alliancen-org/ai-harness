@@ -1,8 +1,43 @@
 # Teststatus før invitation
 
-Senest kontrolleret 20. november 2026. Afsnittene er daterede, så tidligere begrænsninger kan læses i deres sammenhæng. Dette er status for den aktuelle arbejdsmappe, ikke en erklæring om, at alle installationsfiler eller modeller er klar. Særskilt godkendte Git-handlinger, udgivelser og GitHub-kørsler fremgår af de enkelte afsnit.
+Senest kontrolleret 25. november 2026. Afsnittene er daterede, så tidligere begrænsninger kan læses i deres sammenhæng. Dette er status for den aktuelle arbejdsmappe, ikke en erklæring om, at alle installationsfiler eller modeller er klar. Særskilt godkendte Git-handlinger, udgivelser og GitHub-kørsler fremgår af de enkelte afsnit.
 
 [Gennemgangen før offentlig beta](offentliggoerelse.md) samler historik- og logkontrol samt de lokale prøver af README, hjemmeside og udgivelseskontrol. Den offentliggør ikke appen og ændrer ikke installationsstatus nedenfor.
+
+## Beta 5: forhåndsvisningens nøgle · 25. november 2026
+
+Kun Node-prøver; ingen Electron-kørsel. Prøverne kørte på arbejdsmappen på `beta-5` før commit. Beslutningen står i `decisions.md`, «Beta 5 · motorens nøgler skjules for andre programmer», punktet «Forhåndsvisningens nøgle følger samme vej».
+
+**Prøver.**
+
+- Udvidet mod den rigtige motor: i `g-motorens-noegler-rigtig-motor.test.cjs` kalder den falske model nu `aura_preview` gennem en lokal bro. Efter start står ingen af de tre nøgler i motorens eller vagtprocessens startmiljø eller i nogen fil i motorens mappe, og kaldet når broen med broens nøgle.
+- Udvidet i Node: `c2-aura-preview.test.cjs` (pluginet henter nøglen hos nøglepluginet, og uden nøglen kaldes broen ikke), `preview-bridge.test.cjs`, `motorens-noegler.test.cjs` (også at vagtprocessen og nøglepluginet tager de samme navne), `engine-shell-env.test.cjs` og `engine-guardian.test.cjs`.
+- Mod den gamle kode i `desktop/core` fejler 9 af de 25 prøver i de seks filer, også prøven mod den rigtige motor.
+- Mod den rigtige motor: `g-motorens-noegler-rigtig-motor` 1 af 1, `g-kommando-miljoe-rigtig-motor` 1 af 1 og `m3-opencode-real` 9 af 9. `scripts/verify-preview-tool.cjs` bestod: modellen kaldte `aura_preview`, broen blev kaldt én gang med projektets rod, og Auras svar nåede modellen.
+- Hele desktop-suiten (`npm test` i `desktop/`): 1.618 af 1.618 bestod (to nye prøver). CLI-suiten (`npm run test:cli`): 120 bestod, ingen fejlede, og 4 er sprunget over som før. Begge kørte med lav prioritet, i alt 236 sekunder.
+
+**Ikke prøvet.** Electron-flowet (`verify-*.cjs`), den pakkede app, Linux og Windows.
+
+## Beta 5: motorens nøgler skjules · 25. november 2026
+
+Kun Node-prøver; ingen Electron-kørsel. Prøverne kørte på arbejdsmappen `codex/release-0.7.0-beta.4` (samme indhold som `main`) før commit; ændringerne er commit `c0bab79` på `beta-5`. Beslutningen står i `decisions.md`, «Beta 5 · motorens nøgler skjules for andre programmer».
+
+**Forundersøgelse mod den rigtige OpenCode 1.19.5 (macOS 27.2, Apple Silicon), med midlertidige mapper og en falsk gateway.**
+
+- `ps eww` viser startmiljøet for en anden proces med samme bruger, undtagen Apples egne programmer. Motoren er ikke beskyttet.
+- Motoren indlæser hverken `bunfig.toml` (preload), `.env`, `.env.local`, `.env.production` eller `BUN_OPTIONS` fra arbejdsmappen. Samme værdi i det rigtige miljø virker. Der er altså ingen anden vej ind for adgangskoden end miljøet.
+- OpenCode læser adgangskoden én gang ved start. Efter overskrivning og sletning i pluginet giver et kald med adgangskode 200 og uden 401, også efter en genindlæsning af instansen. Den overskrevne værdi brugt som adgangskode giver 401.
+- OpenCode genlæser `OPENCODE_CONFIG_CONTENT` ved hver indlæsning af instansen, og `rg` arver motorens kopi af miljøet. Derfor står gatewaynøglen ikke længere i opsætningen.
+- Med gatewaynøglen gennem config-hooket viser `/config` den rigtige nøgle, og to modelkald (før og efter en genindlæsning) når gatewayen med den rigtige nøgle.
+
+**Prøver.**
+
+- Nye: `motorens-noegler.test.cjs` (4), to i `engine-guardian.test.cjs` og `g-motorens-noegler-rigtig-motor.test.cjs` mod den rigtige motor. Udvidet: `g-kommando-miljoe-rigtig-motor.test.cjs` (også gatewaynøglen), `engine-start.test.cjs`, `engine-shell-env.test.cjs` og `engine-start-cancellation.test.cjs`, hvor den falske motor nu kræver sin adgangskode og kører nøglepluginets config-hook.
+- Mod den gamle `engine.cjs` og `engine-guardian.cjs` fejler prøven mod den rigtige motor, de to nye vagtprøver (den ene ved tidsgrænsen) og den nye påstand i `engine-start.test.cjs`.
+- De 11 berørte filer: 69 prøver bestod. Mod den rigtige motor: `g-motorens-noegler-rigtig-motor` 1 af 1, `g-kommando-miljoe-rigtig-motor` 1 af 1 og `m3-opencode-real` 9 af 9.
+- Hele desktop-suiten (`npm test` i `desktop/`): 1.616 af 1.616 bestod. CLI-suiten (`npm run test:cli`): 120 bestod, ingen fejlede, og 4 er sprunget over som før (valgfrie eller platformsbestemte). Begge kørte med lav prioritet, i alt 224 sekunder.
+
+**Ikke prøvet.** Electron-flowet (`verify-*.cjs`), den pakkede app, Linux og Windows.
 
 ## Offentlig desktopbeta 0.7.0-beta.4 · 20. november 2026
 

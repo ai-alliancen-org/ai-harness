@@ -176,7 +176,7 @@ test('corti-s1 får plads til tanker og svar, og kun de indsatsniveauer, Corti s
 test('OpenCode får Auras højeste svarloft, så modellens egen grænse bestemmer', () => {
   const { isolatedEnv } = require('../core/engine.cjs');
   const { OUTPUT_CEILING } = require('../core/connections.cjs');
-  assert.equal(isolatedEnv(require('node:os').tmpdir(), {}, 'adgangskode').OPENCODE_EXPERIMENTAL_OUTPUT_TOKEN_MAX, String(OUTPUT_CEILING));
+  assert.equal(isolatedEnv(require('node:os').tmpdir(), {}).OPENCODE_EXPERIMENTAL_OUTPUT_TOKEN_MAX, String(OUTPUT_CEILING));
   assert.equal(OUTPUT_CEILING, 128000);
 });
 test('gatewayen sender kun en indsats, når brugeren har valgt den, og som hver udbyder forventer', async t => {

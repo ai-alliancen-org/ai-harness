@@ -103,6 +103,6 @@ Niveau: *enhedsprøvet* for alle rettelser og *kørt mod rigtigt materiale* (den
 1. Skal en komplai-AI-forbindelse, hvis tilbagekaldelse mislykkes, fortsat fjernes uden spørgsmål, eller kræve «Fjern kun fra denne computer»?
 2. Skal en ødelagt gendannelsesjournal flyttes til side?
 3. Skal appvalget i komplai Run med fem synlige kontroller (Ny app, Eksisterende app, Konto og adgang, Tilbage, Luk) være en udtrykkelig undtagelse fra grænsen på fire?
-4. Skal hullet i kommandoer uden sandkasse (de kan læse motorens midlertidige nøgle med brugerens rettigheder) stå som kendt begrænsning i beta 3 eller kræve en ombygning af motorstarten?
+4. Skal hullet i kommandoer uden sandkasse (de kan læse motorens midlertidige nøgle med brugerens rettigheder) stå som kendt begrænsning i beta 3 eller kræve en ombygning af motorstarten? *Bygget 25. november 2026 til beta 5 (`decisions.md`, «Beta 5 · motorens nøgler skjules for andre programmer»).*
 
 Øvrige smådetaljer, som sporene meldte som spørgsmål (om en 503 med langt Retry-After også skal stoppe straks, om cookien i terminalens forhåndsvisning må følge med til andre lokale porte, og om dialogen med AI-forbindelser skal spørge, før den lukker med ugemte ændringer), er ikke afgjort og ændrer ikke noget i beta 3.

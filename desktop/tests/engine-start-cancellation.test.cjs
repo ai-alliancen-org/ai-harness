@@ -28,14 +28,19 @@ if (process.argv.includes('--version')) {
   reached('serve');
   (async () => {
     const engine = JSON.parse(process.env.OPENCODE_CONFIG_CONTENT);
-    // Den genererede skrive-/læsevagt kvitterer på samme måde, som når OpenCode indlæser den.
+    // Som OpenCode: adgangskoden læses ved start, før pluginerne indlæses (nøglepluginet sletter den fra miljøet).
+    const password = process.env.OPENCODE_SERVER_PASSWORD, expected = 'Basic ' + Buffer.from('harness:' + password).toString('base64');
+    // De genererede plugins kvitterer på samme måde, som når OpenCode indlæser dem. Nøglepluginets config-hook giver
+    // gatewaynøglen tilbage til opsætningen, som /config så viser.
     for (const source of engine.plugin) {
       const plugin = await import(source);
+      if (plugin.AuraEngineSecrets) await (await plugin.AuraEngineSecrets()).config(engine);
       if (plugin.AuraReadProtection) await plugin.AuraReadProtection();
     }
     const answer = (res, value) => { res.setHeader('content-type', 'application/json'); res.end(JSON.stringify(value)); };
     const server = http.createServer((req, res) => {
       seen(req.method + ' ' + req.url);
+      if (!password || req.headers.authorization !== expected) { res.writeHead(401); return res.end(); }
       if (req.url === '/global/health') { reached('health'); if (config.hold !== 'health') answer(res, { version: config.version }); }
       else if (req.url === '/config') answer(res, engine);
       else if (req.url === '/session' && req.method === 'POST') { reached('session'); if (config.hold !== 'session') answer(res, { id: 'ses_startup_test' }); }
@@ -80,7 +85,8 @@ async function fixture(t, hold) {
   process.env.HARNESS_OPENCODE_PATH = binary;
   const events = [], engine = new OpenCodeEngine({ root, directory: path.join(base, 'runtime'), model: { id: 'test' },
     provider: { npm: '@ai-sdk/openai-compatible', name: 'test', options: { baseURL: 'http://127.0.0.1:1/v1', apiKey: 'synthetic-only' }, models: { test: { name: 'test' } } },
-    startTimeout: 8000, onEvent: event => events.push(event) });
+    // Den falske motor er Node, ikke OpenCodes Bun, så den kan ikke skjule hemmelighederne; resten af nøglekontrollen gælder.
+    startTimeout: 8000, requireHiddenSecrets: false, onEvent: event => events.push(event) });
   let settled = false;
   const started = engine.start().then(value => { settled = true; return { value }; }, error => { settled = true; return { error }; });
   t.after(async () => {

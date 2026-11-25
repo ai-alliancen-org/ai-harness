@@ -62,7 +62,7 @@ async function startEngine({ root, directory, config, env = {} }) {
   await fs.mkdir(path.join(directory, 'home'), { recursive: true });
   await writePluginRuntime(directory);
   const password = randomBytes(32).toString('hex'), auth = 'Basic ' + Buffer.from('harness:' + password).toString('base64');
-  const child = spawn(executable, ['serve', '--hostname', '127.0.0.1', '--port', '0'], { cwd: root, env: { ...isolatedEnv(directory, config, password), ...env }, detached: process.platform !== 'win32', windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+  const child = spawn(executable, ['serve', '--hostname', '127.0.0.1', '--port', '0'], { cwd: root, env: { ...isolatedEnv(directory, config), OPENCODE_SERVER_PASSWORD: password, ...env }, detached: process.platform !== 'win32', windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
   let stderr = ''; child.stderr.on('data', chunk => { stderr = (stderr + chunk).slice(-8000); });
   const url = await new Promise((resolve, reject) => {
     let output = ''; const timer = setTimeout(() => reject(new Error('OpenCode startede ikke inden for 120 s. ' + stderr)), 120000);

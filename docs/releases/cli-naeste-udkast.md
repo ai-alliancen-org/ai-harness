@@ -7,6 +7,7 @@
 - API-nøgler gemmes i computerens nøglering: macOS Nøglering, DPAPI gennem PowerShell på Windows og en nøgletjeneste gennem `secret-tool` (libsecret) på Linux. Adgangssætningen bruges kun som reserve, når nøgleringen ikke kan bruges, og CLI'en siger det.
 - Nøgler fra 0.2.0-beta.6 ligger i adgangssætningslageret. Første gang en sådan forbindelse bruges, beder CLI'en om den gamle adgangssætning og flytter alle gamle nøgler til nøgleringen. Når de er flyttet, bruges adgangssætningen ikke mere; ved en forkert adgangssætning flyttes intet, og CLI'en spørger igen næste gang. `aura login` tilbyder også at flytte dem med valgene **Flyt nu (anbefalet)** og **Ikke nu**. Har man glemt adgangssætningen, fjernes de gamle forbindelser med `aura logout`.
 - OpenCode-motoren er 1.19.5.
+- Motorens adgangskode og gatewayens midlertidige nøgle står ikke længere i motorens miljø, når motoren er startet, så andre programmer ikke kan læse dem med `ps eww`. Lykkes det ikke på macOS, startes opgaven ikke. På Linux prøves det samme, men CLI'en er ikke afprøvet dér. På Windows står nøglerne stadig i motorens miljø.
 - Komplai er ikke et AI-valg i terminalen. En gammel Komplai-forbindelse kan kun fjernes med `aura logout`. Kan dens nøgle ikke læses, fjernes den efter et ja kun fra Aura, og adgangen kan tilbagekaldes i Komplai.
 - **AI på min computer** gemmer Ollamas egen adresse, også når den er skrevet med `/v1`.
 - Ctrl+C under login og modelvalg stopper selve netkaldet, så terminalen ikke venter på tidsgrænsen.
