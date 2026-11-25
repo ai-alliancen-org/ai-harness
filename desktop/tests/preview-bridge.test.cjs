@@ -25,9 +25,12 @@ test('en fejl i håndteringen bliver til en dansk fejltekst, ikke en stakspor', 
   assert.equal(response.status, 200); assert.equal(body.state, 'error'); assert.match(body.message, /Installér projektets pakker først/); assert.doesNotMatch(JSON.stringify(body), /at .*\.cjs/);
 });
 
-test('pluginkilden indeholder værktøjet og kun den nøgle og rod, den blev skrevet til', () => {
-  const source = preview.pluginSource({ url: 'http://127.0.0.1:1234/', token: 'hemmelig', root: '/projekt' });
-  assert.match(source, /aura_preview/); assert.match(source, /"hemmelig"/); assert.match(source, /"\/projekt"/);
+test('pluginfilen indeholder værktøjet og projektets rod, men ikke broens nøgle', () => {
+  // Nøglen kommer med motorens hemmeligheder (engine-secrets.cjs). En fil i motorens mappe kan læses af andre programmer.
+  const source = preview.pluginSource({ url: 'http://127.0.0.1:1234/', token: 'SYNTETISK-BRONOEGLE', root: '/projekt' });
+  assert.match(source, /aura_preview/); assert.match(source, /"\/projekt"/); assert.match(source, /"http:\/\/127\.0\.0\.1:1234\/"/);
+  assert.doesNotMatch(source, /SYNTETISK-BRONOEGLE/);
+  assert.match(source, /AURA_PREVIEW_TOKEN/);
   assert.match(source, /enum\(\['start', 'status'\]\)/);
 });
 

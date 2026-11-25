@@ -1,9 +1,9 @@
-// RN:B1-2: AI'ens kommandoer må ikke arve motorens opsætning, adgangskode eller gatewaynøgle. Motoren starter med
-// OPENCODE_CONFIG_CONTENT (gatewayens adresse, med en pladsholder i stedet for nøglen), OPENCODE_SERVER_USERNAME og, ad en anden vej end
-// startmiljøet, OPENCODE_SERVER_PASSWORD og AURA_GATEWAY_TOKEN (engine-secrets.cjs). Nøglepluginet sletter de to sidste fra motorens
-// miljø; read-guardens shell.env tømmer dem alle for kommandoerne som en ekstra sikring. Prøven går gennem det genererede plugin, som
-// motoren indlæser. At andre programmer heller ikke kan læse dem i motorens proces efter starten (ps eww, /proc/<pid>/environ), viser
-// g-motorens-noegler-rigtig-motor.test.cjs mod den rigtige motor.
+// RN:B1-2: AI'ens kommandoer må ikke arve motorens opsætning, adgangskode, gatewaynøgle eller forhåndsvisningens nøgle. Motoren starter
+// med OPENCODE_CONFIG_CONTENT (gatewayens adresse, med en pladsholder i stedet for nøglen), OPENCODE_SERVER_USERNAME og, ad en anden vej
+// end startmiljøet, OPENCODE_SERVER_PASSWORD, AURA_GATEWAY_TOKEN og AURA_PREVIEW_TOKEN (engine-secrets.cjs). Nøglepluginet sletter de tre
+// sidste fra motorens miljø; read-guardens shell.env tømmer dem alle for kommandoerne som en ekstra sikring. Prøven går gennem det
+// genererede plugin, som motoren indlæser. At andre programmer heller ikke kan læse dem i motorens proces efter starten (ps eww,
+// /proc/<pid>/environ), viser g-motorens-noegler-rigtig-motor.test.cjs mod den rigtige motor.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
@@ -26,19 +26,19 @@ async function commandEnv(hooks, engineEnv) {
   await hooks['shell.env']({ cwd: '/', sessionID: 's', callID: 'c' }, output);
   return { ...engineEnv, ...output.env };
 }
-const KEYS = ['OPENCODE_CONFIG_CONTENT', 'OPENCODE_SERVER_PASSWORD', 'OPENCODE_SERVER_USERNAME', 'AURA_GATEWAY_TOKEN'];
+const KEYS = ['OPENCODE_CONFIG_CONTENT', 'OPENCODE_SERVER_PASSWORD', 'OPENCODE_SERVER_USERNAME', 'AURA_GATEWAY_TOKEN', 'AURA_PREVIEW_TOKEN'];
 
-test('en kommando arver ikke motorens opsætning, adgangskode, brugernavn eller gatewaynøgle', async t => {
+test('en kommando arver ikke motorens opsætning, adgangskode, brugernavn, gatewaynøgle eller forhåndsvisningens nøgle', async t => {
   const { directory, hooks } = await plugin(t);
   const config = { provider: { harness: { options: { apiKey: 'SYNTETISK-GATEWAYNØGLE', baseURL: 'http://127.0.0.1:1/v1' } } } };
   // Alt det, motoren får ved start: startmiljøet og hemmelighederne, som her lægges ved siden af.
-  const engineEnv = { ...isolatedEnv(directory, withoutToken(config)), ...secretEnv('SYNTETISK-MOTORADGANGSKODE', 'SYNTETISK-GATEWAYNØGLE') };
+  const engineEnv = { ...isolatedEnv(directory, withoutToken(config)), ...secretEnv('SYNTETISK-MOTORADGANGSKODE', 'SYNTETISK-GATEWAYNØGLE', 'SYNTETISK-BRONØGLE') };
   for (const key of KEYS) assert.ok(engineEnv[key], key);
   // Opsætningen i startmiljøet har pladsholderen, ikke gatewaynøglen.
   assert.doesNotMatch(engineEnv.OPENCODE_CONFIG_CONTENT, /SYNTETISK-GATEWAYNØGLE/);
   const env = await commandEnv(hooks, engineEnv);
   for (const key of KEYS) assert.equal(Boolean(env[key]), false, key);
-  assert.doesNotMatch(JSON.stringify(env), /SYNTETISK-GATEWAYNØGLE|SYNTETISK-MOTORADGANGSKODE/);
+  assert.doesNotMatch(JSON.stringify(env), /SYNTETISK-GATEWAYNØGLE|SYNTETISK-MOTORADGANGSKODE|SYNTETISK-BRONØGLE/);
   // Resten af motorens miljø står, fx PATH og motorens egne mapper.
   assert.equal(env.PATH, engineEnv.PATH);
 });

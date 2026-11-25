@@ -1,6 +1,7 @@
-// Motorens hemmeligheder (engine-secrets.cjs): adgangskoden og gatewaynøglen kommer uden om startmiljøets opsætning, og nøglepluginet
-// tager dem, sletter dem fra motorens miljø og giver gatewaynøglen tilbage gennem config-hooket. Her indlæses pluginet i Node i en
-// separat proces, som motoren ville; Node har ikke bun:ffi, så overskrivningen af startmiljøet prøves mod den rigtige motor i
+// Motorens hemmeligheder (engine-secrets.cjs): adgangskoden, gatewaynøglen og forhåndsvisningens nøgle kommer uden om startmiljøets
+// opsætning, og nøglepluginet tager dem, sletter dem fra motorens miljø, giver gatewaynøglen tilbage gennem config-hooket og holder
+// broens nøgle til forhåndsvisningens plugin (preview-bridge.cjs). Her indlæses pluginet i Node i en separat proces, som motoren
+// ville; Node har ikke bun:ffi, så overskrivningen af startmiljøet prøves mod den rigtige motor i
 // g-motorens-noegler-rigtig-motor.test.cjs.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
@@ -23,16 +24,18 @@ const config = () => ({ provider: { harness: { options: { apiKey: ${JSON.stringi
 const first = config(), second = config();
 await (await plugin.AuraEngineSecrets()).config(first);
 await (await plugin.AuraEngineSecrets()).config(second);
-console.log(JSON.stringify({ env: { password: process.env.OPENCODE_SERVER_PASSWORD ?? null, token: process.env.AURA_GATEWAY_TOKEN ?? null }, keys: [first, second].map(c => c.provider.harness.options.apiKey) }));`;
+const held = globalThis[Symbol.for(${JSON.stringify(secrets.HELD)})];
+console.log(JSON.stringify({ env: { password: process.env.OPENCODE_SERVER_PASSWORD ?? null, token: process.env.AURA_GATEWAY_TOKEN ?? null, preview: process.env.AURA_PREVIEW_TOKEN ?? null }, keys: [first, second].map(c => c.provider.harness.options.apiKey), preview: held?.secrets?.AURA_PREVIEW_TOKEN ?? null }));`;
   const { stdout } = await promisify(execFile)(process.execPath, ['--input-type=module', '-e', script], { env: { PATH: process.env.PATH, ...env } });
   return JSON.parse(stdout);
 }
 
 test('nøglepluginet sletter hemmelighederne fra motorens miljø og giver gatewaynøglen tilbage ved hver indlæsning', async t => {
   const plugin = await secrets.writePlugin(await folder(t));
-  const result = await loadPlugin(plugin.pluginURL, secrets.secretEnv('SYNTETISK-ADGANGSKODE', 'SYNTETISK-GATEWAYNOEGLE'));
-  assert.deepEqual(result.env, { password: null, token: null }, 'motorens kopi af miljøet har dem ikke mere');
+  const result = await loadPlugin(plugin.pluginURL, secrets.secretEnv('SYNTETISK-ADGANGSKODE', 'SYNTETISK-GATEWAYNOEGLE', 'SYNTETISK-BRONOEGLE'));
+  assert.deepEqual(result.env, { password: null, token: null, preview: null }, 'motorens kopi af miljøet har dem ikke mere');
   assert.deepEqual(result.keys, ['SYNTETISK-GATEWAYNOEGLE', 'SYNTETISK-GATEWAYNOEGLE'], 'opsætningen får den rigtige nøgle hver gang');
+  assert.equal(result.preview, 'SYNTETISK-BRONOEGLE', 'forhåndsvisningens plugin kan hente broens nøgle hos nøglepluginet');
   const report = await secrets.verify(plugin, { expected: secrets.KEYS });
   assert.deepEqual(report.received.sort(), [...secrets.KEYS].sort());
   // Node kan ikke overskrive startmiljøet. Kræves det skjult, afvises starten.
@@ -40,10 +43,11 @@ test('nøglepluginet sletter hemmelighederne fra motorens miljø og giver gatewa
   await assert.rejects(secrets.verify(plugin, { expected: secrets.KEYS, requireHidden: true }), /kunne ikke skjules for andre programmer/);
 });
 
-test('uden gatewaynøgle bliver pladsholderen stående, og kontrollen kræver kun adgangskoden', async t => {
+test('uden gatewaynøgle og forhåndsvisning bliver pladsholderen stående, og kontrollen kræver kun adgangskoden', async t => {
   const plugin = await secrets.writePlugin(await folder(t));
   const result = await loadPlugin(plugin.pluginURL, secrets.secretEnv('SYNTETISK-ADGANGSKODE', ''));
   assert.deepEqual(result.keys, [secrets.PLACEHOLDER, secrets.PLACEHOLDER]);
+  assert.equal(result.preview, null);
   await secrets.verify(plugin, { expected: ['OPENCODE_SERVER_PASSWORD'] });
   await assert.rejects(secrets.verify(plugin, { expected: secrets.KEYS }), /blev ikke indlæst/);
 });
@@ -71,4 +75,14 @@ test('startopsætningen har pladsholderen i stedet for gatewaynøglen, og origin
   assert.deepEqual(secrets.withoutToken({ provider: { harness: { options: { baseURL: 'x' } } } }), { provider: { harness: { options: { baseURL: 'x' } } } });
   assert.deepEqual(secrets.secretEnv('a', 'b'), { OPENCODE_SERVER_PASSWORD: 'a', AURA_GATEWAY_TOKEN: 'b' });
   assert.deepEqual(secrets.secretEnv('a', undefined), { OPENCODE_SERVER_PASSWORD: 'a' });
+  assert.deepEqual(secrets.secretEnv('a', 'b', 'c'), { OPENCODE_SERVER_PASSWORD: 'a', AURA_GATEWAY_TOKEN: 'b', AURA_PREVIEW_TOKEN: 'c' });
+  assert.deepEqual(secrets.secretEnv('a', '', 'c'), { OPENCODE_SERVER_PASSWORD: 'a', AURA_PREVIEW_TOKEN: 'c' });
+});
+
+test('vagtprocessen tager imod netop de navne, nøglepluginet tager', async () => {
+  // Vagtprocessen pakkes ud af app.asar for sig selv og har sin egen kopi af listen.
+  const source = await fs.readFile(path.join(__dirname, '..', 'core', 'engine-guardian.cjs'), 'utf8');
+  const list = source.match(/const SECRET_KEYS = \[([^\]]*)\];/)?.[1];
+  assert.ok(list, 'listen findes i engine-guardian.cjs');
+  assert.deepEqual(list.split(',').map(name => name.trim().replace(/^'|'$/g, '')), [...secrets.KEYS]);
 });

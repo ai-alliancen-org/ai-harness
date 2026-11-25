@@ -4,9 +4,23 @@ Senest kontrolleret 25. november 2026. Afsnittene er daterede, så tidligere beg
 
 [Gennemgangen før offentlig beta](offentliggoerelse.md) samler historik- og logkontrol samt de lokale prøver af README, hjemmeside og udgivelseskontrol. Den offentliggør ikke appen og ændrer ikke installationsstatus nedenfor.
 
+## Beta 5: forhåndsvisningens nøgle · 25. november 2026
+
+Kun Node-prøver; ingen Electron-kørsel. Prøverne kørte på arbejdsmappen på `beta-5` før commit. Beslutningen står i `decisions.md`, «Beta 5 · motorens nøgler skjules for andre programmer», punktet «Forhåndsvisningens nøgle følger samme vej».
+
+**Prøver.**
+
+- Udvidet mod den rigtige motor: i `g-motorens-noegler-rigtig-motor.test.cjs` kalder den falske model nu `aura_preview` gennem en lokal bro. Efter start står ingen af de tre nøgler i motorens eller vagtprocessens startmiljø eller i nogen fil i motorens mappe, og kaldet når broen med broens nøgle.
+- Udvidet i Node: `c2-aura-preview.test.cjs` (pluginet henter nøglen hos nøglepluginet, og uden nøglen kaldes broen ikke), `preview-bridge.test.cjs`, `motorens-noegler.test.cjs` (også at vagtprocessen og nøglepluginet tager de samme navne), `engine-shell-env.test.cjs` og `engine-guardian.test.cjs`.
+- Mod den gamle kode i `desktop/core` fejler 9 af de 25 prøver i de seks filer, også prøven mod den rigtige motor.
+- Mod den rigtige motor: `g-motorens-noegler-rigtig-motor` 1 af 1, `g-kommando-miljoe-rigtig-motor` 1 af 1 og `m3-opencode-real` 9 af 9. `scripts/verify-preview-tool.cjs` bestod: modellen kaldte `aura_preview`, broen blev kaldt én gang med projektets rod, og Auras svar nåede modellen.
+- Hele desktop-suiten (`npm test` i `desktop/`): 1.618 af 1.618 bestod (to nye prøver). CLI-suiten (`npm run test:cli`): 120 bestod, ingen fejlede, og 4 er sprunget over som før. Begge kørte med lav prioritet, i alt 236 sekunder.
+
+**Ikke prøvet.** Electron-flowet (`verify-*.cjs`), den pakkede app, Linux og Windows.
+
 ## Beta 5: motorens nøgler skjules · 25. november 2026
 
-Kun Node-prøver; ingen Electron-kørsel. Arbejdsmappen er `codex/release-0.7.0-beta.4` (samme indhold som `main`) med ændringerne uden commit. Beslutningen står i `decisions.md`, «Beta 5 · motorens nøgler skjules for andre programmer».
+Kun Node-prøver; ingen Electron-kørsel. Prøverne kørte på arbejdsmappen `codex/release-0.7.0-beta.4` (samme indhold som `main`) før commit; ændringerne er commit `c0bab79` på `beta-5`. Beslutningen står i `decisions.md`, «Beta 5 · motorens nøgler skjules for andre programmer».
 
 **Forundersøgelse mod den rigtige OpenCode 1.19.5 (macOS 27.2, Apple Silicon), med midlertidige mapper og en falsk gateway.**
 

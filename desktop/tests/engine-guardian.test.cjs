@@ -105,8 +105,8 @@ test('dør ejeren, mens vagtprocessen starter, efterlades ingen motor', posix, a
 test('motorens hemmeligheder når motoren gennem IPC og står ikke i vagtprocessens eget startmiljø', posix, async t => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'aura-vagt-noegler-'));
   const marker = path.join(directory, 'motor.json'), fixture = path.join(directory, 'motor.cjs');
-  await fs.writeFile(fixture, `require('node:fs').writeFileSync(${JSON.stringify(marker)},JSON.stringify({pid:process.pid,password:process.env.OPENCODE_SERVER_PASSWORD??null,token:process.env.AURA_GATEWAY_TOKEN??null}));setInterval(()=>{},1000);`);
-  const password = 'SYNTETISK-ADGANGSKODE-' + process.pid, token = 'SYNTETISK-GATEWAYNOEGLE-' + process.pid;
+  await fs.writeFile(fixture, `require('node:fs').writeFileSync(${JSON.stringify(marker)},JSON.stringify({pid:process.pid,password:process.env.OPENCODE_SERVER_PASSWORD??null,token:process.env.AURA_GATEWAY_TOKEN??null,preview:process.env.AURA_PREVIEW_TOKEN??null}));setInterval(()=>{},1000);`);
+  const password = 'SYNTETISK-ADGANGSKODE-' + process.pid, token = 'SYNTETISK-GATEWAYNOEGLE-' + process.pid, preview = 'SYNTETISK-BRONOEGLE-' + process.pid;
   const owned = spawn(process.execPath, [guardian, process.execPath, fixture], { stdio: ['ignore', 'ignore', 'ignore', 'ipc'] });
   let engine;
   t.after(async () => {
@@ -114,15 +114,17 @@ test('motorens hemmeligheder når motoren gennem IPC og står ikke i vagtprocess
     if (engine?.pid) { try { process.kill(-engine.pid, 'SIGKILL'); } catch (error) { if (error.code !== 'ESRCH') throw error; } }
     await fs.rm(directory, { recursive: true, force: true });
   });
-  owned.send({ type: 'secrets', env: { OPENCODE_SERVER_PASSWORD: password, AURA_GATEWAY_TOKEN: token } });
+  owned.send({ type: 'secrets', env: { OPENCODE_SERVER_PASSWORD: password, AURA_GATEWAY_TOKEN: token, AURA_PREVIEW_TOKEN: preview } });
   for (let i = 0; i < 100; i++) { try { engine = JSON.parse(await fs.readFile(marker, 'utf8')); break; } catch { await pause(30); } }
   assert.ok(engine?.pid && alive(engine.pid));
   assert.equal(engine.password, password, 'motoren får adgangskoden');
   assert.equal(engine.token, token, 'motoren får gatewaynøglen');
+  assert.equal(engine.preview, preview, 'motoren får forhåndsvisningens nøgle');
   const own = await startEnvironment(owned.pid);
   assert.match(own, /PATH=/, 'vagtprocessens startmiljø kunne læses');
   assert.equal(own.includes(password), false, 'adgangskoden står ikke i vagtprocessens startmiljø');
   assert.equal(own.includes(token), false, 'gatewaynøglen står ikke i vagtprocessens startmiljø');
+  assert.equal(own.includes(preview), false, 'forhåndsvisningens nøgle står ikke i vagtprocessens startmiljø');
 });
 
 test('vagtprocessen starter ikke motoren uden adgangskode, med ukendte navne eller uden hemmeligheder', { skip: process.platform === 'win32', timeout: 20000 }, async t => {

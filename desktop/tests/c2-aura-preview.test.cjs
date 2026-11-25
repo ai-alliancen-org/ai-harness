@@ -9,6 +9,7 @@ const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { aiPreview } = require('../core/ai-preview.cjs');
 const bridge = require('../core/preview-bridge.cjs');
+const secrets = require('../core/engine-secrets.cjs');
 const nu = { wait: async () => {} };
 
 function statiskRum({ url = null } = {}) {
@@ -53,13 +54,21 @@ function viteRum() {
   return { devServer: server, forceStatic: false, owner: { project: { root: '/p' }, store: { project: async () => ({ previewConsent: { fingerprint: 'f1', scripts: false } }) } } };
 }
 
-// Pluginet køres, som motoren kører det: som ES-modul med det rigtige @opencode-ai/plugin.
-async function aabnPlugin(t, info) {
+// Pluginet køres, som motoren kører det: som ES-modul med det rigtige @opencode-ai/plugin, efter nøglepluginet, der tager broens
+// nøgle fra motorens miljø (engine-secrets.cjs). Nøglen står ikke i pluginfilen. Med previewToken null har motoren ikke fået den.
+async function aabnPlugin(t, info, previewToken = info.token) {
   const directory = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), 'aura-c2-plugin-')));
   t.after(() => fs.rm(directory, { recursive: true, force: true }));
+  const held = Symbol.for(secrets.HELD);
+  delete globalThis[held];
+  if (previewToken) process.env.AURA_PREVIEW_TOKEN = previewToken; else delete process.env.AURA_PREVIEW_TOKEN;
+  t.after(() => { delete globalThis[held]; delete process.env.AURA_PREVIEW_TOKEN; });
+  await import((await secrets.writePlugin(directory)).pluginURL);
+  assert.equal(process.env.AURA_PREVIEW_TOKEN, undefined, 'nøglepluginet har taget nøglen fra motorens miljø');
   const plugin = pathToFileURL(path.join(__dirname, '../node_modules/@opencode-ai/plugin/dist/index.js')).href;
-  const file = path.join(directory, 'aura-preview.mjs');
-  await fs.writeFile(file, bridge.pluginSource(info).replace("'@opencode-ai/plugin'", JSON.stringify(plugin)));
+  const file = path.join(directory, 'aura-preview.mjs'), source = bridge.pluginSource(info);
+  if (info.token) assert.equal(source.includes(info.token), false, 'broens nøgle står ikke i pluginfilen');
+  await fs.writeFile(file, source.replace("'@opencode-ai/plugin'", JSON.stringify(plugin)));
   const { AuraPreview } = await import(pathToFileURL(file).href);
   return (await AuraPreview()).tool.aura_preview;
 }
@@ -73,13 +82,14 @@ test('fund 25: pluginet venter længere end Aura højst venter på installation 
   assert.ok(timeout > aura, `pluginet giver op efter ${timeout} ms, men Aura venter op til ${aura} ms på installation og start`);
   // Motoren (OpenCode 1.19.5) kører pluginet i Bun 1.4.4, og dér giver fetch selv op efter cirka 360 sekunder, også med et
   // længere signal (målt med motoren). Kun med timeout: false gælder pluginets egen grænse. Prøven ser, hvad fetch faktisk får.
-  const tool = await aabnPlugin(t, { url: 'http://127.0.0.1:1/', token: 't', root: '/p' });
+  const tool = await aabnPlugin(t, { url: 'http://127.0.0.1:1/', token: 'SYNTETISK-BRONOEGLE', root: '/p' });
   const kald = [], original = globalThis.fetch;
   t.after(() => { globalThis.fetch = original; });
   globalThis.fetch = async (url, init) => { kald.push(init); return new Response(JSON.stringify({ state: 'running', url: 'http://localhost:5173/' })); };
   const stop = new AbortController();
   assert.equal(JSON.parse(await tool.execute({ action: 'start' }, { abort: stop.signal })).state, 'running');
   assert.equal(kald.length, 1);
+  assert.equal(kald[0].headers.authorization, 'Bearer SYNTETISK-BRONOEGLE', 'nøglen kommer fra nøglepluginet');
   assert.equal(kald[0].timeout, false, 'Bun-motorens egen grænse for fetch skal være slået fra, ellers giver pluginet op efter cirka 360 sekunder');
   assert.ok(kald[0].signal instanceof AbortSignal && !kald[0].signal.aborted, 'pluginets egen ventetid styrer kaldet');
   stop.abort(); assert.equal(kald[0].signal.aborted, true, 'Stop afbryder kaldet');
@@ -98,4 +108,17 @@ test('fund 25: pluginet giver Auras svar videre, og Stop afslutter ventetiden me
   assert.ok(Date.now() - started < 5000, 'værktøjet venter ikke videre efter Stop');
   assert.equal(stopped.state, 'error'); assert.match(stopped.message, /stoppet/);
   assert.doesNotMatch(stopped.message, /Bed brugeren starte forhåndsvisningen/);
+});
+
+test('har motoren ikke fået broens nøgle, kalder værktøjet ikke broen', async t => {
+  const kaldt = [];
+  const svarer = await bridge.listen({ start: async () => { kaldt.push('start'); return { state: 'running', url: 'http://localhost:5173/' }; }, status: async () => ({ state: 'idle' }) });
+  t.after(() => svarer.close());
+  const tool = await aabnPlugin(t, { url: svarer.url, token: svarer.token, root: '/p' }, null);
+  const forsøg = [], original = globalThis.fetch;
+  t.after(() => { globalThis.fetch = original; });
+  globalThis.fetch = async (...args) => { forsøg.push(args); return original(...args); };
+  const svar = JSON.parse(await tool.execute({ action: 'start' }, { abort: new AbortController().signal }));
+  assert.equal(svar.state, 'error'); assert.match(svar.message, /Bed brugeren starte forhåndsvisningen i appen/);
+  assert.deepEqual([forsøg.length, kaldt.length], [0, 0], 'broen blev ikke kaldt');
 });

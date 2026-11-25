@@ -7,8 +7,9 @@ const executable = process.argv[2], args = process.argv.slice(3);
 if (process.platform === 'win32' || !process.connected || !executable || !(path.isAbsolute(executable) || /^opencode$/.test(executable))) process.exit(1);
 // Motorens hemmeligheder kommer gennem IPC-forbindelsen, ikke gennem vagtprocessens eget miljø, så ps eww og /proc/<pid>/environ
 // ikke kan vise dem her (engine-secrets.cjs). Kun disse navne tages imod, og uden adgangskoden startes motoren ikke: en OpenCode uden
-// adgangskode svarer alle programmer på computeren.
-const SECRET_KEYS = ['OPENCODE_SERVER_PASSWORD', 'AURA_GATEWAY_TOKEN'];
+// adgangskode svarer alle programmer på computeren. Listen er den samme som KEYS i engine-secrets.cjs; vagtprocessen pakkes ud af
+// app.asar for sig selv og kan ikke indlæse modulet.
+const SECRET_KEYS = ['OPENCODE_SERVER_PASSWORD', 'AURA_GATEWAY_TOKEN', 'AURA_PREVIEW_TOKEN'];
 let child, closing = false, timer;
 function signal(name) {
   if (!child?.pid) return;

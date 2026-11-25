@@ -4,6 +4,7 @@
 // i forhåndsvisningens dialog og huskes, til projektets pakkefiler ændres.
 const http = require('node:http');
 const { randomBytes, timingSafeEqual } = require('node:crypto');
+const { HELD } = require('./engine-secrets.cjs');
 
 let active = null;
 
@@ -41,11 +42,16 @@ function consentValid(consent, fingerprint) { return Boolean(consent && typeof c
 const WAITS = Object.freeze({ busy: 90_000, install: 300_000, start: 90_000 });
 const PLUGIN_TIMEOUT = WAITS.install + WAITS.start + 60_000;
 
-// Pluginet er selvstændigt: det kender kun broens adresse, nøglen og projektets rod.
-function pluginSource({ url, token, root }) {
+// Pluginfilen kender kun broens adresse og projektets rod. Broens nøgle står ikke i filen, hvor et program med brugerens
+// rettigheder kunne læse den: den kommer med motorens andre hemmeligheder, og pluginet henter den hos nøglepluginet, når AI'en
+// bruger værktøjet (engine-secrets.cjs). Mangler nøglen, kaldes broen ikke.
+function pluginSource({ url, root }) {
   return `import { tool } from '@opencode-ai/plugin';
-const bridge = ${JSON.stringify(url)}, token = ${JSON.stringify(token)}, root = ${JSON.stringify(root)};
+const bridge = ${JSON.stringify(url)}, root = ${JSON.stringify(root)};
+const key = () => globalThis[Symbol.for(${JSON.stringify(HELD)})]?.secrets?.AURA_PREVIEW_TOKEN;
 const call = async (action, stop) => {
+  const token = key();
+  if (!token) throw new Error('Forhåndsvisningens nøgle mangler.');
   const timeout = AbortSignal.timeout(${PLUGIN_TIMEOUT}), signal = stop && AbortSignal.any ? AbortSignal.any([timeout, stop]) : timeout;
   const response = await fetch(bridge, { method: 'POST', headers: { authorization: 'Bearer ' + token, 'content-type': 'application/json' }, body: JSON.stringify({ action, root }), signal, timeout: false });
   return JSON.stringify(await response.json());
