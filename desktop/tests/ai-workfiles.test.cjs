@@ -24,7 +24,7 @@ test('systemprompten peger på den relative mappe og ikke på en absolut sti', (
 });
 
 test('motorprocessen har sin egen temp-mappe i appdata, ikke i projektet', () => {
-  const env = isolatedEnv('/appdata/runtime', {}, 'kode', { commandIsolation: false });
+  const env = isolatedEnv('/appdata/runtime', {}, { commandIsolation: false });
   assert.equal(env.TMPDIR, path.join('/appdata/runtime', 'tmp'));
   assert.equal(env.TEMP, env.TMPDIR); assert.equal(env.TMP, env.TMPDIR);
 });

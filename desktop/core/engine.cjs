@@ -8,6 +8,7 @@ const { randomBytes } = require('node:crypto');
 const { pathToFileURL } = require('node:url');
 const run = promisify(execFile);
 const { EngineEvents } = require('./engine-events.cjs');
+const engineSecrets = require('./engine-secrets.cjs');
 const { setTimeout: delay } = require('node:timers/promises');
 // Skal svare til opencode i runtime-lock.json. En unit-test holder de to ens, så motoren ikke afvises af sin egen version.
 const VERSION = '1.19.5';
@@ -118,7 +119,8 @@ async function writeSkills(directory, skills) {
 function engineConfig(provider, model, permission, buildPermission = null) {
   return { $schema: 'https://opencode.ai/config.json', model: `harness/${model.id}`, small_model: `harness/${model.id}`, enabled_providers: ['harness'], provider: { harness: provider }, permission, agent: { plan: { permission }, laes: { mode: 'primary', description: 'Skrivebeskyttet: læser og svarer, men ændrer ikke noget.', permission }, ...(buildPermission ? { build: { permission: buildPermission } } : {}) }, share: 'disabled', autoupdate: false, snapshot: false, plugin: [], mcp: {}, lsp: false, formatter: false };
 }
-function isolatedEnv(directory, config, password, { commandIsolation = false, tempRoot = null } = {}) {
+// Motorens startmiljø uden hemmeligheder. Adgangskoden og gatewaynøglen kommer ad en anden vej (engine-secrets.cjs).
+function isolatedEnv(directory, config, { commandIsolation = false, tempRoot = null } = {}) {
   const env = {};
   for (const key of ['PATH', 'HOME', 'USERPROFILE', 'SystemRoot', 'WINDIR', 'COMSPEC', 'PATHEXT', 'TEMP', 'TMP', 'TMPDIR', 'LANG']) if (process.env[key]) env[key] = process.env[key];
   // Selve motorprocessen (Bun udpakker et bibliotek på 4,8 MB ved hver start) har sin egen temp-mappe i appdata, aldrig i
@@ -128,7 +130,7 @@ function isolatedEnv(directory, config, password, { commandIsolation = false, te
   // OpenCode søger altid også i HOME/.opencode, selv med projektkonfiguration slået fra.
   // Motorens plugins, pakker og hjælpeprocesser må kun bruge Auras egne mapper.
   env.HOME = path.join(directory, 'home'); env.USERPROFILE = env.HOME;
-  Object.assign(env, { OPENCODE_CONFIG_CONTENT: JSON.stringify(config), OPENCODE_CONFIG_DIR: path.join(directory, 'config'), OPENCODE_SERVER_PASSWORD: password, OPENCODE_SERVER_USERNAME: 'harness', OPENCODE_CLIENT: 'harness' });
+  Object.assign(env, { OPENCODE_CONFIG_CONTENT: JSON.stringify(config), OPENCODE_CONFIG_DIR: path.join(directory, 'config'), OPENCODE_SERVER_USERNAME: 'harness', OPENCODE_CLIENT: 'harness' });
   if (process.platform !== 'win32' && commandIsolation) env.SHELL = '/bin/bash';
   for (const flag of ['DISABLE_PROJECT_CONFIG', 'DISABLE_DEFAULT_PLUGINS', 'DISABLE_EXTERNAL_SKILLS', 'DISABLE_CLAUDE_CODE', 'DISABLE_AUTOUPDATE', 'DISABLE_MODELS_FETCH', 'DISABLE_LSP_DOWNLOAD', 'DISABLE_SHARE', 'DISABLE_EMBEDDED_WEB_UI']) env[`OPENCODE_${flag}`] = 'true';
   // OpenCode tilbyder kun spørgeværktøjet til sine egne klienter. Aura viser spørgsmålene selv, ét ad gangen med klikbare svar.
@@ -333,7 +335,7 @@ async function writeReadGuard(directory, root, references, skills = [], { tempRo
   const pluginPath = path.join(directory, 'read-guard.mjs'), readyPath = path.join(directory, 'read-guard-ready.json'), token = randomBytes(32).toString('hex');
   const selectedFiles = skills.flatMap(skill => skill.files.map(file => path.join(directory, 'config', 'skills', skill.name, file.path)));
   await fs.rm(readyPath, { force: true });
-  const source = `import fs from 'node:fs/promises';\nimport path from 'node:path';\nconst classify = (${createPathClassifier.toString()})(${JSON.stringify(RULES)});\nconst guard = (${createReadGuard.toString()})({ fs, path, root: ${JSON.stringify(root)}, references: ${JSON.stringify(references)}, selectedFiles: ${JSON.stringify(selectedFiles)}, classifyPath: classify, engineRoot: ${JSON.stringify(engineRoot)}, storeRoot: ${JSON.stringify(storeRoot)} });\nconst grepGuard = (${createGrepGuard.toString()})({ fs, path, root: ${JSON.stringify(root)}, classifyPath: classify, engineRoot: ${JSON.stringify(engineRoot)}, storeRoot: ${JSON.stringify(storeRoot)} });\nconst writeGuard = (${createWriteGuard.toString()})({ fs, path, root: ${JSON.stringify(root)} });\nconst tempRoot = ${JSON.stringify(tempRoot)};\nexport const AuraReadProtection = async () => {\n await fs.writeFile(${JSON.stringify(readyPath)}, ${JSON.stringify(JSON.stringify({ token }))}, { mode: 0o600 });\n return {\n 'shell.env': async (_input, output) => {\n  // AI'ens kommandoer arver ikke motorens opsætning (gatewayens midlertidige nøgle og adresse) eller motorens adgangskode, heller ikke\n  // en kommando, der kører uden sandkasse. Miljøet lægges oven på motorens eget, så værdierne tømmes. En kommando uden sandkasse kører\n  // dog med brugerens rettigheder og kan stadig læse dem i motorens egen proces (fx med ps på macOS); det forhindrer kun sandkassen.\n  output.env = { ...output.env, OPENCODE_CONFIG_CONTENT: '', OPENCODE_SERVER_PASSWORD: '', OPENCODE_SERVER_USERNAME: '' };\n  // AI'ens kommandoer bruger projektets .aura/tmp. Sandkassens plugin kommer efter og overskriver miljøet helt.\n  if (tempRoot && !output.env.TMPDIR) output.env = { ...output.env, TMPDIR: tempRoot, TMP: tempRoot, TEMP: tempRoot, NODE_DISABLE_COMPILE_CACHE: '1' };\n },\n 'tool.execute.before': async (input, output) => { await guard(input, output); await writeGuard(input, output); await grepGuard.before(input, output); },\n  'tool.execute.after': async (input, output) => { await grepGuard.after(input, output); }\n };\n};\n`;
+  const source = `import fs from 'node:fs/promises';\nimport path from 'node:path';\nconst classify = (${createPathClassifier.toString()})(${JSON.stringify(RULES)});\nconst guard = (${createReadGuard.toString()})({ fs, path, root: ${JSON.stringify(root)}, references: ${JSON.stringify(references)}, selectedFiles: ${JSON.stringify(selectedFiles)}, classifyPath: classify, engineRoot: ${JSON.stringify(engineRoot)}, storeRoot: ${JSON.stringify(storeRoot)} });\nconst grepGuard = (${createGrepGuard.toString()})({ fs, path, root: ${JSON.stringify(root)}, classifyPath: classify, engineRoot: ${JSON.stringify(engineRoot)}, storeRoot: ${JSON.stringify(storeRoot)} });\nconst writeGuard = (${createWriteGuard.toString()})({ fs, path, root: ${JSON.stringify(root)} });\nconst tempRoot = ${JSON.stringify(tempRoot)};\nexport const AuraReadProtection = async () => {\n await fs.writeFile(${JSON.stringify(readyPath)}, ${JSON.stringify(JSON.stringify({ token }))}, { mode: 0o600 });\n return {\n 'shell.env': async (_input, output) => {\n  // AI'ens kommandoer arver ikke motorens opsætning, adgangskode eller gatewaynøgle, heller ikke en kommando, der kører uden sandkasse.\n  // Miljøet lægges oven på motorens eget, så værdierne tømmes. Nøglepluginet har allerede slettet adgangskoden og gatewaynøglen fra\n  // motorens miljø (engine-secrets.cjs); tømningen her er en ekstra sikring.\n  output.env = { ...output.env, OPENCODE_CONFIG_CONTENT: '', OPENCODE_SERVER_PASSWORD: '', OPENCODE_SERVER_USERNAME: '', AURA_GATEWAY_TOKEN: '' };\n  // AI'ens kommandoer bruger projektets .aura/tmp. Sandkassens plugin kommer efter og overskriver miljøet helt.\n  if (tempRoot && !output.env.TMPDIR) output.env = { ...output.env, TMPDIR: tempRoot, TMP: tempRoot, TEMP: tempRoot, NODE_DISABLE_COMPILE_CACHE: '1' };\n },\n 'tool.execute.before': async (input, output) => { await guard(input, output); await writeGuard(input, output); await grepGuard.before(input, output); },\n  'tool.execute.after': async (input, output) => { await grepGuard.after(input, output); }\n };\n};\n`;
   await fs.writeFile(pluginPath, source, { mode: 0o600 });
   return { pluginURL: pathToFileURL(pluginPath).href, readyPath, token };
 }
@@ -344,7 +346,7 @@ const START_TIMEOUT_MS = 30000, SLOW_START_MS = 10000;
 const SLOW_START_TEXT = 'AI-motoren brugte længere tid end normalt på at starte. Computeren kan være travl, eller et antivirusprogram kan være ved at kontrollere programmet. Vent lidt, og prøv igen.';
 class OpenCodeEngine {
   // resume: en tidligere OpenCode-session for samme samtale. Findes den ikke længere, oprettes en ny.
-  constructor({ root, directory, provider, model, references = [], mode = 'free', skills = [], resume = null, sandbox = null, detached = false, recovery = {}, tempRoot = null, preview = null, startTimeout = START_TIMEOUT_MS, slowStartMs = SLOW_START_MS, onEvent = () => {} }) { Object.assign(this, { startTimeout, slowStartMs, tempRoot, preview, root, directory, provider, model, references, mode, skills, resume, sandbox, detached, recovery, onEvent }); this.promptEpoch = 0; this.closedPermissions = new Set(); this.closedQuestions = new Set(); this.pendingQuestions = new Map(); this.pending = new Map(); this.active = false; this.resumed = false; }
+  constructor({ root, directory, provider, model, references = [], mode = 'free', skills = [], resume = null, sandbox = null, detached = false, recovery = {}, tempRoot = null, preview = null, startTimeout = START_TIMEOUT_MS, slowStartMs = SLOW_START_MS, requireHiddenSecrets = process.platform === 'darwin', onEvent = () => {} }) { Object.assign(this, { startTimeout, slowStartMs, requireHiddenSecrets, tempRoot, preview, root, directory, provider, model, references, mode, skills, resume, sandbox, detached, recovery, onEvent }); this.promptEpoch = 0; this.closedPermissions = new Set(); this.closedQuestions = new Set(); this.pendingQuestions = new Map(); this.pending = new Map(); this.active = false; this.resumed = false; }
   async request(url, method = 'GET', body, signal) {
     const requestSignal = signal || AbortSignal.timeout(15000);
     const response = await fetch(`${this.url}${url}`, { method, headers: { authorization: this.auth, 'content-type': 'application/json', 'x-opencode-directory': encodeURIComponent(this.root) }, body: body === undefined ? undefined : JSON.stringify(body), signal: this.startup ? AbortSignal.any([this.startup.signal, requestSignal]) : requestSignal, redirect: 'error' });
@@ -384,6 +386,8 @@ class OpenCodeEngine {
     signal.throwIfAborted();
     const readGuard = await writeReadGuard(this.directory, this.root, this.references, this.skills, { tempRoot: this.tempRoot });
     signal.throwIfAborted();
+    const secretsPlugin = await engineSecrets.writePlugin(this.directory);
+    signal.throwIfAborted();
     const password = randomBytes(32).toString('hex');
     this.auth = `Basic ${Buffer.from(`harness:${password}`).toString('base64')}`;
     const skillSet = { directory: this.directory, names: this.skills.map(skill => skill.name) };
@@ -402,13 +406,16 @@ class OpenCodeEngine {
       const file = path.join(this.directory, 'config', 'opencode', 'preview-tool.mjs');
       await fs.writeFile(file, require('./preview-bridge.cjs').pluginSource(this.preview), { mode: 0o600 }); previewURL = pathToFileURL(file).href;
     }
-    this.config.plugin = [readGuard.pluginURL, ...(previewURL ? [previewURL] : []), ...(this.sandbox ? [this.sandbox.pluginURL] : [])];
+    // Nøglepluginet indlæses først, så motorens hemmeligheder er skjult og slettet fra dens miljø, før noget andet kører.
+    this.config.plugin = [secretsPlugin.pluginURL, readGuard.pluginURL, ...(previewURL ? [previewURL] : []), ...(this.sandbox ? [this.sandbox.pluginURL] : [])];
     if (/\{(?:env|file):/.test(JSON.stringify(this.config))) throw new Error('Konfigurationen indeholder en ikke tilladt variabelhenvisning.');
     // Terminalklienten styrer Stop via API'et; dens Ctrl+C må ikke også ramme motorens procesgruppe.
-    const args = ['serve', '--hostname', '127.0.0.1', '--port', '0'], env = isolatedEnv(this.directory, this.config, password, { commandIsolation: Boolean(this.sandbox), tempRoot: this.tempRoot });
+    const args = ['serve', '--hostname', '127.0.0.1', '--port', '0'], env = isolatedEnv(this.directory, engineSecrets.withoutToken(this.config), { commandIsolation: Boolean(this.sandbox), tempRoot: this.tempRoot });
+    const secrets = engineSecrets.secretEnv(password, this.provider?.options?.apiKey);
     this.enginePID = null; const startedAt = Date.now(); this.startMs = null; this.slowStart = false;
     signal.throwIfAborted();
-    if (process.platform === 'win32') this.child = spawn(executable, args, { cwd: this.root, env, detached: this.detached, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+    // Windows har ingen vagtproces; dér står hemmelighederne i motorens startmiljø, indtil nøglepluginet sletter dem fra dens kopi.
+    if (process.platform === 'win32') this.child = spawn(executable, args, { cwd: this.root, env: { ...env, ...secrets }, detached: this.detached, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
     else {
       // På macOS og Linux startes OpenCode gennem en vagtproces, så motoren også stopper, hvis Aura eller CLI'en
       // forsvinder brat. Vagtprocessen kører med appens egen Node eller Electron som Node. Efter forslag i #31.
@@ -419,6 +426,9 @@ class OpenCodeEngine {
       const program = await guardedProgram(executable);
       signal.throwIfAborted();
       this.child = spawn(node, [guardian, program, ...args], { cwd: this.root, env: { ...env, ELECTRON_RUN_AS_NODE: '1' }, detached: true, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe', 'ipc'] });
+      // Hemmelighederne går gennem den private IPC-forbindelse, ikke gennem vagtprocessens miljø, hvor ps kunne se dem.
+      // Fejler afsendelsen, er vagtprocessen allerede væk, og dens exit afviser starten.
+      try { this.child.send({ type: 'secrets', env: secrets }, () => {}); } catch { /* Se ovenfor. */ }
     }
     // Ingen rå proceslogs sendes til UI; de kan indeholde projektindhold.
     const child = this.child;
@@ -463,6 +473,12 @@ class OpenCodeEngine {
         const ready = await fs.readFile(this.sandbox.readyPath, 'utf8').then(JSON.parse).catch(() => null);
         if (ready?.token !== this.sandbox.readyToken || ready?.identity !== this.sandbox.identity) throw new Error('Kommandobeskyttelsen blev ikke indlæst. Opgaven blev ikke startet.');
       }
+      await engineSecrets.verify(secretsPlugin, { expected: Object.keys(secrets), requireHidden: this.requireHiddenSecrets });
+      signal.throwIfAborted();
+      // Motoren skal kræve sin adgangskode. Har OpenCode ikke fået den, svarer den alle programmer på computeren.
+      const unauthenticated = await fetch(`${this.url}/config`, { headers: { 'x-opencode-directory': encodeURIComponent(this.root) }, redirect: 'error', signal: AbortSignal.any([signal, AbortSignal.timeout(15000)]) }).then(response => response.status, () => 0);
+      signal.throwIfAborted();
+      if (unauthenticated !== 401) throw new Error('Agentmotoren krævede ikke sin adgangskode. Opgaven blev ikke startet.');
       await this.openSession();
       signal.throwIfAborted();
       this.active = true;

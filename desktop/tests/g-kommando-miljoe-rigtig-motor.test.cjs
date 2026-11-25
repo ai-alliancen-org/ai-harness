@@ -1,8 +1,8 @@
 // RN:B1-2, skeptikerens fund efter G1 og G2: verify-multi-project.cjs kørte «kommandoen uden sandkasse» i en motor, der var startet med
 // sandkassen, hvor env -i tømmer miljøet i forvejen. Vagten kunne derfor ikke fyre. Her kører den rigtige OpenCode (den låste version)
 // gennem Auras gateway med en lokal falsk model og UDEN sandkasse. Modellen beder om en kommando, prøven godkender den én gang, og
-// kommandoen skriver, om den kan se motorens opsætning (OPENCODE_CONFIG_CONTENT, med gatewayens midlertidige adgang) og motorens
-// adgangskode (OPENCODE_SERVER_PASSWORD). PATH viser, at kommandoen har motorens øvrige miljø. Prøven kræver den forberedte runtime
+// kommandoen skriver, om den kan se motorens opsætning (OPENCODE_CONFIG_CONTENT), motorens adgangskode (OPENCODE_SERVER_PASSWORD) og
+// gatewayens midlertidige nøgle (AURA_GATEWAY_TOKEN). PATH viser, at kommandoen har motorens øvrige miljø. Prøven kræver den forberedte runtime
 // (npm run runtime:prepare); uden den springes den over. Intet forlader maskinen.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
@@ -16,7 +16,7 @@ const connections = require('../core/connections.cjs');
 
 const binary = path.join(__dirname, '..', '.runtime', `${process.platform}-${process.arch}`, 'opencode', 'bin', process.platform === 'win32' ? 'opencode.exe' : 'opencode');
 const real = { skip: process.platform === 'win32' || !require('node:fs').existsSync(binary) ? 'den forberedte OpenCode-runtime findes ikke' : false, timeout: 120_000 };
-const KOMMANDO = `printf '%s|%s|%s' "\${OPENCODE_CONFIG_CONTENT:+ja}" "\${OPENCODE_SERVER_PASSWORD:+ja}" "\${PATH:+ja}" > miljoe.txt`;
+const KOMMANDO = `printf '%s|%s|%s|%s' "\${OPENCODE_CONFIG_CONTENT:+ja}" "\${OPENCODE_SERVER_PASSWORD:+ja}" "\${AURA_GATEWAY_TOKEN:+ja}" "\${PATH:+ja}" > miljoe.txt`;
 
 function ramme(delta, finish) {
   const base = { id: 'x', object: 'chat.completion.chunk', created: 1, model: 'falsk', choices: [{ index: 0, delta: { role: 'assistant', ...delta }, finish_reason: null }] };
@@ -36,7 +36,7 @@ async function falskModel(root) {
   return server;
 }
 
-test('en kommando, der godkendes én gang uden sandkasse, arver hverken motorens opsætning eller adgangskode', real, async t => {
+test('en kommando, der godkendes én gang uden sandkasse, arver hverken motorens opsætning, adgangskode eller gatewaynøgle', real, async t => {
   const dir = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), 'aura-kommando-miljoe-'))); t.after(() => fs.rm(dir, { recursive: true, force: true }));
   const root = path.join(dir, 'projekt'); await fs.mkdir(root);
   const server = await falskModel(root); t.after(() => { server.closeAllConnections(); server.close(); });
@@ -55,5 +55,5 @@ test('en kommando, der godkendes én gang uden sandkasse, arver hverken motorens
   let vagt; const slutning = await Promise.race([færdig, new Promise(resolve => { vagt = setTimeout(() => resolve('hang'), 90_000); })]); clearTimeout(vagt);
   assert.equal(slutning, 'session.idle', JSON.stringify(hændelser.slice(-20)));
   assert.equal(godkendt.length, 1, 'kommandoen blev godkendt én gang af prøven');
-  assert.equal(await fs.readFile(path.join(root, 'miljoe.txt'), 'utf8'), '||ja', 'OPENCODE_CONFIG_CONTENT og OPENCODE_SERVER_PASSWORD er tomme; PATH er der');
+  assert.equal(await fs.readFile(path.join(root, 'miljoe.txt'), 'utf8'), '|||ja', 'OPENCODE_CONFIG_CONTENT, OPENCODE_SERVER_PASSWORD og AURA_GATEWAY_TOKEN er tomme; PATH er der');
 });

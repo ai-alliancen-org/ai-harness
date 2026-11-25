@@ -1,8 +1,29 @@
 # Teststatus før invitation
 
-Senest kontrolleret 20. november 2026. Afsnittene er daterede, så tidligere begrænsninger kan læses i deres sammenhæng. Dette er status for den aktuelle arbejdsmappe, ikke en erklæring om, at alle installationsfiler eller modeller er klar. Særskilt godkendte Git-handlinger, udgivelser og GitHub-kørsler fremgår af de enkelte afsnit.
+Senest kontrolleret 25. november 2026. Afsnittene er daterede, så tidligere begrænsninger kan læses i deres sammenhæng. Dette er status for den aktuelle arbejdsmappe, ikke en erklæring om, at alle installationsfiler eller modeller er klar. Særskilt godkendte Git-handlinger, udgivelser og GitHub-kørsler fremgår af de enkelte afsnit.
 
 [Gennemgangen før offentlig beta](offentliggoerelse.md) samler historik- og logkontrol samt de lokale prøver af README, hjemmeside og udgivelseskontrol. Den offentliggør ikke appen og ændrer ikke installationsstatus nedenfor.
+
+## Beta 5: motorens nøgler skjules · 25. november 2026
+
+Kun Node-prøver; ingen Electron-kørsel. Arbejdsmappen er `codex/release-0.7.0-beta.4` (samme indhold som `main`) med ændringerne uden commit. Beslutningen står i `decisions.md`, «Beta 5 · motorens nøgler skjules for andre programmer».
+
+**Forundersøgelse mod den rigtige OpenCode 1.19.5 (macOS 27.2, Apple Silicon), med midlertidige mapper og en falsk gateway.**
+
+- `ps eww` viser startmiljøet for en anden proces med samme bruger, undtagen Apples egne programmer. Motoren er ikke beskyttet.
+- Motoren indlæser hverken `bunfig.toml` (preload), `.env`, `.env.local`, `.env.production` eller `BUN_OPTIONS` fra arbejdsmappen. Samme værdi i det rigtige miljø virker. Der er altså ingen anden vej ind for adgangskoden end miljøet.
+- OpenCode læser adgangskoden én gang ved start. Efter overskrivning og sletning i pluginet giver et kald med adgangskode 200 og uden 401, også efter en genindlæsning af instansen. Den overskrevne værdi brugt som adgangskode giver 401.
+- OpenCode genlæser `OPENCODE_CONFIG_CONTENT` ved hver indlæsning af instansen, og `rg` arver motorens kopi af miljøet. Derfor står gatewaynøglen ikke længere i opsætningen.
+- Med gatewaynøglen gennem config-hooket viser `/config` den rigtige nøgle, og to modelkald (før og efter en genindlæsning) når gatewayen med den rigtige nøgle.
+
+**Prøver.**
+
+- Nye: `motorens-noegler.test.cjs` (4), to i `engine-guardian.test.cjs` og `g-motorens-noegler-rigtig-motor.test.cjs` mod den rigtige motor. Udvidet: `g-kommando-miljoe-rigtig-motor.test.cjs` (også gatewaynøglen), `engine-start.test.cjs`, `engine-shell-env.test.cjs` og `engine-start-cancellation.test.cjs`, hvor den falske motor nu kræver sin adgangskode og kører nøglepluginets config-hook.
+- Mod den gamle `engine.cjs` og `engine-guardian.cjs` fejler prøven mod den rigtige motor, de to nye vagtprøver (den ene ved tidsgrænsen) og den nye påstand i `engine-start.test.cjs`.
+- De 11 berørte filer: 69 prøver bestod. Mod den rigtige motor: `g-motorens-noegler-rigtig-motor` 1 af 1, `g-kommando-miljoe-rigtig-motor` 1 af 1 og `m3-opencode-real` 9 af 9.
+- Hele desktop-suiten (`npm test` i `desktop/`): 1.616 af 1.616 bestod. CLI-suiten (`npm run test:cli`): 120 bestod, ingen fejlede, og 4 er sprunget over som før (valgfrie eller platformsbestemte). Begge kørte med lav prioritet, i alt 224 sekunder.
+
+**Ikke prøvet.** Electron-flowet (`verify-*.cjs`), den pakkede app, Linux og Windows.
 
 ## Offentlig desktopbeta 0.7.0-beta.4 · 20. november 2026
 
